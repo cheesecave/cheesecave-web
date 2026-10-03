@@ -2,8 +2,9 @@
 <template>
   <div
     class="app-shell w-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors flex flex-col"
+    :class="{ 'workspace-shell': isWorkspaceHome }"
   >
-    <TheHeader class="shrink-0" />
+    <TheHeader class="shrink-0" :expanded="isWorkspaceHome" />
     <PageScrollArea>
       <main class="flex-1 min-w-0">
         <RouterView v-slot="{ Component, route }">
@@ -12,7 +13,7 @@
           </keep-alive>
         </RouterView>
       </main>
-      <TheFooter />
+      <TheFooter v-if="!isWorkspaceHome" />
     </PageScrollArea>
   </div>
 </template>
@@ -21,6 +22,14 @@
 import TheHeader from "@/components/layout/TheHeader.vue";
 import TheFooter from "@/components/layout/TheFooter.vue";
 import PageScrollArea from "@/components/layout/PageScrollArea.vue";
+import { computed } from "vue";
+import { useAuthStore } from "@/stores/auth";
+
+const route = useRoute();
+const authStore = useAuthStore();
+const isWorkspaceHome = computed(
+  () => authStore.isAuthenticated && route.path === "/",
+);
 
 // Theme is applied early via inline script in index.html to prevent flash
 // No need to initialize here
@@ -45,8 +54,14 @@ function getRouteKey(route) {
 
 <style scoped>
 .app-shell {
+  --site-header-height: 65px;
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
+}
+@media (max-width: 767px) {
+  .app-shell {
+    --site-header-height: 49px;
+  }
 }
 </style>

@@ -42,8 +42,9 @@ describe("TheHeader", () => {
     setActivePinia(createPinia());
   });
 
-  function mountHeader() {
+  function mountHeader(props = {}) {
     return mount(TheHeader, {
+      props,
       global: {
         mocks: {
           $router: mocks.router,
@@ -55,6 +56,23 @@ describe("TheHeader", () => {
       },
     });
   }
+
+  it("expands navigation width for the workspace without affecting other pages", async () => {
+    const wrapper = mountHeader();
+    expect(wrapper.get(".container-main").classes()).not.toContain(
+      "workspace-header",
+    );
+    await wrapper.setProps({ expanded: true });
+    expect(wrapper.get(".container-main").classes()).toContain(
+      "workspace-header",
+    );
+    expect(wrapper.text()).toContain("Models");
+    await wrapper.setProps({ expanded: false });
+    expect(wrapper.get(".container-main").classes()).not.toContain(
+      "workspace-header",
+    );
+    wrapper.unmount();
+  });
 
   it("renders visitor navigation and toggles theme", async () => {
     const themeStore = useThemeStore();

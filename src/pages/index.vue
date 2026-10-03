@@ -1,39 +1,13 @@
 <!-- src/pages/index.vue -->
 <template>
-  <div>
-    <!-- Hero Section -->
-    <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
-      <div class="container-main py-8 md:py-16 text-center">
-        <h1 class="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-          Welcome to CheeseCave
-        </h1>
-        <p class="text-base md:text-lg lg:text-xl mb-6 md:mb-8 px-4">
-          Self-hosted HuggingFace Hub alternative for your AI models and
-          datasets
-        </p>
-        <div class="flex flex-col sm:flex-row gap-2 justify-center px-4">
-          <el-button
-            size="large"
-            type="default"
-            class="!bg-white !text-gray-900 hover:!bg-gray-100 !font-semibold !shadow-lg"
-            @click="$router.push('/get-started')"
-          >
-            Get Started
-          </el-button>
-          <div class="w-0 h-0 p-0 m-0"></div>
-          <el-button
-            size="large"
-            class="!bg-transparent !text-white !border-white !border-2 hover:!bg-white/20 !font-semibold"
-            @click="$router.push('/self-hosted')"
-          >
-            Host Your Own Hub
-          </el-button>
-        </div>
-      </div>
-    </div>
-
+  <div :class="{ 'workspace-home': isAuthenticated }">
+    <WorkspacePanel v-if="isAuthenticated" />
+    <HomepageHero v-else :config="homepage" full-screen />
     <!-- Recent Repos - Three Columns -->
-    <div class="container-main py-8">
+    <div
+      v-if="!isAuthenticated && homepage.show_repositories"
+      class="container-main discovery-section py-8"
+    >
       <div class="flex flex-col gap-4 mb-6 md:mb-8 md:flex-row md:items-center">
         <h2 class="text-2xl md:text-3xl font-bold">
           {{ repoSectionTitle }}
@@ -233,6 +207,9 @@
 </template>
 
 <script setup>
+import HomepageHero from "../shared/components/HomepageHero.vue";
+import WorkspacePanel from "@/components/home/WorkspacePanel.vue";
+import { DEFAULT_HOMEPAGE, fetchHomepage } from "../shared/site-homepage.js";
 import { repoAPI } from "@/utils/api";
 import { useAuthStore } from "@/stores/auth";
 import { formatRelativeTime } from "@/utils/datetime";
@@ -245,12 +222,18 @@ import { ElMessage } from "element-plus";
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
-const { isAuthenticated } = storeToRefs(authStore);
+const { isAuthenticated, username } = storeToRefs(authStore);
+
+const homepage = ref({ ...DEFAULT_HOMEPAGE });
+const homepageController = new AbortController();
+onBeforeUnmount(() => homepageController.abort());
 
 const stats = ref({ models: 0, datasets: 0, spaces: 0 });
 const recentModels = ref([]);
 const recentDatasets = ref([]);
 const recentSpaces = ref([]);
+let discoveryVersion = 0;
+const homepageLoaded = ref(false);
 const selectedSort = ref(
   getRepoSortPreference({
     scope: "home",
@@ -289,6 +272,7 @@ function goToRepo(type, repo) {
 }
 
 async function loadStats() {
+  const version = ++discoveryVersion;
   try {
     const [models, datasets, spaces] = await Promise.all([
       repoAPI.listRepos("model", {
@@ -308,6 +292,8 @@ async function loadStats() {
       }),
     ]);
 
+    if (version !== discoveryVersion || homepageController.signal.aborted)
+      return;
     stats.value = {
       models: models.data.length,
       datasets: datasets.data.length,
@@ -329,10 +315,24 @@ watch(selectedSort, () => {
     repoType: "all",
     value: selectedSort.value,
   });
-  loadStats();
+  if (!isAuthenticated.value && homepage.value.show_repositories) loadStats();
 });
 
-onMounted(() => {
+watch(username, () => {
+  ++discoveryVersion;
+  recentModels.value = [];
+  recentDatasets.value = [];
+  recentSpaces.value = [];
+  stats.value = { models: 0, datasets: 0, spaces: 0 };
+  if (
+    homepageLoaded.value &&
+    !isAuthenticated.value &&
+    homepage.value.show_repositories
+  )
+    loadStats();
+});
+
+onMounted(async () => {
   // Check for verification error messages in query params
   if (route.query.error) {
     const errorType = route.query.error;
@@ -348,6 +348,43 @@ onMounted(() => {
     }
   }
 
-  loadStats();
+  try {
+    homepage.value = await fetchHomepage({ signal: homepageController.signal });
+  } catch {
+    // Bundled defaults keep the page usable when configuration is unavailable.
+  }
+  homepageLoaded.value = true;
+  if (
+    !homepageController.signal.aborted &&
+    !isAuthenticated.value &&
+    homepage.value.show_repositories
+  )
+    loadStats();
 });
 </script>
+
+<style scoped>
+.workspace-home {
+  min-height: calc(100dvh - var(--site-header-height, 64px));
+}
+.discovery-section {
+  padding-bottom: 48px;
+}
+.discovery-section h2 {
+  font-size: 24px;
+  letter-spacing: -0.025em;
+}
+.discovery-section h3 {
+  font-size: 16px;
+  font-weight: 650;
+}
+.discovery-section .card {
+  border-radius: 12px;
+  padding: 18px;
+}
+@media (max-width: 700px) {
+  .discovery-section h2 {
+    font-size: 20px;
+  }
+}
+</style>

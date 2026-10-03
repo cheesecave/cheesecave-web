@@ -67,5 +67,6 @@ declare module 'vue' {
     TarMemberThumbnail: typeof import('./components/repo/preview/TarMemberThumbnail.vue')['default']
     TheFooter: typeof import('./components/layout/TheFooter.vue')['default']
     TheHeader: typeof import('./components/layout/TheHeader.vue')['default']
+    WorkspacePanel: typeof import('./components/home/WorkspacePanel.vue')['default']
   }
 }

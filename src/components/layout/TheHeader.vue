@@ -4,7 +4,10 @@
     class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 transition-colors"
     style="z-index: 1000"
   >
-    <div class="container-main flex items-center justify-between h-12 md:h-16">
+    <div
+      class="container-main flex items-center justify-between h-12 md:h-16"
+      :class="{ 'workspace-header': expanded }"
+    >
       <!-- Logo -->
       <RouterLink
         to="/"
@@ -393,6 +396,7 @@
 </template>
 
 <script setup>
+defineProps({ expanded: { type: Boolean, default: false } });
 import { storeToRefs } from "pinia";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
@@ -443,6 +447,15 @@ async function handleLogout() {
 </script>
 
 <style scoped>
+.workspace-header {
+  max-width: none;
+  padding-inline: 24px;
+}
+@media (max-width: 767px) {
+  .workspace-header {
+    padding-inline: 16px;
+  }
+}
 /* Ensure mobile menu buttons have proper touch targets */
 @media (max-width: 768px) {
   :deep(.el-button) {
