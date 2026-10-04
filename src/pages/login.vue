@@ -2,7 +2,7 @@
 <template>
   <div class="min-h-[calc(100vh-16rem)] flex items-center justify-center">
     <div class="card w-full max-w-md">
-      <h1 class="text-2xl font-bold mb-6 text-center">Login to KohakuHub</h1>
+      <h1 class="text-2xl font-bold mb-6 text-center">Login to CheeseCave</h1>
 
       <el-form
         ref="formRef"

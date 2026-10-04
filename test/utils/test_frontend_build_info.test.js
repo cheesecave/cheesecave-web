@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { getFrontendBuildInfo } from "../../../scripts/frontend-build-info.mjs";
+import { getFrontendBuildInfo } from "../../scripts/frontend-build-info.mjs";
 
 const temporaryRoots = [];
 const unknownBuild = { commit: "unknown", dirty: false };

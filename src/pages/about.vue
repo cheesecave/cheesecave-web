@@ -2,13 +2,15 @@
 <script setup>
 import MarkdownPage from "@/components/common/MarkdownPage.vue";
 
-const content = `# About KohakuHub
+const content = `# About CheeseCave
 
-## What is KohakuHub?
+CheeseCave is derived from [KohakuHub](https://github.com/KohakuBlueleaf/KohakuHub), including the [DeepGHS fork](https://github.com/deepghs/KohakuHub). Original authorship and license notices are retained.
 
-KohakuHub is a self-hosted, open-source alternative to HuggingFace Hub, designed to give you complete control over your AI models, datasets, and applications. Built with modern web technologies, KohakuHub provides a powerful platform for hosting and sharing machine learning resources within your organization or community.
+## What is CheeseCave?
 
-## Why KohakuHub?
+CheeseCave is a self-hosted, open-source alternative to HuggingFace Hub, designed to give you complete control over your AI models, datasets, and applications. Built with modern web technologies, CheeseCave provides a powerful platform for hosting and sharing machine learning resources within your organization or community.
+
+## Why CheeseCave?
 
 ### 🔒 Self-Hosted Control
 
@@ -56,7 +58,7 @@ KohakuHub is a self-hosted, open-source alternative to HuggingFace Hub, designed
 
 ## Technology Stack
 
-KohakuHub is built with:
+CheeseCave is built with:
 
 ### Frontend
 - **Vue 3**: Progressive JavaScript framework
@@ -75,7 +77,7 @@ KohakuHub is built with:
 
 ## Project History
 
-KohakuHub was created to address the growing need for self-hosted machine learning model repositories. As AI models become increasingly important business assets, organizations need the ability to maintain complete control over their data while still benefiting from collaborative workflows.
+CheeseCave was created to address the growing need for self-hosted machine learning model repositories. As AI models become increasingly important business assets, organizations need the ability to maintain complete control over their data while still benefiting from collaborative workflows.
 
 The project aims to provide an enterprise-ready alternative to cloud-based ML platforms, with a focus on:
 
@@ -98,7 +100,7 @@ We welcome contributions from the community! Here's how you can participate:
 
 ### Connect With Us
 
-- **GitHub**: [KohakuBlueleaf/Kohaku-Hub](https://github.com/KohakuBlueleaf/Kohaku-Hub)
+- **GitHub**: [cheesecave/cheesecave-web](https://github.com/cheesecave/cheesecave-web)
 - **Discord**: [Join our community](https://discord.gg/xWYrkyvJ2s)
 - **Documentation**: Coming soon
 - **Discussions**: GitHub Discussions
@@ -135,7 +137,7 @@ We welcome contributions from the community! Here's how you can participate:
 
 ## Roadmap
 
-We're constantly working to improve KohakuHub. Upcoming features include:
+We're constantly working to improve CheeseCave. Upcoming features include:
 
 - **Model Cards**: Structured documentation for models
 - **Dataset Viewers**: Built-in preview for common formats
@@ -149,7 +151,7 @@ We're constantly working to improve KohakuHub. Upcoming features include:
 
 ### Self-Hosted Support
 
-KohakuHub is designed to be self-hosted. For installation and configuration help:
+CheeseCave is designed to be self-hosted. For installation and configuration help:
 
 - Check our documentation
 - Join our Discord community
@@ -161,7 +163,7 @@ Looking for enterprise support, custom development, or professional services? Co
 
 ## License
 
-KohakuHub is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+CheeseCave is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
 
 This means you are free to:
 - ✅ Use the software commercially
@@ -177,18 +179,20 @@ With the conditions that:
 
 ## Credits
 
-KohakuHub is maintained by:
-- **KohakuBlueleaf** - Project creator and lead developer
+CheeseCave is maintained by the CheeseCave project.
+
+Upstream KohakuHub was created and maintained by:
+- **KohakuBlueleaf** - Original project creator and lead developer
 
 Special thanks to all contributors and the open-source community for their invaluable support.
 
 ## Acknowledgments
 
-This project is inspired by HuggingFace Hub and built with the goal of providing a self-hosted alternative. We're grateful to the entire ML and open-source communities for their contributions to the tools and libraries that make KohakuHub possible.
+This project is inspired by HuggingFace Hub and built with the goal of providing a self-hosted alternative. We're grateful to the entire ML and open-source communities for their contributions to the tools and libraries that make CheeseCave possible.
 
 ---
 
-**Ready to get started?** Check out our [GitHub repository](https://github.com/KohakuBlueleaf/Kohaku-Hub) for installation instructions and documentation.
+**Ready to get started?** Check out our [GitHub repository](https://github.com/cheesecave/cheesecave-web) for installation instructions and documentation.
 `;
 </script>
 

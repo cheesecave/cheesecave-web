@@ -3,9 +3,9 @@ import MarkdownPage from "@/components/common/MarkdownPage.vue";
 
 const baseUrl = window.location.origin;
 
-const content = `# Get Started with KohakuHub
+const content = `# Get Started with CheeseCave
 
-Welcome to KohakuHub - your self-hosted AI model and dataset hub! This guide covers everything from account creation to advanced features.
+Welcome to CheeseCave - your self-hosted AI model and dataset hub! This guide covers everything from account creation to advanced features.
 
 ---
 
@@ -41,7 +41,7 @@ Welcome to KohakuHub - your self-hosted AI model and dataset hub! This guide cov
 ### Environment Setup
 
 \`\`\`bash
-# Point all HuggingFace tools to this KohakuHub instance
+# Point all HuggingFace tools to this CheeseCave instance
 export HF_ENDPOINT=${baseUrl}
 export HF_TOKEN=your_access_token_here
 
@@ -72,8 +72,8 @@ huggingface-cli repo create username/my-model --type model
 
 \`\`\`bash
 # Install (from source)
-git clone https://github.com/KohakuBlueleaf/KohakuHub
-cd KohakuHub
+git clone https://github.com/cheesecave/cheesecave-backend
+cd cheesecave-backend
 pip install -e .
 
 # Interactive TUI mode
@@ -456,7 +456,7 @@ curl ${baseUrl}/api/quota/username/public
 
 - **API Docs:** ${baseUrl}/docs
 - **Admin Portal:** ${baseUrl}/admin
-- **GitHub:** https://github.com/KohakuBlueleaf/KohakuHub
+- **GitHub:** https://github.com/cheesecave/cheesecave-web
 - **Discord:** https://discord.gg/xWYrkyvJ2s
 - **Documentation:** ${baseUrl}/docs
 

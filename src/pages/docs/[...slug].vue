@@ -231,7 +231,7 @@ watch(
     <div class="max-w-6xl mx-auto">
       <h1 class="text-4xl font-bold mb-4">Documentation</h1>
       <p class="text-xl text-gray-600 dark:text-gray-400 mb-8">
-        Everything you need to know about KohakuHub
+        Everything you need to know about CheeseCave
       </p>
 
       <!-- Main Sections -->

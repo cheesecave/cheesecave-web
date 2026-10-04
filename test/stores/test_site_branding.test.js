@@ -11,7 +11,7 @@ import {
   normalizeBranding,
   readCachedBranding,
   saveCachedBranding,
-} from "../../../src/shared/site-branding.js";
+} from "../../src/shared/site-branding.js";
 
 const png =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==";
@@ -86,7 +86,7 @@ describe("site branding resilience", () => {
     const store = useSiteBrandingStore();
     const dispose = store.initialize();
     expect(store.branding).toEqual(DEFAULT_BRANDING);
-    expect(document.title).toBe("KohakuHub");
+    expect(document.title).toBe("CheeseCave");
     expect(
       document.querySelector('link[rel="icon"]').getAttribute("href"),
     ).toBe("/favicon.svg");
@@ -431,7 +431,7 @@ describe("site branding resilience", () => {
         .getAttribute("href"),
     ).toBe(png);
     applyDocumentBranding(DEFAULT_BRANDING, { admin: true });
-    expect(document.title).toBe("KohakuHub Admin Portal");
+    expect(document.title).toBe("CheeseCave Admin Portal");
     expect(
       document.querySelector('link[rel="icon"]').getAttribute("href"),
     ).toBe("/admin/favicon.svg");

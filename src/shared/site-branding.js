@@ -5,7 +5,7 @@ import { getGifLoop } from "./gif-branding.js";
 export { getGifLoop };
 export const CACHE_KEY = "kohakuhub.site-branding.v1";
 export const DEFAULT_BRANDING = Object.freeze({
-  site_name: "KohakuHub",
+  site_name: "CheeseCave",
   footer_description: "Self-hosted HuggingFace Hub alternative",
   header_logo: null,
   favicon: null,

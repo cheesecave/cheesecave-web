@@ -81,7 +81,7 @@ const legacyDocs = [
       <div class="mb-8">
         <h1 class="text-4xl font-bold mb-4">Documentation</h1>
         <p class="text-xl text-gray-600 dark:text-gray-400">
-          Everything you need to know about KohakuHub
+          Everything you need to know about CheeseCave
         </p>
       </div>
 
@@ -134,7 +134,7 @@ const legacyDocs = [
             Join Discord
           </a>
           <a
-            href="https://github.com/KohakuBlueleaf/KohakuHub"
+            href="https://github.com/cheesecave/cheesecave-web"
             target="_blank"
             class="flex items-center gap-2 text-primary-600 dark:text-primary-400 hover:underline"
           >

@@ -26,3 +26,11 @@ public/CONTRIBUTING.md
 *.njsproj
 *.sln
 *.sw?
+
+coverage/
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.pyc

@@ -22,7 +22,7 @@ describe("TheFooter", () => {
     );
     const link = version.get("a");
     expect(link.attributes("href")).toBe(
-      `https://github.com/deepghs/KohakuHub/commit/${commit}`,
+      `https://github.com/cheesecave/cheesecave-web/commit/${commit}`,
     );
     expect(link.attributes("target")).toBe("_blank");
     expect(link.attributes("rel")).toBe("noopener noreferrer");
@@ -41,7 +41,7 @@ describe("TheFooter", () => {
     const wrapper = mount(TheFooter);
 
     expect(wrapper.findAll("h3").map((heading) => heading.text())).toEqual([
-      "KohakuHub",
+      "CheeseCave",
       "Resources",
       "Start",
       "Community",
@@ -75,7 +75,9 @@ describe("TheFooter", () => {
     ).toBe("DeepGHS");
     expect(
       originalLine
-        .get('a[href="https://github.com/deepghs/KohakuHub/blob/main/LICENSE"]')
+        .get(
+          'a[href="https://github.com/cheesecave/cheesecave-web/blob/main/LICENSE"]',
+        )
         .text(),
     ).toBe("AGPL-3.0");
     expect(
@@ -96,10 +98,11 @@ describe("TheFooter", () => {
         "/self-hosted",
         "/terms",
         "/privacy",
+        "https://github.com/cheesecave/cheesecave-web",
         "https://github.com/KohakuBlueleaf/KohakuHub",
         "https://discord.gg/xWYrkyvJ2s",
         "https://github.com/deepghs/KohakuHub",
-        "https://github.com/deepghs/KohakuHub/issues",
+        "https://github.com/cheesecave/cheesecave-web/issues",
       ]),
     );
   });

@@ -15,10 +15,10 @@ import { describe, expect, it } from "vitest";
 // future component fails the suite instead of leaking out.
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC_ROOT = resolve(__dirname, "../../../src/kohaku-hub-ui/src");
+const SRC_ROOT = resolve(__dirname, "../../src");
 const CARBON_INDEX = resolve(
   __dirname,
-  "../../../src/kohaku-hub-ui/node_modules/@iconify-json/carbon/icons.json",
+  "../../node_modules/@iconify-json/carbon/icons.json",
 );
 
 function walk(dir, exts) {

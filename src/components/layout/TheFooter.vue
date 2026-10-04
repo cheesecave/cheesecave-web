@@ -17,7 +17,7 @@ const versionTitle =
 const commitUrl =
   buildInfo.commit === "unknown"
     ? null
-    : `https://github.com/deepghs/KohakuHub/commit/${buildInfo.commit}`;
+    : `https://github.com/cheesecave/cheesecave-web/commit/${buildInfo.commit}`;
 </script>
 
 <template>
@@ -75,7 +75,7 @@ const commitUrl =
           <h3 class="font-semibold mb-3">Community</h3>
           <div class="flex flex-col gap-2 text-sm">
             <a
-              href="https://github.com/KohakuBlueleaf/KohakuHub"
+              href="https://github.com/cheesecave/cheesecave-web"
               target="_blank"
               rel="noopener noreferrer"
               class="text-gray-600 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
@@ -99,7 +99,7 @@ const commitUrl =
               DeepGHS fork
             </a>
             <a
-              href="https://github.com/deepghs/KohakuHub/issues"
+              href="https://github.com/cheesecave/cheesecave-web/issues"
               target="_blank"
               rel="noopener noreferrer"
               class="text-gray-600 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
@@ -150,7 +150,7 @@ const commitUrl =
             >KohakuHub</a
           >. Licensed under
           <a
-            href="https://github.com/deepghs/KohakuHub/blob/main/LICENSE"
+            href="https://github.com/cheesecave/cheesecave-web/blob/main/LICENSE"
             target="_blank"
             rel="noopener noreferrer"
             class="font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 underline underline-offset-2 transition-colors"

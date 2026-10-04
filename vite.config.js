@@ -1,57 +1,57 @@
-// src/kohaku-hub-ui/vite.config.js
-import { fileURLToPath, URL } from 'node:url'
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import VueRouter from 'unplugin-vue-router/vite'
-import AutoImport from 'unplugin-auto-import/vite'
-import Components from 'unplugin-vue-components/vite'
-import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
-import UnoCSS from 'unocss/vite'
-import { getFrontendBuildInfo } from '../../scripts/frontend-build-info.mjs'
+// Standalone CheeseCave web application.
+import { fileURLToPath, URL } from "node:url";
+import { defineConfig } from "vite";
+import vue from "@vitejs/plugin-vue";
+import VueRouter from "unplugin-vue-router/vite";
+import AutoImport from "unplugin-auto-import/vite";
+import Components from "unplugin-vue-components/vite";
+import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
+import UnoCSS from "unocss/vite";
+import { getFrontendBuildInfo } from "./scripts/frontend-build-info.mjs";
 
 export default defineConfig({
   define: {
-    __BUILD_INFO__: JSON.stringify(getFrontendBuildInfo())
+    __BUILD_INFO__: JSON.stringify(getFrontendBuildInfo()),
   },
   plugins: [
     // Must be before Vue plugin
     VueRouter({
-      routesFolder: 'src/pages',
-      dts: 'src/typed-router.d.ts',
-      extensions: ['.vue'],
-      exclude: ['**/components/**']
+      routesFolder: "src/pages",
+      dts: "src/typed-router.d.ts",
+      extensions: [".vue"],
+      exclude: ["**/components/**"],
     }),
 
     vue({
       template: {
         compilerOptions: {
           // Treat cropper custom elements as custom elements, not Vue components
-          isCustomElement: (tag) => tag.startsWith('cropper-')
-        }
-      }
+          isCustomElement: (tag) => tag.startsWith("cropper-"),
+        },
+      },
     }),
 
     // Auto import APIs
     AutoImport({
       imports: [
-        'vue',
-        'pinia',
+        "vue",
+        "pinia",
         {
-          'vue-router': [
-            'onBeforeRouteLeave',
-            'onBeforeRouteUpdate',
-            'useLink'
-          ]
+          "vue-router": [
+            "onBeforeRouteLeave",
+            "onBeforeRouteUpdate",
+            "useLink",
+          ],
         },
         {
-          'vue-router/auto': ['useRoute', 'useRouter']
-        }
+          "vue-router/auto": ["useRoute", "useRouter"],
+        },
       ],
       resolvers: [ElementPlusResolver()],
-      dts: 'src/auto-imports.d.ts',
+      dts: "src/auto-imports.d.ts",
       eslintrc: {
-        enabled: true
-      }
+        enabled: true,
+      },
     }),
 
     // Auto import components.
@@ -63,17 +63,17 @@ export default defineConfig({
     // when navigating to a page that first uses a new component.
     Components({
       resolvers: [ElementPlusResolver({ importStyle: false })],
-      dts: 'src/components.d.ts',
-      dirs: ['src/components']
+      dts: "src/components.d.ts",
+      dirs: ["src/components"],
     }),
 
-    UnoCSS()
+    UnoCSS(),
   ],
 
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
-    }
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+    },
   },
 
   // Pre-bundle every third-party dep that the UI actually imports, and turn
@@ -90,79 +90,79 @@ export default defineConfig({
   optimizeDeps: {
     include: [
       // Vue core
-      'vue',
-      'vue-router',
-      'pinia',
+      "vue",
+      "vue-router",
+      "pinia",
 
       // UI library
-      'element-plus',
-      'element-plus/es',
+      "element-plus",
+      "element-plus/es",
 
       // HTTP / time
-      'axios',
-      'dayjs',
-      'dayjs/plugin/relativeTime',
-      'dayjs/plugin/timezone',
-      'dayjs/plugin/utc',
+      "axios",
+      "dayjs",
+      "dayjs/plugin/relativeTime",
+      "dayjs/plugin/timezone",
+      "dayjs/plugin/utc",
 
       // Code editor
-      'codemirror',
-      '@codemirror/commands',
-      '@codemirror/state',
-      '@codemirror/theme-one-dark',
-      '@codemirror/view',
-      '@codemirror/lang-cpp',
-      '@codemirror/lang-css',
-      '@codemirror/lang-html',
-      '@codemirror/lang-java',
-      '@codemirror/lang-javascript',
-      '@codemirror/lang-json',
-      '@codemirror/lang-markdown',
-      '@codemirror/lang-php',
-      '@codemirror/lang-python',
-      '@codemirror/lang-rust',
-      '@codemirror/lang-sql',
-      '@codemirror/lang-xml',
+      "codemirror",
+      "@codemirror/commands",
+      "@codemirror/state",
+      "@codemirror/theme-one-dark",
+      "@codemirror/view",
+      "@codemirror/lang-cpp",
+      "@codemirror/lang-css",
+      "@codemirror/lang-html",
+      "@codemirror/lang-java",
+      "@codemirror/lang-javascript",
+      "@codemirror/lang-json",
+      "@codemirror/lang-markdown",
+      "@codemirror/lang-php",
+      "@codemirror/lang-python",
+      "@codemirror/lang-rust",
+      "@codemirror/lang-sql",
+      "@codemirror/lang-xml",
 
       // Syntax highlighting
-      'highlight.js/lib/core',
-      'highlight.js/lib/languages/bash',
-      'highlight.js/lib/languages/cpp',
-      'highlight.js/lib/languages/csharp',
-      'highlight.js/lib/languages/css',
-      'highlight.js/lib/languages/go',
-      'highlight.js/lib/languages/java',
-      'highlight.js/lib/languages/javascript',
-      'highlight.js/lib/languages/json',
-      'highlight.js/lib/languages/kotlin',
-      'highlight.js/lib/languages/markdown',
-      'highlight.js/lib/languages/php',
-      'highlight.js/lib/languages/python',
-      'highlight.js/lib/languages/ruby',
-      'highlight.js/lib/languages/rust',
-      'highlight.js/lib/languages/shell',
-      'highlight.js/lib/languages/sql',
-      'highlight.js/lib/languages/swift',
-      'highlight.js/lib/languages/typescript',
-      'highlight.js/lib/languages/xml',
-      'highlight.js/lib/languages/yaml',
+      "highlight.js/lib/core",
+      "highlight.js/lib/languages/bash",
+      "highlight.js/lib/languages/cpp",
+      "highlight.js/lib/languages/csharp",
+      "highlight.js/lib/languages/css",
+      "highlight.js/lib/languages/go",
+      "highlight.js/lib/languages/java",
+      "highlight.js/lib/languages/javascript",
+      "highlight.js/lib/languages/json",
+      "highlight.js/lib/languages/kotlin",
+      "highlight.js/lib/languages/markdown",
+      "highlight.js/lib/languages/php",
+      "highlight.js/lib/languages/python",
+      "highlight.js/lib/languages/ruby",
+      "highlight.js/lib/languages/rust",
+      "highlight.js/lib/languages/shell",
+      "highlight.js/lib/languages/sql",
+      "highlight.js/lib/languages/swift",
+      "highlight.js/lib/languages/typescript",
+      "highlight.js/lib/languages/xml",
+      "highlight.js/lib/languages/yaml",
 
       // Misc
-      'cropperjs',
-      'hyparquet',
-      'isomorphic-dompurify',
-      'js-sha256',
-      'js-yaml',
-      'markdown-it',
-      'mermaid',
-      'panzoom'
+      "cropperjs",
+      "hyparquet",
+      "isomorphic-dompurify",
+      "js-sha256",
+      "js-yaml",
+      "markdown-it",
+      "mermaid",
+      "panzoom",
     ],
-    noDiscovery: true
+    noDiscovery: true,
   },
 
   build: {
     // Target modern browsers (skip legacy transpilation)
-    target: 'esnext',
+    target: "esnext",
 
     // Enable minification (rolldown uses built-in minifier)
     minify: true,
@@ -177,92 +177,94 @@ export default defineConfig({
       output: {
         manualChunks: (id) => {
           // Split highlight.js into separate chunk (it's large)
-          if (id.includes('highlight.js')) {
-            return 'highlight';
+          if (id.includes("highlight.js")) {
+            return "highlight";
           }
           // Split element-plus into separate chunk
-          if (id.includes('element-plus')) {
-            return 'element-plus';
+          if (id.includes("element-plus")) {
+            return "element-plus";
           }
           // Split core vendor libraries
-          if (id.includes('node_modules/vue/') ||
-              id.includes('node_modules/vue-router/') ||
-              id.includes('node_modules/pinia/')) {
-            return 'vendor';
+          if (
+            id.includes("node_modules/vue/") ||
+            id.includes("node_modules/vue-router/") ||
+            id.includes("node_modules/pinia/")
+          ) {
+            return "vendor";
           }
-        }
-      }
+        },
+      },
     },
     chunkSizeWarningLimit: 1000, // Increase limit to 1000kb to reduce warnings
   },
 
   // Enable caching for faster rebuilds
-  cacheDir: 'node_modules/.vite',
+  cacheDir: "node_modules/.vite",
 
   server: {
     port: 5173,
     proxy: {
-      // Mount the admin Vite dev server under /admin so `make ui` exposes the
+      // Mount the optional admin Vite dev server under /admin to expose the
       // admin portal at the same origin as the main UI. Admin builds with
       // base: '/admin/', and ws: true keeps its HMR socket working through
       // this proxy. The bypass redirects bare `/admin` to `/admin/` so users
       // never see Vite's "did you mean to visit /admin/" base-URL hint page.
-      '/admin': {
-        target: 'http://localhost:5174',
+      "/admin": {
+        target: process.env.VITE_ADMIN_URL || "http://localhost:5174",
         changeOrigin: true,
         ws: true,
         bypass: (req, res) => {
-          const path = (req.url || '').split('?')[0]
-          if (path === '/admin') {
-            const qs = (req.url || '').slice(path.length)
-            res.writeHead(302, { Location: '/admin/' + qs })
-            res.end()
-            return false
+          const path = (req.url || "").split("?")[0];
+          if (path === "/admin") {
+            const qs = (req.url || "").slice(path.length);
+            res.writeHead(302, { Location: "/admin/" + qs });
+            res.end();
+            return false;
           }
-        }
+        },
       },
       // Proxy API calls
-      '/api': {
-        target: 'http://localhost:48888',
-        changeOrigin: true
+      "/api": {
+        target: process.env.VITE_BACKEND_URL || "http://localhost:48888",
+        changeOrigin: true,
       },
       // Proxy organization API endpoints (must be more specific to avoid catching /organizations frontend routes)
       // This matches /org/ followed by anything (but not /organizations)
-      '^/org/': {
-        target: 'http://localhost:48888',
-        changeOrigin: true
+      "^/org/": {
+        target: process.env.VITE_BACKEND_URL || "http://localhost:48888",
+        changeOrigin: true,
       },
       // Proxy Git HTTP Smart Protocol endpoints
       // This catches: /{namespace}/{name}.git/info/refs, /{namespace}/{name}.git/git-upload-pack, etc.
       // Enables native Git clone/push operations
-      '^/[^/]+/[^/]+\\.git/(info/refs|git-upload-pack|git-receive-pack|HEAD)': {
-        target: 'http://localhost:48888',
+      "^/[^/]+/[^/]+\\.git/(info/refs|git-upload-pack|git-receive-pack|HEAD)": {
+        target: process.env.VITE_BACKEND_URL || "http://localhost:48888",
         changeOrigin: true,
         configure: (proxy, options) => {
-          proxy.on('proxyReq', (proxyReq, req, res) => {
+          proxy.on("proxyReq", (proxyReq, req, res) => {
             // Disable buffering for Git protocol streaming
-            proxyReq.setHeader('X-Forwarded-Proto', 'http');
+            proxyReq.setHeader("X-Forwarded-Proto", "http");
           });
-        }
+        },
       },
       // Proxy Git LFS endpoints
       // This catches: /{namespace}/{name}.git/info/lfs/*
-      '^/[^/]+/[^/]+\\.git/info/lfs/': {
-        target: 'http://localhost:48888',
-        changeOrigin: true
+      "^/[^/]+/[^/]+\\.git/info/lfs/": {
+        target: process.env.VITE_BACKEND_URL || "http://localhost:48888",
+        changeOrigin: true,
       },
       // Proxy file resolve/download endpoints (models/datasets/spaces)
       // This catches: /models/*/resolve/*, /datasets/*/resolve/*, /spaces/*/resolve/*
-      '^/(models|datasets|spaces)/.+/resolve/': {
-        target: 'http://localhost:48888',
-        changeOrigin: true
+      "^/(models|datasets|spaces)/.+/resolve/": {
+        target: process.env.VITE_BACKEND_URL || "http://localhost:48888",
+        changeOrigin: true,
       },
       // Proxy direct download endpoints (for backward compatibility)
       // This catches: /namespace/name/resolve/*
-      '^/[^/]+/[^/]+/resolve/': {
-        target: 'http://localhost:48888',
-        changeOrigin: true
-      }
-    }
-  }
-})
+      "^/[^/]+/[^/]+/resolve/": {
+        target: process.env.VITE_BACKEND_URL || "http://localhost:48888",
+        changeOrigin: true,
+      },
+    },
+  },
+});

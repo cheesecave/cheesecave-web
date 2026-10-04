@@ -8,7 +8,7 @@ import {
   parseCachedBranding,
   readCachedBranding,
   saveCachedBranding,
-} from "../../../shared/site-branding.js";
+} from "../shared/site-branding.js";
 
 export const useSiteBrandingStore = defineStore("siteBranding", {
   state: () => ({ branding: readCachedBranding(), revision: 0 }),

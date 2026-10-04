@@ -8,17 +8,17 @@ const content = `# Terms of Service
 
 ## 1. Acceptance of Terms
 
-By accessing and using KohakuHub ("the Service"), you accept and agree to be bound by the terms and provisions of this agreement.
+By accessing and using CheeseCave ("the Service"), you accept and agree to be bound by the terms and provisions of this agreement.
 
 ## 2. Use License
 
-Permission is granted to temporarily download one copy of the materials (information or software) on KohakuHub for personal, non-commercial transitory viewing only.
+Permission is granted to temporarily download one copy of the materials (information or software) on CheeseCave for personal, non-commercial transitory viewing only.
 
 ### This is the grant of a license, not a transfer of title, and under this license you may not:
 
 - Modify or copy the materials
 - Use the materials for any commercial purpose or for any public display
-- Attempt to reverse engineer any software contained on KohakuHub
+- Attempt to reverse engineer any software contained on CheeseCave
 - Remove any copyright or other proprietary notations from the materials
 - Transfer the materials to another person or "mirror" the materials on any other server
 
@@ -40,7 +40,7 @@ Permission is granted to temporarily download one copy of the materials (informa
 
 ### 4.1 Your Content
 
-- You retain ownership of content you upload to KohakuHub
+- You retain ownership of content you upload to CheeseCave
 - You grant us a license to host, store, and share your content as necessary to provide the Service
 - You are responsible for ensuring you have the right to upload and share your content
 
@@ -71,7 +71,7 @@ You may not upload content that:
 
 ### 6.1 Service Ownership
 
-- KohakuHub and its original content, features, and functionality are owned by the project maintainers
+- CheeseCave and its original content, features, and functionality are owned by the project maintainers
 - The Service is protected by copyright, trademark, and other laws
 
 ### 6.2 User Content
@@ -90,7 +90,7 @@ We may terminate or suspend your account and access to the Service immediately, 
 
 ## 8. Limitation of Liability
 
-In no event shall KohakuHub, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential, or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses.
+In no event shall CheeseCave, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential, or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses.
 
 ## 9. Disclaimer
 
@@ -113,7 +113,7 @@ If you have any questions about these Terms, please contact us:
 
 ---
 
-By using KohakuHub, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
+By using CheeseCave, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
 `;
 </script>
 

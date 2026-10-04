@@ -4,8 +4,11 @@ import { defineConfig } from "vitest/config";
 import vue from "@vitejs/plugin-vue";
 import AutoImport from "unplugin-auto-import/vite";
 
-const testRoot = fileURLToPath(new URL("../../test/kohaku-hub-ui", import.meta.url));
-const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
+const testRoot = fileURLToPath(new URL("./test", import.meta.url)).replaceAll(
+  "\\",
+  "/",
+);
+const repoRoot = fileURLToPath(new URL(".", import.meta.url));
 const uiRoot = dirname(fileURLToPath(import.meta.url));
 const uiNodeModules = resolve(uiRoot, "node_modules");
 
@@ -35,12 +38,15 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
       vue: resolve(uiNodeModules, "vue/dist/vue.runtime.esm-bundler.js"),
       pinia: resolve(uiNodeModules, "pinia/dist/pinia.mjs"),
-      "vue-router/auto": resolve(uiNodeModules, "vue-router/dist/vue-router.mjs"),
+      "vue-router/auto": resolve(
+        uiNodeModules,
+        "vue-router/dist/vue-router.mjs",
+      ),
       "@vue/test-utils": resolve(
         uiNodeModules,
         "@vue/test-utils/dist/vue-test-utils.esm-bundler.mjs",
       ),
-      // Test files live outside `src/kohaku-hub-ui/` so bare imports of
+      // Test files live outside `src/` so bare imports of
       // `element-plus` do not resolve from their location by default. That
       // matters for `vi.mock("element-plus", ...)` — without a canonical
       // alias, the mock and the component's real import resolve to
@@ -65,7 +71,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "text-summary", "cobertura"],
-      reportsDirectory: "../../coverage-ui",
+      reportsDirectory: "coverage",
       include: [
         "src/App.vue",
         "src/stores/auth.js",

@@ -8,7 +8,7 @@ const content = `# Privacy Policy
 
 ## Introduction
 
-Welcome to KohakuHub. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our service.
+Welcome to CheeseCave. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our service.
 
 ## Information We Collect
 
@@ -29,7 +29,7 @@ When you register for an account, we collect:
 
 ### Usage Information
 
-We automatically collect certain information when you use KohakuHub:
+We automatically collect certain information when you use CheeseCave:
 
 - **Log Data**: IP address, browser type, operating system, pages visited
 - **Device Information**: Device identifiers and mobile network information
@@ -79,7 +79,7 @@ We do not sell, trade, or rent your personal information to third parties. We ma
 - **With Your Consent**: When you explicitly agree to share information
 - **Legal Requirements**: When required by law, court order, or legal process
 - **Service Providers**: With trusted third parties who help us operate the service (e.g., hosting providers)
-- **Security Threats**: To protect rights, property, or safety of KohakuHub, our users, or others
+- **Security Threats**: To protect rights, property, or safety of CheeseCave, our users, or others
 
 ## Data Storage and Security
 
@@ -123,7 +123,7 @@ You have the right to:
 ### What We Use
 
 - **Essential Cookies**: Required for authentication and basic functionality
-- **Analytics**: To understand how users interact with KohakuHub
+- **Analytics**: To understand how users interact with CheeseCave
 - **Preferences**: To remember your settings and preferences
 
 ### Your Choices
@@ -133,15 +133,15 @@ You have the right to:
 
 ## Third-Party Links
 
-KohakuHub may contain links to external websites. We are not responsible for the privacy practices of these third-party sites. We encourage you to read their privacy policies.
+CheeseCave may contain links to external websites. We are not responsible for the privacy practices of these third-party sites. We encourage you to read their privacy policies.
 
 ## Children's Privacy
 
-KohakuHub is not intended for users under 13 years of age. We do not knowingly collect personal information from children under 13. If we discover that a child under 13 has provided us with personal information, we will delete it immediately.
+CheeseCave is not intended for users under 13 years of age. We do not knowingly collect personal information from children under 13. If we discover that a child under 13 has provided us with personal information, we will delete it immediately.
 
 ## International Users
 
-KohakuHub is hosted and operated according to the laws of the hosting jurisdiction. By using the service, you consent to the transfer and processing of your information in that jurisdiction.
+CheeseCave is hosted and operated according to the laws of the hosting jurisdiction. By using the service, you consent to the transfer and processing of your information in that jurisdiction.
 
 ## Changes to This Privacy Policy
 
@@ -151,7 +151,7 @@ We may update this Privacy Policy from time to time. We will notify you of any m
 - Updating the "Last Updated" date
 - Sending you an email notification (for significant changes)
 
-Your continued use of KohakuHub after changes constitutes acceptance of the updated policy.
+Your continued use of CheeseCave after changes constitutes acceptance of the updated policy.
 
 ## Data Breach Notification
 
@@ -171,11 +171,11 @@ If you have questions, concerns, or requests regarding this Privacy Policy or yo
 
 ## Your Consent
 
-By using KohakuHub, you consent to this Privacy Policy and agree to its terms.
+By using CheeseCave, you consent to this Privacy Policy and agree to its terms.
 
 ---
 
-**Self-Hosted Instances**: If you are using a self-hosted instance of KohakuHub, this privacy policy may not apply. Please contact your instance administrator for their privacy policy.
+**Self-Hosted Instances**: If you are using a self-hosted instance of CheeseCave, this privacy policy may not apply. Please contact your instance administrator for their privacy policy.
 `;
 </script>
 

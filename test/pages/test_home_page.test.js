@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { http } from "@/testing/msw";
 import { ElementPlusStubs, RouterLinkStub } from "../helpers/vue";
-import { cloneFixture, jsonResponse, uiApiFixtures } from "../helpers/api-fixtures";
+import {
+  cloneFixture,
+  jsonResponse,
+  uiApiFixtures,
+} from "../helpers/api-fixtures";
 import { server } from "../setup/msw-server";
 
 const mocks = vi.hoisted(() => ({
@@ -132,7 +136,7 @@ describe("home page", () => {
       },
     ]);
 
-    expect(wrapper.text()).toContain("Welcome to KohakuHub");
+    expect(wrapper.text()).toContain("Welcome to CheeseCave");
     expect(wrapper.text()).toContain("🔥 Trending");
     expect(wrapper.text()).toContain("mai_lin/lineart-caption-base");
     expect(wrapper.text()).toContain("mai_lin/street-sign-zh-en");
@@ -195,7 +199,7 @@ describe("home page", () => {
     await flushPromises();
 
     expect(mocks.router.replace).toHaveBeenCalledWith("/");
-    expect(wrapper.text()).toContain("Welcome to KohakuHub");
+    expect(wrapper.text()).toContain("Welcome to CheeseCave");
   });
 
   it("handles missing users and renders fallback metrics", async () => {
@@ -245,7 +249,9 @@ describe("home page", () => {
       error: "something_else",
     };
     server.use(
-      http.get("/api/models", () => jsonResponse({ detail: "boom" }, { status: 500 })),
+      http.get("/api/models", () =>
+        jsonResponse({ detail: "boom" }, { status: 500 }),
+      ),
     );
 
     const wrapper = mountPage();
@@ -253,6 +259,6 @@ describe("home page", () => {
 
     expect(mocks.elMessage.error).not.toHaveBeenCalled();
     expect(mocks.router.replace).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain("Welcome to KohakuHub");
+    expect(wrapper.text()).toContain("Welcome to CheeseCave");
   });
 });

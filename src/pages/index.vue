@@ -5,7 +5,7 @@
     <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
       <div class="container-main py-8 md:py-16 text-center">
         <h1 class="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-          Welcome to KohakuHub
+          Welcome to CheeseCave
         </h1>
         <p class="text-base md:text-lg lg:text-xl mb-6 md:mb-8 px-4">
           Self-hosted HuggingFace Hub alternative for your AI models and
@@ -34,9 +34,7 @@
 
     <!-- Recent Repos - Three Columns -->
     <div class="container-main py-8">
-      <div
-        class="flex flex-col gap-4 mb-6 md:mb-8 md:flex-row md:items-center"
-      >
+      <div class="flex flex-col gap-4 mb-6 md:mb-8 md:flex-row md:items-center">
         <h2 class="text-2xl md:text-3xl font-bold">
           {{ repoSectionTitle }}
         </h2>

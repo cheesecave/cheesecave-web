@@ -9,7 +9,7 @@ const error = ref(null);
 onMounted(async () => {
   try {
     // Fetch the CONTRIBUTING.md file
-    const response = await fetch("/CONTRIBUTING.md");
+    const response = await fetch("/documentation/contributing.md");
     if (!response.ok) {
       throw new Error("Failed to load documentation");
     }
@@ -20,7 +20,7 @@ onMounted(async () => {
 
 ${e.message}
 
-Please check the documentation on [GitHub](https://github.com/KohakuBlueleaf/KohakuHub/blob/main/CONTRIBUTING.md).`;
+Please check the documentation on [GitHub](https://github.com/cheesecave/cheesecave-web/blob/main/CONTRIBUTING.md).`;
   }
 });
 </script>
