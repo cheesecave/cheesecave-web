@@ -42,7 +42,7 @@ pnpm preview
 
 `src/` 包含页面、组件及本地共享工具，`test/` 包含 Vitest 测试与预览数据。`pnpm test` 同时生成覆盖率报告，`pnpm build` 将静态产物写入 `dist/`。构建前会将随仓库保留的参考文档和图片复制到 `public/`；其中历史文档可能使用原项目名称与路径。
 
-构建信息默认读取本仓库的 Git 提交；源代码压缩包或 Docker 构建可显式提供 `VITE_GIT_COMMIT` 与 `VITE_GIT_DIRTY`。继承的 CI 配置已在分仓库前移除，以上命令可直接在本地执行。
+构建信息默认读取本仓库的 Git 提交；源代码压缩包或 Docker 构建可显式提供 `VITE_GIT_COMMIT` 与 `VITE_GIT_DIRTY`。继承的 CI 配置已在分仓库前移除。新的[手动 CI 分类](docs/development/ci.zh-CN.md)覆盖回归、生产构建与单独可选的容器构建，提交工作流不会触发运行。以上命令也可直接在本地执行。
 
 ## 容器与独立更新
 

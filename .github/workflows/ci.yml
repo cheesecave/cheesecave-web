@@ -1,0 +1,81 @@
+name: Web CI (manual)
+
+"on":
+  workflow_dispatch:
+    inputs:
+      category:
+        description: Select the verification category
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - regression
+          - build
+          - docker
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Frontend regression and coverage
+    if: ${{ inputs.category == 'all' || inputs.category == 'regression' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          version: 10.18.1
+          run_install: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.x"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run the complete regression suite with coverage
+        run: pnpm test --maxWorkers=2
+
+  build:
+    name: Production build
+    if: ${{ inputs.category == 'all' || inputs.category == 'build' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          version: 10.18.1
+          run_install: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.x"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build production assets
+        run: pnpm build
+
+  docker:
+    name: Container build
+    if: ${{ inputs.category == 'docker' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: Build the local container image
+        run: >-
+          docker build
+          --build-arg VITE_GIT_COMMIT="$GITHUB_SHA"
+          --build-arg VITE_GIT_DIRTY=false
+          -t cheesecave-web:ci .

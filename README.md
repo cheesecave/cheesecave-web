@@ -42,7 +42,7 @@ pnpm preview
 
 `src/` contains pages, components and local shared helpers; `test/` contains Vitest tests and preview fixtures. `pnpm test` also produces a coverage report, and `pnpm build` writes static assets to `dist/`. Before building, retained reference documents and images are copied to `public/`; historical documents may use the original project's names and paths.
 
-Build metadata normally reads this repository's Git commit. Source archives and Docker builds can explicitly supply `VITE_GIT_COMMIT` and `VITE_GIT_DIRTY`. Inherited CI configuration was removed before the repository split; the commands above run locally.
+Build metadata normally reads this repository's Git commit. Source archives and Docker builds can explicitly supply `VITE_GIT_COMMIT` and `VITE_GIT_DIRTY`. Inherited CI configuration was removed before the repository split. The new [manual CI categories](docs/development/ci.md) cover regression, production builds and optional container builds; committing the workflow does not trigger it. The commands above also run locally.
 
 ## Containers and independent updates
 
