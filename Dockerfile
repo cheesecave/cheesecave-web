@@ -13,7 +13,7 @@ FROM nginx:alpine
 ENV BACKEND_URL=http://hub-api:48888 ADMIN_URL=http://hub-admin:80
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
-COPY LICENSE LICENSING.md /usr/share/doc/cheesecave-web/
+COPY LICENSE LICENSING.md NOTICE.md /usr/share/doc/cheesecave-web/
 COPY provenance /usr/share/doc/cheesecave-web/provenance
 COPY src/components/DatasetViewer/LICENSE /usr/share/doc/cheesecave-web/DatasetViewer.LICENSE
 EXPOSE 80

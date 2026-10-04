@@ -34,3 +34,5 @@ coverage/
 
 __pycache__/
 *.pyc
+
+/docs/licensing-review*.md
