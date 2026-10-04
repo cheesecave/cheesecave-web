@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Page scroll layout regression</title>
+    <style>
+      #fixture {
+        height: 100vh;
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
+      }
+      #fixture-header {
+        flex: 0 0 48px;
+        background: #2563eb;
+        color: white;
+      }
+      #fixture-main {
+        flex: 1 0 auto;
+      }
+      #fixture-footer {
+        flex: 0 0 40px;
+        background: #e5e7eb;
+        color: #213547;
+      }
+      #results {
+        position: fixed;
+        inset: 60px 20px auto;
+        max-height: calc(100vh - 80px);
+        overflow: auto;
+        padding: 12px;
+        background: white;
+        color: #213547;
+        border: 1px solid #aaa;
+        font-size: 13px;
+        z-index: 10;
+      }
+      .pass {
+        color: #06752d;
+      }
+      .fail {
+        color: #b91c1c;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- With this standalone Vite server: /test/browser/page-scroll-layout.html. -->
+    <div id="fixture"></div>
+    <section id="results">
+      <button id="run" type="button">Run</button>
+      <div id="summary" role="status">Loading test dependencies…</div>
+      <ol id="checks"></ol>
+      <p>
+        Verify native PageDown/ArrowDown and thumb dragging in the main UI;
+        synthetic keys do not invoke browser default scrolling.
+      </p>
+    </section>
+    <script type="module">
+      import { createApp, h, nextTick, ref } from "vue";
+      import { ElDialog, ElDrawer } from "element-plus";
+      import "element-plus/dist/index.css";
+      import "../../src/style.css";
+      import PageScrollArea from "../../src/components/layout/PageScrollArea.vue";
+
+      const contentHeight = ref(innerHeight * 3);
+      const dialog = ref(false);
+      const drawer = ref(false);
+      let opened;
+      let closed;
+      const overlayProps = (visible, title) => ({
+        modelValue: visible.value,
+        "onUpdate:modelValue": (value) => (visible.value = value),
+        title,
+        onOpened: () => opened?.(),
+        onClosed: () => closed?.(),
+      });
+      createApp({
+        setup: () => () => [
+          h("header", { id: "fixture-header" }, "Fixed page header"),
+          h(PageScrollArea, null, () => [
+            h(
+              "main",
+              {
+                id: "fixture-main",
+                style: { minHeight: `${contentHeight.value}px` },
+              },
+              "Scrollable page content",
+            ),
+            h("footer", { id: "fixture-footer" }, "Page footer"),
+          ]),
+          h(
+            ElDialog,
+            {
+              ...overlayProps(dialog, "Actual Element Plus dialog"),
+              width: "min(500px, 90vw)",
+            },
+            () => "Document scroll lock test",
+          ),
+          h(
+            ElDrawer,
+            {
+              ...overlayProps(drawer, "Actual Element Plus drawer"),
+              size: "min(280px, 90vw)",
+            },
+            () => "Mobile navigation scroll lock test",
+          ),
+        ],
+      }).mount("#fixture");
+
+      const shell = document.querySelector("#fixture");
+      const header = document.querySelector("#fixture-header");
+      const checks = document.querySelector("#checks");
+      const summary = document.querySelector("#summary");
+      const runButton = document.querySelector("#run");
+      const wrap = () => document.querySelector(".page-scroll-wrap");
+      const area = () => wrap().closest(".el-scrollbar");
+      const frame = () => new Promise(requestAnimationFrame);
+      const settle = async () => {
+        await nextTick();
+        await frame();
+        await frame();
+      };
+      let failures = 0;
+      function check(label, passed, detail = "") {
+        const item = document.createElement("li");
+        item.className = passed ? "pass" : "fail";
+        item.textContent = `${passed ? "PASS" : "FAIL"} ${label}${detail ? ` (${detail})` : ""}`;
+        checks.append(item);
+        if (!passed) failures++;
+      }
+      async function waitUntil(predicate) {
+        const deadline = performance.now() + 3000;
+        while (!predicate()) {
+          if (performance.now() > deadline)
+            throw new Error("Timed out waiting for layout or transition");
+          await frame();
+        }
+      }
+      function checkLayout(label) {
+        const bounds = wrap().getBoundingClientRect();
+        const headerBounds = header.getBoundingClientRect();
+        check(
+          `${label}: header stays at top and full width`,
+          headerBounds.top === 0 &&
+            Math.abs(headerBounds.width - innerWidth) < 0.5,
+        );
+        check(
+          `${label}: content uses full width without gutter`,
+          Math.abs(bounds.width - innerWidth) < 0.5 &&
+            Math.abs(wrap().clientWidth - innerWidth) < 0.5,
+          `box/client/viewport ${bounds.width}/${wrap().clientWidth}/${innerWidth}px`,
+        );
+        check(
+          `${label}: content height fills shell below header`,
+          Math.abs(bounds.top - headerBounds.bottom) < 0.5 &&
+            Math.abs(bounds.bottom - shell.getBoundingClientRect().bottom) <
+              0.5,
+        );
+        check(
+          `${label}: document has no second vertical or horizontal scroll`,
+          document.scrollingElement.scrollHeight <= innerHeight + 1 &&
+            document.scrollingElement.scrollWidth <= innerWidth + 1 &&
+            document.scrollingElement.scrollTop === 0,
+        );
+      }
+      async function checkThumb(label, overflowing) {
+        area().dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+        await settle();
+        const thumb = area().querySelector(
+          ".el-scrollbar__bar.is-vertical .el-scrollbar__thumb",
+        );
+        const visible = () =>
+          Boolean(
+            thumb &&
+              thumb.getBoundingClientRect().height > 0 &&
+              getComputedStyle(thumb.parentElement).display !== "none" &&
+              Number(getComputedStyle(thumb.parentElement).opacity) > 0,
+          );
+        await waitUntil(() => visible() === overflowing).catch(() => {});
+        check(
+          `${label}: vertical thumb ${overflowing ? "is visible" : "has no visible height"}`,
+          visible() === overflowing,
+        );
+      }
+      function transitionEvent(event) {
+        return new Promise((resolve, reject) => {
+          const timeout = setTimeout(
+            () => reject(new Error(`Missing ${event} transition event`)),
+            3000,
+          );
+          const complete = () => {
+            clearTimeout(timeout);
+            resolve();
+          };
+          if (event === "opened") opened = complete;
+          else closed = complete;
+        });
+      }
+      async function testOverlay(name, visible) {
+        const scrollTop = wrap().scrollTop;
+        const openComplete = transitionEvent("opened");
+        visible.value = true;
+        await openComplete;
+        await settle();
+        check(
+          `${name}: locks page scrolling`,
+          document.body.classList.contains("el-popup-parent--hidden") &&
+            getComputedStyle(wrap()).overflowY === "hidden",
+        );
+        check(
+          `${name}: overlay scrollbar cannot receive pointer input`,
+          [...area().querySelectorAll(".el-scrollbar__bar")].every(
+            (bar) => getComputedStyle(bar).pointerEvents === "none",
+          ),
+        );
+        check(
+          `${name}: opening preserves page position`,
+          wrap().scrollTop === scrollTop,
+        );
+        checkLayout(`${name} open`);
+        const closeComplete = transitionEvent("closed");
+        visible.value = false;
+        await closeComplete;
+        await waitUntil(
+          () => !document.body.classList.contains("el-popup-parent--hidden"),
+        );
+        await settle();
+        check(
+          `${name}: closing restores page scrolling and position`,
+          getComputedStyle(wrap()).overflowY !== "hidden" &&
+            wrap().scrollTop === scrollTop &&
+            document.body.style.width === "",
+        );
+        checkLayout(`${name} closed`);
+      }
+      async function testInternalScrolling() {
+        const container = document.createElement("div");
+        container.style.cssText =
+          "position:fixed;left:-1000px;top:0;width:120px;height:80px;overflow:scroll;border:0";
+        container.innerHTML = '<div style="width:240px;height:160px"></div>';
+        const reference = document.createElement("iframe");
+        reference.style.cssText =
+          "position:fixed;left:-1000px;top:0;width:240px;height:240px;border:0";
+        const loaded = new Promise((resolve) => {
+          reference.onload = resolve;
+        });
+        reference.srcdoc = `<!doctype html><body>${container.outerHTML}</body>`;
+        document.body.append(container, reference);
+        try {
+          await loaded;
+          const gutter = (element) => [
+            element.offsetWidth - element.clientWidth,
+            element.offsetHeight - element.clientHeight,
+          ];
+          const actual = gutter(container);
+          const native = gutter(reference.contentDocument.querySelector("div"));
+          check(
+            "Internal container retains native scrollbar dimensions",
+            actual.every((size, i) => size === native[i]),
+            `${actual.join("/")}px; native ${native.join("/")}px`,
+          );
+          container.scrollLeft = 40;
+          container.scrollTop = 40;
+          await settle();
+          check(
+            "Internal horizontal and vertical scrolling work",
+            container.scrollLeft === 40 && container.scrollTop === 40,
+          );
+        } finally {
+          container.remove();
+          reference.remove();
+        }
+      }
+      async function run() {
+        runButton.disabled = true;
+        document.documentElement.dataset.testResult = "running";
+        checks.replaceChildren();
+        failures = 0;
+        summary.textContent = `Running at ${innerWidth} × ${innerHeight}…`;
+        try {
+          contentHeight.value = innerHeight * 3;
+          await settle();
+          wrap().scrollTop = 120;
+          await settle();
+          check(
+            "Long page scrolls inside the content area",
+            wrap().scrollTop === 120 &&
+              wrap().scrollHeight > wrap().clientHeight,
+          );
+          checkLayout("Long page");
+          await checkThumb("Long page", true);
+          wrap().focus({ preventScroll: true });
+          check(
+            "Scroll area is keyboard-focusable",
+            document.activeElement === wrap(),
+          );
+          await testOverlay("Long-page dialog", dialog);
+          await testOverlay("Long-page drawer", drawer);
+          contentHeight.value = 1;
+          await settle();
+          check(
+            "Short content fits scroll area",
+            wrap().scrollHeight <= wrap().clientHeight + 1,
+          );
+          check(
+            "Short-page footer sits at the bottom",
+            Math.abs(
+              document.querySelector("#fixture-footer").getBoundingClientRect()
+                .bottom - wrap().getBoundingClientRect().bottom,
+            ) < 0.5,
+          );
+          checkLayout("Short page");
+          await checkThumb("Short page", false);
+          await testOverlay("Short-page dialog", dialog);
+          await testOverlay("Short-page drawer", drawer);
+          shell.style.height = `${Math.max(160, innerHeight - 120)}px`;
+          await settle();
+          checkLayout("Resized shell");
+          check(
+            "Resizing short page keeps footer at shell bottom",
+            Math.abs(
+              document.querySelector("#fixture-footer").getBoundingClientRect()
+                .bottom - shell.getBoundingClientRect().bottom,
+            ) < 0.5,
+          );
+          shell.style.height = "";
+          contentHeight.value = innerHeight * 3;
+          await settle();
+          checkLayout("Dynamic content restored");
+          await checkThumb("Dynamic content restored", true);
+          await testInternalScrolling();
+        } catch (error) {
+          check("Test execution", false, error.message);
+          dialog.value = false;
+          drawer.value = false;
+        } finally {
+          shell.style.height = "";
+          summary.textContent = `${failures ? "FAIL" : "PASS"}: ${checks.children.length - failures}/${checks.children.length} checks at ${innerWidth} × ${innerHeight}`;
+          document.documentElement.dataset.testResult = failures
+            ? "fail"
+            : "pass";
+          runButton.disabled = false;
+        }
+      }
+      runButton.addEventListener("click", run);
+      await run();
+    </script>
+  </body>
+</html>
