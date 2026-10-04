@@ -121,11 +121,15 @@ describe("TheFooter", () => {
     expect(wrapper.get(".whitespace-pre-wrap").text()).toBe(
       "A community model hub.\nModels and datasets.",
     );
+    expect(wrapper.text()).toContain("Based on KohakuHub");
     expect(wrapper.text()).toContain(
       "© 2025 KohakuHub. Licensed under AGPL-3.0",
     );
     expect(
       wrapper.find('a[href="https://discord.gg/xWYrkyvJ2s"]').exists(),
     ).toBe(true);
+    expect(wrapper.find('[data-testid="frontend-version"]').exists()).toBe(
+      true,
+    );
   });
 });
