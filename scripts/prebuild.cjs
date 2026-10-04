@@ -150,6 +150,20 @@ function main() {
   console.log("Copying docs/ directory recursively...");
   copyDirRecursive(docsSourceDir, docsPublicDir);
 
+  // Copy required attribution into the generated service documentation.
+  const noticeSource = path.join(rootDir, "NOTICE.md");
+  if (fs.existsSync(noticeSource)) {
+    copyFile(noticeSource, path.join(docsPublicDir, "notices.md"));
+    const manifestPath = path.join(docsPublicDir, ".manifest.json");
+    const entries = fs.existsSync(manifestPath)
+      ? JSON.parse(fs.readFileSync(manifestPath, "utf8"))
+      : [];
+    if (!entries.includes("notices.md")) {
+      entries.push("notices.md");
+      fs.writeFileSync(manifestPath, JSON.stringify(entries, null, 2));
+    }
+  }
+
   // Copy CONTRIBUTING.md
   const contributingSource = path.join(rootDir, "CONTRIBUTING.md");
   const contributingDest = path.join(docsPublicDir, "contributing.md");

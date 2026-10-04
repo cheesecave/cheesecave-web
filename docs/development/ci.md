@@ -11,7 +11,7 @@ The workflow at [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) has
 | `all`        | Regression and production build       | The two categories below, in independent jobs                                                                    |
 | `regression` | Complete frontend suite with coverage | `pnpm test --maxWorkers=2`                                                                                       |
 | `build`      | Production static assets              | `pnpm build`                                                                                                     |
-| `docker`     | Container build only                  | `docker build --build-arg VITE_GIT_COMMIT="$GITHUB_SHA" --build-arg VITE_GIT_DIRTY=false -t cheesecave-web:ci .` |
+| `docker`     | Container build and application/license smoke checks | `docker build --build-arg VITE_GIT_COMMIT="$GITHUB_SHA" --build-arg VITE_GIT_DIRTY=false -t cheesecave-web:ci .` |
 
 Each job has an explicit condition for the selected category. Unselected jobs are skipped. Docker is an optional separate category and is not included in `all`.
 

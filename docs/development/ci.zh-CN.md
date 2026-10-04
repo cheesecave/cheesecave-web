@@ -11,7 +11,7 @@
 | `all`        | 完整回归与生产构建   | 以下两个分类，各自独立运行                                                                                       |
 | `regression` | 完整前端测试与覆盖率 | `pnpm test --maxWorkers=2`                                                                                       |
 | `build`      | 生产静态资源         | `pnpm build`                                                                                                     |
-| `docker`     | 仅容器构建           | `docker build --build-arg VITE_GIT_COMMIT="$GITHUB_SHA" --build-arg VITE_GIT_DIRTY=false -t cheesecave-web:ci .` |
+| `docker`     | 容器构建及应用/许可文件冒烟检查 | `docker build --build-arg VITE_GIT_COMMIT="$GITHUB_SHA" --build-arg VITE_GIT_DIRTY=false -t cheesecave-web:ci .` |
 
 每个任务都根据所选分类设置执行条件，未选择的任务会跳过。Docker 是单独可选的分类，不包含在 `all` 中。
 

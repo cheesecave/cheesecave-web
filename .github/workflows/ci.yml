@@ -79,3 +79,13 @@ jobs:
           --build-arg VITE_GIT_COMMIT="$GITHUB_SHA"
           --build-arg VITE_GIT_DIRTY=false
           -t cheesecave-web:ci .
+      - name: Verify packaged application and legal notices
+        run: |
+          docker run --rm --network none --entrypoint sh cheesecave-web:ci -ec '
+            test -s /usr/share/nginx/html/index.html
+            test -s /usr/share/doc/cheesecave-web/LICENSE
+            test -s /usr/share/doc/cheesecave-web/LICENSING.md
+            test -s /usr/share/doc/cheesecave-web/NOTICE.md
+            test -s /usr/share/doc/cheesecave-web/DatasetViewer.LICENSE
+            grep -Fq "This Software is licensed under the Kohaku Software License" /usr/share/nginx/html/documentation/notices.md
+          '
