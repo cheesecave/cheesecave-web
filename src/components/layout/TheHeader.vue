@@ -33,28 +33,12 @@
         aria-label="Main navigation"
       >
         <RouterLink
-          to="/models"
+          v-for="item in HEADER_NAVIGATION_ITEMS"
+          :key="item.id"
+          :to="item.to"
           class="text-gray-700 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
         >
-          Models
-        </RouterLink>
-        <RouterLink
-          to="/datasets"
-          class="text-gray-700 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
-        >
-          Datasets
-        </RouterLink>
-        <RouterLink
-          to="/spaces"
-          class="text-gray-700 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
-        >
-          Spaces
-        </RouterLink>
-        <RouterLink
-          to="/organizations"
-          class="text-gray-700 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
-        >
-          Organizations
+          {{ item.label }}
         </RouterLink>
       </nav>
 
@@ -78,28 +62,15 @@
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item @click="createNew('model')">
+                <el-dropdown-item
+                  v-for="item in HEADER_CREATION_ITEMS"
+                  :key="item.id"
+                  :divided="item.divided"
+                  @click="selectMenuItem(item)"
+                >
                   <div class="flex items-center gap-2">
-                    <div class="i-carbon-model text-blue-500" />
-                    <span>New Model</span>
-                  </div>
-                </el-dropdown-item>
-                <el-dropdown-item @click="createNew('dataset')">
-                  <div class="flex items-center gap-2">
-                    <div class="i-carbon-data-table text-green-500" />
-                    <span>New Dataset</span>
-                  </div>
-                </el-dropdown-item>
-                <el-dropdown-item @click="createNew('space')">
-                  <div class="flex items-center gap-2">
-                    <div class="i-carbon-application text-purple-500" />
-                    <span>New Space</span>
-                  </div>
-                </el-dropdown-item>
-                <el-dropdown-item divided @click="createOrganization">
-                  <div class="flex items-center gap-2">
-                    <div class="i-carbon-group text-orange-500" />
-                    <span>New Organization</span>
+                    <div :class="item.icon" />
+                    <span>{{ item.label }}</span>
                   </div>
                 </el-dropdown-item>
               </el-dropdown-menu>
@@ -110,30 +81,25 @@
           <el-dropdown>
             <div class="flex items-center gap-2 cursor-pointer">
               <!-- User Avatar -->
-              <img
-                v-if="hasAvatar"
-                :src="`/api/users/${username}/avatar?t=${Date.now()}`"
+              <EntityAvatar
+                :username="username"
+                :size="32"
                 :alt="`${username} avatar`"
-                class="w-8 h-8 rounded-full object-cover border border-gray-300 dark:border-gray-600"
-                @error="hasAvatar = false"
+                class="header-avatar"
               />
-              <div v-else class="i-carbon-user-avatar text-2xl" />
               <span>{{ username }}</span>
               <div class="i-carbon-chevron-down" />
             </div>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item @click="$router.push(`/${username}`)">
-                  <div class="i-carbon-user inline-block mr-2" />
-                  Profile
-                </el-dropdown-item>
-                <el-dropdown-item @click="$router.push('/settings')">
-                  <div class="i-carbon-settings inline-block mr-2" />
-                  Settings
-                </el-dropdown-item>
-                <el-dropdown-item divided @click="handleLogout">
-                  <div class="i-carbon-logout inline-block mr-2" />
-                  Logout
+                <el-dropdown-item
+                  v-for="item in accountItems"
+                  :key="item.id"
+                  :divided="item.divided"
+                  @click="selectMenuItem(item)"
+                >
+                  <div :class="item.icon" class="inline-block mr-2" />
+                  {{ item.label }}
                 </el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -191,43 +157,15 @@
           aria-label="Mobile navigation"
         >
           <RouterLink
-            to="/models"
+            v-for="item in HEADER_NAVIGATION_ITEMS"
+            :key="item.id"
+            :to="item.to"
             @click="mobileMenuOpen = false"
             class="px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
           >
             <div class="flex items-center gap-2">
-              <div class="i-carbon-model text-blue-500" />
-              Models
-            </div>
-          </RouterLink>
-          <RouterLink
-            to="/datasets"
-            @click="mobileMenuOpen = false"
-            class="px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-          >
-            <div class="flex items-center gap-2">
-              <div class="i-carbon-data-table text-green-500" />
-              Datasets
-            </div>
-          </RouterLink>
-          <RouterLink
-            to="/spaces"
-            @click="mobileMenuOpen = false"
-            class="px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-          >
-            <div class="flex items-center gap-2">
-              <div class="i-carbon-application text-purple-500" />
-              Spaces
-            </div>
-          </RouterLink>
-          <RouterLink
-            to="/organizations"
-            @click="mobileMenuOpen = false"
-            class="px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-          >
-            <div class="flex items-center gap-2">
-              <div class="i-carbon-group text-orange-500" />
-              Organizations
+              <div :class="item.icon" />
+              {{ item.label }}
             </div>
           </RouterLink>
         </nav>
@@ -245,51 +183,14 @@
               CREATE NEW
             </div>
             <div
-              @click="
-                createNew('model');
-                mobileMenuOpen = false;
-              "
+              v-for="item in HEADER_CREATION_ITEMS"
+              :key="item.id"
+              @click="selectMenuItem(item, true)"
               class="px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
             >
               <div class="flex items-center gap-2">
-                <div class="i-carbon-model text-blue-500" />
-                New Model
-              </div>
-            </div>
-            <div
-              @click="
-                createNew('dataset');
-                mobileMenuOpen = false;
-              "
-              class="px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
-            >
-              <div class="flex items-center gap-2">
-                <div class="i-carbon-data-table text-green-500" />
-                New Dataset
-              </div>
-            </div>
-            <div
-              @click="
-                createNew('space');
-                mobileMenuOpen = false;
-              "
-              class="px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
-            >
-              <div class="flex items-center gap-2">
-                <div class="i-carbon-application text-purple-500" />
-                New Space
-              </div>
-            </div>
-            <div
-              @click="
-                createOrganization();
-                mobileMenuOpen = false;
-              "
-              class="px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
-            >
-              <div class="flex items-center gap-2">
-                <div class="i-carbon-group text-orange-500" />
-                New Organization
+                <div :class="item.icon" />
+                {{ item.label }}
               </div>
             </div>
           </div>
@@ -303,19 +204,12 @@
           <div class="px-4">
             <div class="flex items-center gap-2 px-4 mb-4">
               <!-- User Avatar in Mobile Menu -->
-              <img
-                v-if="hasAvatar"
-                :src="`/api/users/${username}/avatar?t=${Date.now()}`"
+              <EntityAvatar
+                :username="username"
+                :size="48"
                 :alt="`${username} avatar`"
-                class="w-12 h-12 rounded-full object-cover border-2 border-gray-300 dark:border-gray-600"
-                @error="hasAvatar = false"
+                class="header-avatar"
               />
-              <div
-                v-else
-                class="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center"
-              >
-                <div class="i-carbon-user-avatar text-2xl text-gray-400" />
-              </div>
               <div
                 class="text-sm font-semibold text-gray-700 dark:text-gray-300"
               >
@@ -323,39 +217,19 @@
               </div>
             </div>
             <div
-              @click="
-                $router.push(`/${username}`);
-                mobileMenuOpen = false;
+              v-for="item in accountItems"
+              :key="item.id"
+              @click="selectMenuItem(item, true)"
+              class="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
+              :class="
+                item.danger
+                  ? 'text-red-600 dark:text-red-400'
+                  : 'text-gray-700 dark:text-gray-300'
               "
-              class="px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
             >
               <div class="flex items-center gap-2">
-                <div class="i-carbon-user" />
-                Profile
-              </div>
-            </div>
-            <div
-              @click="
-                $router.push('/settings');
-                mobileMenuOpen = false;
-              "
-              class="px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
-            >
-              <div class="flex items-center gap-2">
-                <div class="i-carbon-settings" />
-                Settings
-              </div>
-            </div>
-            <div
-              @click="
-                handleLogout();
-                mobileMenuOpen = false;
-              "
-              class="px-4 py-3 text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
-            >
-              <div class="flex items-center gap-2">
-                <div class="i-carbon-logout" />
-                Logout
+                <div :class="item.icon" />
+                {{ item.label }}
               </div>
             </div>
           </div>
@@ -403,6 +277,12 @@ import { useThemeStore } from "@/stores/theme";
 import { useSiteBrandingStore } from "@/stores/siteBranding";
 import { computed, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
+import EntityAvatar from "@/components/common/EntityAvatar.vue";
+import {
+  HEADER_NAVIGATION_ITEMS,
+  HEADER_CREATION_ITEMS,
+  getHeaderAccountItems,
+} from "@/utils/header-navigation";
 
 const authStore = useAuthStore();
 const themeStore = useThemeStore();
@@ -422,17 +302,12 @@ watch(
 const { isAuthenticated, username } = storeToRefs(authStore);
 const router = useRouter();
 const mobileMenuOpen = ref(false);
-const hasAvatar = ref(true);
+const accountItems = computed(() => getHeaderAccountItems(username.value));
 
-function createNew(type) {
-  router.push({
-    path: "/new",
-    query: { type },
-  });
-}
-
-function createOrganization() {
-  router.push("/organizations/new");
+function selectMenuItem(item, closeMobile = false) {
+  if (closeMobile) mobileMenuOpen.value = false;
+  if (item.action === "logout") return handleLogout();
+  return router.push(item.to);
 }
 
 async function handleLogout() {

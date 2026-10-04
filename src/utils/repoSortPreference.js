@@ -1,11 +1,7 @@
+import { REPOSITORY_SORT_VALUES } from "./repository-sorts";
+
 const REPO_SORT_PREFERENCE_KEY_PREFIX = "kohakuhub:repo-sort-preference";
-const ALLOWED_REPO_SORT_PREFERENCES = new Set([
-  "trending",
-  "recent",
-  "updated",
-  "downloads",
-  "likes",
-]);
+const ALLOWED_REPO_SORT_PREFERENCES = new Set(REPOSITORY_SORT_VALUES);
 
 function buildRepoSortPreferenceKey(scope, repoType) {
   return `${REPO_SORT_PREFERENCE_KEY_PREFIX}:${scope}:${repoType}`;
@@ -34,7 +30,9 @@ export function setRepoSortPreference({ scope, repoType, value }) {
   if (typeof window === "undefined") return;
 
   if (!ALLOWED_REPO_SORT_PREFERENCES.has(value)) {
-    window.sessionStorage.removeItem(buildRepoSortPreferenceKey(scope, repoType));
+    window.sessionStorage.removeItem(
+      buildRepoSortPreferenceKey(scope, repoType),
+    );
     return;
   }
 

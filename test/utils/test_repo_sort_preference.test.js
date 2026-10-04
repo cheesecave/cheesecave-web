@@ -7,6 +7,19 @@ import {
 } from "@/utils/repoSortPreference";
 
 describe("repo sort preference utilities", () => {
+  it.each(["trending", "recent", "updated", "downloads", "likes"])(
+    "persists the %s choice independently for homepage and repository discovery",
+    (value) => {
+      setRepoSortPreference({ scope: "home", repoType: "all", value });
+      setRepoSortPreference({ scope: "repo", repoType: "model", value });
+      expect(getRepoSortPreference({ scope: "home", repoType: "all" })).toBe(
+        value,
+      );
+      expect(getRepoSortPreference({ scope: "repo", repoType: "model" })).toBe(
+        value,
+      );
+    },
+  );
   it("persists and validates sort preferences", () => {
     expect(
       getRepoSortPreference({

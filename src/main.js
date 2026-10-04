@@ -6,7 +6,9 @@ import { routes } from "vue-router/auto-routes";
 import App from "./App.vue";
 import { initializeBrowserTimezone } from "./utils/datetime";
 import { createPageScrollBehavior } from "./utils/page-scroll";
+import { createRepoViewRoutes } from "./utils/repo-view-routes";
 import { useSiteBrandingStore } from "./stores/siteBranding";
+import { useSiteAppearanceStore } from "./stores/siteAppearance";
 
 // Import UnoCSS
 import "virtual:uno.css";
@@ -32,7 +34,7 @@ initializeBrowserTimezone();
 const pageScroll = createPageScrollBehavior();
 const router = createRouter({
   history: createWebHistory(),
-  routes,
+  routes: createRepoViewRoutes(routes),
   scrollBehavior: pageScroll.scrollBehavior,
 });
 pageScroll.install(router);
@@ -46,6 +48,10 @@ app.use(router);
 const disposeBranding = useSiteBrandingStore().initialize();
 app.onUnmount(disposeBranding);
 if (import.meta.hot) import.meta.hot.dispose(disposeBranding);
+
+const disposeAppearance = useSiteAppearanceStore().initialize();
+app.onUnmount(disposeAppearance);
+if (import.meta.hot) import.meta.hot.dispose(disposeAppearance);
 
 // Initialize auth before mounting
 import { useAuthStore } from "./stores/auth";

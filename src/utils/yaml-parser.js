@@ -12,18 +12,20 @@ import yaml from "js-yaml";
 export function parseYAMLFrontmatter(markdown) {
   if (!markdown) return { metadata: {}, content: "" };
 
-  const frontmatterRegex = /^---\s*\n([\s\S]*?\n)?---\s*\n/;
-  const match = markdown.match(frontmatterRegex);
-
-  if (!match) {
+  const opening = /^\uFEFF?[ \t]*---[ \t]*\r?\n/.exec(markdown);
+  if (!opening) {
     return { metadata: {}, content: markdown };
   }
-
-  const yamlContent = match[1] || "";
-  const content = markdown.slice(match[0].length);
+  const rest = markdown.slice(opening[0].length);
+  const closing = /^(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/m.exec(rest);
+  if (!closing) return { metadata: {}, content: markdown };
+  const yamlContent = rest.slice(0, closing.index);
+  const content = rest.slice(closing.index + closing[0].length);
 
   try {
-    const metadata = yaml.load(yamlContent) || {};
+    const raw = yaml.load(yamlContent);
+    const metadata =
+      raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
     return { metadata, content };
   } catch (err) {
     console.error("YAML parse error:", err);

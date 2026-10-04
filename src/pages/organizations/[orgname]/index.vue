@@ -50,15 +50,13 @@
         <aside class="space-y-4 lg:sticky lg:top-4 lg:self-start">
           <div class="card">
             <div class="flex items-center gap-3 mb-4">
-              <!-- Avatar (always try API endpoint with fallback) -->
-              <img
-                v-if="hasAvatar"
-                :src="`/api/organizations/${orgname}/avatar?t=${Date.now()}`"
+              <EntityAvatar
+                :username="orgname"
+                is-org
+                :name="orgname"
+                :size="80"
                 :alt="`${orgname} avatar`"
-                class="w-20 h-20 rounded-full object-cover"
-                @error="hasAvatar = false"
               />
-              <div v-else class="i-carbon-group text-5xl text-gray-400" />
 
               <div>
                 <h2 class="text-xl font-bold">{{ orgname }}</h2>
@@ -78,6 +76,7 @@
               </div>
             </div>
 
+            <FollowControls v-if="!isExternalOrg" :username="orgname" />
             <div v-if="profileInfo" class="space-y-3 text-sm">
               <!-- Description -->
               <p
@@ -242,21 +241,11 @@
                 class="flex items-center gap-2 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                 @click="goToUser(member.user)"
               >
-                <!-- Member Avatar -->
-                <img
-                  :src="`/api/users/${member.user}/avatar?t=${Date.now()}`"
+                <EntityAvatar
+                  :username="member.user"
+                  :name="member.user"
+                  :size="32"
                   :alt="`${member.user} avatar`"
-                  class="w-8 h-8 rounded-full object-cover border border-gray-300 dark:border-gray-600"
-                  @error="
-                    (e) => {
-                      e.target.style.display = 'none';
-                      e.target.nextElementSibling.style.display = 'block';
-                    }
-                  "
-                />
-                <div
-                  class="i-carbon-user-avatar text-2xl text-gray-400"
-                  style="display: none"
                 />
                 <div class="flex-1 min-w-0">
                   <div class="text-sm font-medium truncate">
@@ -452,7 +441,7 @@
           </section>
 
           <!-- Models Section -->
-          <section class="mb-8">
+          <section id="repositories" class="mb-8">
             <div
               class="flex items-center justify-between gap-3 flex-wrap mb-4 pb-3 border-b-2 border-blue-500"
             >
@@ -475,7 +464,9 @@
                     />
                   </el-select>
                 </div>
-                <el-tag type="info" size="large">{{ getCount("model") }}</el-tag>
+                <el-tag type="info" size="large">{{
+                  getCount("model")
+                }}</el-tag>
               </div>
             </div>
 
@@ -825,8 +816,10 @@
 
 <script setup>
 import { repoAPI, orgAPI, settingsAPI } from "@/utils/api";
+import EntityAvatar from "@/components/common/EntityAvatar.vue";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import SocialLinks from "@/components/profile/SocialLinks.vue";
+import FollowControls from "@/components/profile/FollowControls.vue";
 import { formatRelativeTime } from "@/utils/datetime";
 import {
   getRepoSortPreference,
@@ -846,7 +839,6 @@ const repos = ref({ model: [], dataset: [], space: [] });
 const orgCard = ref("");
 const quotaInfo = ref(null);
 const userRole = ref(null);
-const hasAvatar = ref(true); // Assume avatar exists, will be set to false on error
 const orgNotFound = ref(false);
 const selectedSorts = reactive({
   model: getRepoSortPreference({

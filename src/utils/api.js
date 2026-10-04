@@ -50,6 +50,23 @@ api.interceptors.response.use(
   },
 );
 
+export const socialAPI = {
+  getFollowState: (username) =>
+    api.get(`/api/users/${encodeURIComponent(username)}/follow`),
+  follow: (username) =>
+    api.put(`/api/users/${encodeURIComponent(username)}/follow`),
+  unfollow: (username) =>
+    api.delete(`/api/users/${encodeURIComponent(username)}/follow`),
+  listFollowers: (username, params) =>
+    api.get(`/api/users/${encodeURIComponent(username)}/followers`, { params }),
+  listFollowing: (username, params) =>
+    api.get(`/api/users/${encodeURIComponent(username)}/following`, { params }),
+};
+
+export const workspaceAPI = {
+  getFeed: (params) => api.get("/api/workspace/feed", { params }),
+};
+
 export default api;
 
 function getNextLinkFromHeader(linkHeader) {
@@ -108,7 +125,8 @@ function normalizeLikersResponse(response) {
     data: {
       likers: response.data.map((user) => ({
         username: user.user || user.username,
-        full_name: user.fullname || user.full_name || user.user || user.username,
+        full_name:
+          user.fullname || user.full_name || user.user || user.username,
       })),
       total: response.data.length,
     },
@@ -197,6 +215,9 @@ export const repoAPI = {
    * @returns {Promise} - Array of repositories
    */
   listRepos: (type, params) => api.get(`/api/${type}s`, { params }),
+
+  discoverRepos: (type, params) =>
+    api.get(`/api/${type}s/discover`, { params }),
 
   /**
    * Get user overview with all repositories
@@ -652,9 +673,12 @@ export const repoAPI = {
    * @returns {Promise} - { can_write, operations, commits: { [id]: { revert, reset } } }
    */
   getCommitsOperations: (type, namespace, name, branch, commitIds) =>
-    api.post(`/api/${type}s/${namespace}/${name}/commits/${branch}/operations`, {
-      commit_ids: commitIds,
-    }),
+    api.post(
+      `/api/${type}s/${namespace}/${name}/commits/${branch}/operations`,
+      {
+        commit_ids: commitIds,
+      },
+    ),
 
   /**
    * Whether a commit can be reverted on a branch, or the branch reset to it
@@ -666,9 +690,12 @@ export const repoAPI = {
    * @returns {Promise} - { can_write, operations, revert, reset }
    */
   getCommitOperations: (type, namespace, name, commitId, branch) =>
-    api.get(`/api/${type}s/${namespace}/${name}/commit/${commitId}/operations`, {
-      params: { branch },
-    }),
+    api.get(
+      `/api/${type}s/${namespace}/${name}/commit/${commitId}/operations`,
+      {
+        params: { branch },
+      },
+    ),
 
   /**
    * Every LFS file of a commit's tree that garbage collection removed

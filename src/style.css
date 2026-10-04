@@ -2,52 +2,16 @@
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: #213547;
-  background-color: #ffffff;
-
+  color-scheme: light;
+  color: var(--site-text, #2c332b);
+  background-color: var(--site-bg, #f7f4eb);
+  --site-card-radius: 12px;
+  --site-card-shadow: 0 1px 3px #0000000d;
+  --site-card-hover-shadow: 0 3px 12px #00000014;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  /* Element Plus primary color overrides for light mode */
-  --el-color-primary: #2563eb;
-  --el-color-primary-light-3: #3b82f6;
-  --el-color-primary-light-5: #60a5fa;
-  --el-color-primary-light-7: #93c5fd;
-  --el-color-primary-light-8: #bfdbfe;
-  --el-color-primary-light-9: #eff6ff;
-  --el-color-primary-dark-2: #1d4ed8;
-}
-
-/* Dark mode styles */
-.dark {
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  /* Element Plus primary color for dark mode */
-  --el-color-primary: #3b82f6;
-  --el-color-primary-light-3: #60a5fa;
-  --el-color-primary-light-5: #93c5fd;
-  --el-color-primary-light-7: #bfdbfe;
-  --el-color-primary-light-8: #dbeafe;
-  --el-color-primary-light-9: #eff6ff;
-  --el-color-primary-dark-2: #2563eb;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #747bff;
-}
-
-.dark a:hover {
-  color: #535bf2;
 }
 
 html,
@@ -56,50 +20,239 @@ body,
   height: 100%;
   overflow: hidden;
 }
-
-/* Dialogs and drawers lock the page's own scroll region, not just the body. */
-body.el-popup-parent--hidden .page-scroll-wrap {
-  overflow: hidden;
-}
-
-body.el-popup-parent--hidden .page-scroll-area > .el-scrollbar__bar {
-  pointer-events: none;
-  visibility: hidden;
-}
-
 body {
   margin: 0;
   min-width: 320px;
   width: 100%;
 }
-
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
 }
-
-/* Generic button styles removed to avoid conflicts with Element Plus buttons */
-
-/* Fix Element Plus buttons being invisible due to Tailwind reset in production builds */
-.el-button--primary {
-  background-color: var(--el-color-primary) !important;
-  border-color: var(--el-color-primary) !important;
-  color: var(--el-color-white) !important;
+a {
+  font-weight: 500;
+  color: var(--site-page-link, #94621f);
+  text-decoration: inherit;
 }
-
-.el-button--primary:hover,
-.el-button--primary:focus {
-  background-color: var(--el-color-primary-light-3) !important;
-  border-color: var(--el-color-primary-light-3) !important;
+a:hover {
+  color: var(--site-page-link, #94621f);
 }
-
-.el-button--primary:active {
-  background-color: var(--el-color-primary-dark-2) !important;
-  border-color: var(--el-color-primary-dark-2) !important;
+body.el-popup-parent--hidden .page-scroll-wrap {
+  overflow: hidden;
 }
-
+body.el-popup-parent--hidden .page-scroll-area > .el-scrollbar__bar {
+  pointer-events: none;
+  visibility: hidden;
+}
 .card {
   padding: 2em;
 }
+.app-shell .card {
+  border-radius: var(--site-card-radius);
+  box-shadow: var(--site-card-shadow);
+}
+.app-shell .card[class*="hover:shadow-"]:hover {
+  box-shadow: var(--site-card-hover-shadow);
+}
+html[data-site-theme="dark"] {
+  --site-card-shadow: 0 1px 3px #00000026;
+  --site-card-hover-shadow: 0 3px 12px #00000040;
+}
 
-/* Removed #app styles to avoid conflicts with App.vue UnoCSS classes */
+/* These tokens belong to the public app. Entity icons and status colors retain their meaning. */
+html[data-site-theme] .app-shell {
+  background: var(--site-bg);
+  color: var(--site-text);
+  --site-context-text: var(--site-text);
+  --site-context-bg: var(--site-bg);
+  --site-context-link: var(--site-page-link);
+  --site-context-muted: var(--site-page-muted);
+}
+html[data-site-theme]
+  :is(
+    .card,
+    .site-footer,
+    .bg-white,
+    .bg-gray-100,
+    .bg-gray-200,
+    .bg-gray-800
+  ) {
+  background-color: var(--site-card);
+  color: var(--site-card-text);
+  --site-context-text: var(--site-card-text);
+  --site-context-bg: var(--site-card);
+  --site-context-link: var(--site-link);
+  --site-context-muted: var(--site-muted);
+}
+html[data-site-theme="dark"]
+  :is([class~="dark:bg-gray-800"], [class~="dark:bg-gray-700"]) {
+  background-color: var(--site-card);
+  color: var(--site-card-text);
+  --site-context-text: var(--site-card-text);
+  --site-context-bg: var(--site-card);
+  --site-context-link: var(--site-link);
+  --site-context-muted: var(--site-muted);
+}
+html[data-site-theme] .bg-gray-50,
+html[data-site-theme="dark"] [class~="dark:bg-gray-900"] {
+  background-color: var(--site-bg);
+}
+html[data-site-theme]
+  :is(
+    .text-gray-900,
+    .text-gray-800,
+    .text-gray-700,
+    .text-gray-100,
+    .text-gray-200,
+    .text-gray-300,
+    [class~="dark:text-white"],
+    [class~="dark:text-gray-100"],
+    [class~="dark:text-gray-200"],
+    [class~="dark:text-gray-300"]
+  ) {
+  color: var(--site-context-text, var(--site-text));
+}
+html[data-site-theme]
+  :is(
+    .text-gray-400,
+    .text-gray-500,
+    .text-gray-600,
+    [class~="dark:text-gray-400"],
+    [class~="dark:text-gray-500"]
+  ) {
+  color: var(--site-context-muted, var(--site-page-muted));
+}
+html[data-site-theme]
+  :is(
+    .border-gray-100,
+    .border-gray-200,
+    .border-gray-300,
+    [class~="dark:border-gray-600"],
+    [class~="dark:border-gray-700"],
+    [class~="dark:border-gray-800"]
+  ) {
+  border-color: var(--site-border);
+}
+html[data-site-theme]
+  a:is(
+    .text-blue-500,
+    .text-blue-600,
+    .text-blue-700,
+    [class~="dark:text-blue-400"],
+    [class~="dark:text-blue-500"]
+  ),
+html[data-site-theme] a:hover {
+  color: var(--site-context-link, var(--site-page-link));
+}
+html[data-site-theme] :is(a, button)[class*="hover:bg-gray-"]:hover {
+  background-color: var(--site-hover);
+}
+html[data-site-theme] :is(a, button)[class*="hover:text-blue-"]:hover {
+  color: var(--site-context-link, var(--site-link));
+}
+
+html[data-site-theme] .btn-primary,
+html[data-site-theme] :is(a, button):is(.bg-blue-500, .bg-blue-600),
+html[data-site-theme]
+  .el-button--primary:not(.is-plain):not(.is-text):not(.is-link) {
+  background-color: var(--site-primary);
+  border-color: var(--site-primary);
+  color: var(--site-primary-text);
+}
+html[data-site-theme] .btn-primary:hover,
+html[data-site-theme] :is(a, button):is(.bg-blue-500, .bg-blue-600):hover,
+html[data-site-theme]
+  .el-button--primary:not(.is-plain):not(.is-text):not(.is-link):not(
+    .is-disabled
+  ):is(:hover, :focus-visible) {
+  background-color: var(--site-primary-hover);
+  border-color: var(--site-primary-hover);
+  color: var(--site-primary-text);
+}
+html[data-site-theme]
+  .el-button--primary:not(.is-plain):not(.is-text):not(.is-link):not(
+    .is-disabled
+  ):active {
+  background-color: var(--site-primary-active);
+  border-color: var(--site-primary-active);
+}
+html[data-site-theme]
+  .el-button--primary.is-disabled:not(.is-plain):not(.is-text):not(.is-link) {
+  opacity: 0.5;
+}
+html[data-site-theme] .el-button--primary:is(.is-plain, .is-text, .is-link),
+html[data-site-theme] .el-link--primary {
+  --el-button-text-color: var(--site-link);
+  --el-link-text-color: var(--site-link);
+}
+html[data-site-theme] [class*="text-primary-"],
+html[data-site-theme]
+  :is(.el-tabs, .el-pagination, .el-select-dropdown, .el-date-picker) {
+  --el-color-primary: var(--site-link);
+}
+html[data-site-theme] [class*="text-primary-"] {
+  color: var(--site-context-link, var(--site-link));
+}
+html[data-site-theme]
+  .el-checkbox__input.is-checked
+  .el-checkbox__inner::after {
+  border-color: var(--site-primary-text);
+}
+html[data-site-theme] .el-radio__input.is-checked .el-radio__inner::after {
+  background-color: var(--site-primary-text);
+}
+html[data-site-theme]
+  :is(.el-checkbox__input, .el-radio__input).is-checked
+  + :is(.el-checkbox__label, .el-radio__label) {
+  color: var(--site-link);
+}
+html[data-site-theme]
+  .el-button--primary.is-plain:not(.is-disabled):is(:hover, :focus-visible) {
+  background-color: var(--site-primary);
+  border-color: var(--site-primary);
+  color: var(--site-primary-text);
+}
+html[data-site-theme] .el-card {
+  --el-card-bg-color: var(--site-card);
+  --el-card-border-color: var(--site-border);
+}
+html[data-site-theme] .card {
+  border-color: var(--site-border);
+}
+
+html[data-site-theme] .site-footer {
+  border-color: var(--site-border);
+}
+.footer-muted {
+  color: var(--site-muted, #6b7068);
+}
+.footer-link {
+  color: var(--site-link, #94621f);
+}
+.footer-credit {
+  font-weight: 600;
+}
+html[data-site-theme] .site-footer a {
+  color: var(--site-link);
+}
+html[data-site-theme] .site-footer a:hover {
+  color: var(--site-link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.footer-attribution {
+  border-color: var(--site-border, #d9d9d2);
+}
+
+html[data-site-theme] .input {
+  background: var(--site-card);
+  color: var(--site-card-text);
+  border-color: var(--site-border);
+}
+html[data-site-theme] .input:focus {
+  border-color: var(--site-primary);
+}
+html[data-site-theme] .app-shell :is(textarea, select) {
+  color: var(--site-card-text);
+  background-color: var(--site-card);
+}

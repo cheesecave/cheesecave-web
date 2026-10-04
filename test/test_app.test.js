@@ -131,7 +131,23 @@ describe("App shell", () => {
     wrapper.unmount();
   });
 
-  it("expands the header and hides the footer only on the authenticated homepage", async () => {
+  it("separates hyphenated repository identities and restores each cached instance", async () => {
+    mountCounts.repoViewer = 0;
+    routeState.value = { path: "/models/a-b/c" };
+    const wrapper = mount(App, {
+      global: { components: { RouterView: RouterViewStub } },
+    });
+    expect(mountCounts.repoViewer).toBe(1);
+    routeState.value = { path: "/models/a/b-c" };
+    await nextTick();
+    expect(mountCounts.repoViewer).toBe(2);
+    routeState.value = { path: "/models/a-b/c/tree/main" };
+    await nextTick();
+    expect(mountCounts.repoViewer).toBe(2);
+    wrapper.unmount();
+  });
+
+  it("uses the workspace header on every authenticated page and hides the footer only at home", async () => {
     routeState.value = { path: "/" };
     const auth = useAuthStore();
     auth.user = { username: "mai_lin" };
@@ -143,15 +159,38 @@ describe("App shell", () => {
     ).toBe("true");
     expect(wrapper.find('[data-footer="true"]').exists()).toBe(false);
 
-    routeState.value = { path: "/models" };
+    for (const path of [
+      "/models",
+      "/datasets",
+      "/spaces",
+      "/organizations",
+      "/settings",
+      "/models/mai_lin/lineart-caption-base/tree/main",
+    ]) {
+      routeState.value = { path };
+      await nextTick();
+      expect(
+        wrapper.get('[data-header="true"]').attributes("data-expanded"),
+      ).toBe("true");
+      expect(wrapper.find('[data-footer="true"]').exists()).toBe(true);
+    }
+
+    auth.user = null;
     await nextTick();
     expect(
       wrapper.get('[data-header="true"]').attributes("data-expanded"),
     ).toBe("false");
     expect(wrapper.find('[data-footer="true"]').exists()).toBe(true);
 
+    auth.user = { username: "mai_lin" };
+    await nextTick();
+    expect(
+      wrapper.get('[data-header="true"]').attributes("data-expanded"),
+    ).toBe("true");
+
     routeState.value = { path: "/" };
     await nextTick();
+    expect(wrapper.find('[data-footer="true"]').exists()).toBe(false);
     auth.user = null;
     await nextTick();
     expect(

@@ -30,7 +30,8 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("vue-router/auto", () => ({
+vi.mock("vue-router/auto", async (importOriginal) => ({
+  ...(await importOriginal()),
   useRouter: () => mocks.router,
   useRoute: () => mocks.route,
 }));
@@ -40,7 +41,8 @@ vi.mock("@/utils/repoSortPreference", () => ({
   setRepoSortPreference: mocks.repoSortPreference.setRepoSortPreference,
 }));
 
-vi.mock("element-plus", () => ({
+vi.mock("element-plus", async (importOriginal) => ({
+  ...(await importOriginal()),
   ElMessage: mocks.elMessage,
 }));
 
@@ -63,6 +65,38 @@ describe("home page", () => {
     requests.length = 0;
 
     server.use(
+      http.get("/api/workspace/feed", ({ request }) => {
+        const type = new URL(request.url).searchParams.get("repo_type");
+        const items = [
+          {
+            id: "commit:1",
+            kind: "commit",
+            created_at: "2026-10-04T01:30:00Z",
+            actor: { username: "mai_lin", is_org: false },
+            namespace: { username: "mai_lin", is_org: false },
+            repository: {
+              id: "mai_lin/lineart-caption-base",
+              type: "model",
+              private: false,
+            },
+            commit: { sha: "abcdef123456", message: "Update model weights" },
+          },
+          {
+            id: "repo:2",
+            kind: "repo_created",
+            created_at: "2026-10-03T01:30:00Z",
+            actor: null,
+            namespace: { username: "mai_lin", is_org: false },
+            repository: {
+              id: "mai_lin/street-sign-zh-en",
+              type: "dataset",
+              private: false,
+            },
+            commit: null,
+          },
+        ].filter((item) => type === "all" || item.repository.type === type);
+        return jsonResponse({ items, has_more: false, next_cursor: null });
+      }),
       http.get("/api/site-homepage", () => jsonResponse(homepage)),
       http.get("/api/users/:username/repos", ({ request, params }) => {
         const url = new URL(request.url);
@@ -127,6 +161,34 @@ describe("home page", () => {
     wrappers.push(wrapper);
     return wrapper;
   }
+  it("uses the shared theme for discovery links and dividers while keeping category identities", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+    const discovery = wrapper.get(".discovery-section");
+    const headings = discovery.findAll(".discovery-column-heading");
+    expect(headings).toHaveLength(3);
+    expect(headings.map((heading) => heading.find("h3").text())).toEqual([
+      "Models",
+      "Datasets",
+      "Spaces",
+    ]);
+    expect(discovery.findAll(".discovery-repo-link")).toHaveLength(3);
+    for (const link of discovery.findAll(".discovery-repo-link")) {
+      expect(link.attributes("href")).toMatch(/^\/(models|datasets|spaces)\//);
+      expect(
+        link.classes().some((name) => /^text-(blue|green|purple)-/.test(name)),
+      ).toBe(false);
+    }
+    expect(
+      discovery.find(".discovery-model-icon.i-carbon-model").exists(),
+    ).toBe(true);
+    expect(
+      discovery.find(".discovery-dataset-icon.i-carbon-data-table").exists(),
+    ).toBe(true);
+    expect(
+      discovery.find(".discovery-space-icon.i-carbon-application").exists(),
+    ).toBe(true);
+  });
 
   it("loads repo stats through the API client, routes hero actions, and persists sort changes", async () => {
     const wrapper = mountPage();
@@ -183,21 +245,34 @@ describe("home page", () => {
       .find((button) => button.text().includes("View all spaces"))
       .trigger("click");
 
-    await wrapper.get('select[data-el-select="true"]').setValue("likes");
-    await flushPromises();
-    expect(wrapper.text()).toContain("❤️ Most Liked");
-
-    await wrapper.get('select[data-el-select="true"]').setValue("recent");
-    await flushPromises();
-    expect(wrapper.text()).toContain("🆕 Recently Created");
-
-    await wrapper.get('select[data-el-select="true"]').setValue("updated");
-    await flushPromises();
-    expect(wrapper.text()).toContain("🕒 Recently Updated");
-
-    await wrapper.get('select[data-el-select="true"]').setValue("downloads");
-    await flushPromises();
-    expect(wrapper.text()).toContain("⬇️ Most Downloaded");
+    const sortSelect = wrapper.get('select[data-el-select="true"]');
+    expect(
+      sortSelect
+        .findAll("option")
+        .map((option) => [option.attributes("value"), option.text()]),
+    ).toEqual([
+      ["trending", "Trending"],
+      ["recent", "Recently Created"],
+      ["updated", "Recently Updated"],
+      ["downloads", "Most Downloads"],
+      ["likes", "Most Likes"],
+    ]);
+    for (const [value, title] of [
+      ["likes", "❤️ Most Liked"],
+      ["recent", "🆕 Recently Created"],
+      ["updated", "🕒 Recently Updated"],
+      ["downloads", "⬇️ Most Downloaded"],
+    ]) {
+      await sortSelect.setValue(value);
+      await vi.waitFor(() =>
+        expect(requests.slice(-3).map(({ params }) => params.sort)).toEqual([
+          value,
+          value,
+          value,
+        ]),
+      );
+      expect(wrapper.get(".discovery-section h2").text()).toBe(title);
+    }
 
     expect(mocks.repoSortPreference.setRepoSortPreference).toHaveBeenCalledWith(
       {
@@ -262,8 +337,40 @@ describe("home page", () => {
     await flushPromises();
 
     expect(mocks.router.replace).toHaveBeenCalledWith("/");
-    expect(wrapper.text()).toContain("never");
-    expect(wrapper.text()).toContain("0");
+    expect(wrapper.find(".repo-updated").exists()).toBe(false);
+    expect(wrapper.findAll('[aria-label="0 downloads"]')).toHaveLength(3);
+    expect(wrapper.findAll('[aria-label="0 likes"]')).toHaveLength(3);
+  });
+
+  it("keeps each visitor preview bounded and links every repository to its category", async () => {
+    const repos = (type, count) =>
+      Array.from({ length: count }, (_, index) => ({
+        id: `alice/${type}-${index}`,
+        downloads: index,
+        likes: index + 1,
+      }));
+    installHandlers({
+      modelRepos: repos("model", 5),
+      datasetRepos: repos("dataset", 4),
+      spaceRepos: repos("space", 2),
+    });
+    const wrapper = mountPage();
+    await flushPromises();
+    const columns = wrapper.findAll(".repository-preview-column");
+    expect(columns).toHaveLength(3);
+    for (const [index, type] of ["model", "dataset", "space"].entries()) {
+      const links = columns[index].findAll(".repo-discovery-card");
+      expect(links).toHaveLength(index === 2 ? 2 : 3);
+      expect(links.map((link) => link.attributes("href"))).toEqual(
+        Array.from(
+          { length: links.length },
+          (_, repoIndex) => `/${type}s/alice/${type}-${repoIndex}`,
+        ),
+      );
+    }
+    expect(
+      columns.map((column) => column.get('[data-el-tag="true"]').text()),
+    ).toEqual(["5", "4", "2"]);
   });
 
   it("ignores unknown query errors and load failures without redirecting", async () => {
@@ -393,12 +500,282 @@ describe("home page", () => {
     return auth;
   }
 
+  async function selectWorkspace(wrapper, value) {
+    wrapper
+      .get('[data-testid="workspace-personal"]')
+      .getComponent({ name: "ElDropdown" })
+      .vm.$emit("command", value);
+    await nextTick();
+  }
+
+  it("switches the entire workspace to an organization, resets Likes, and restores personal controls on return", async () => {
+    const auth = signIn();
+    auth.userOrganizations.push({ name: "second-team", role: "member" });
+    const feedRequests = [];
+    server.use(
+      http.get("/api/workspace/feed", ({ request }) => {
+        const params = Object.fromEntries(
+          new URL(request.url).searchParams.entries(),
+        );
+        feedRequests.push(params);
+        return jsonResponse({
+          items: [
+            {
+              id: `repo:${params.organization || "self"}`,
+              kind: "repo_created",
+              created_at: "2026-10-04T01:30:00Z",
+              actor: null,
+              namespace: {
+                username: params.organization || "mai_lin",
+                is_org: !!params.organization,
+              },
+              repository: {
+                id: `${params.organization || "mai_lin"}/workspace-project`,
+                type: "model",
+                private: false,
+              },
+              commit: null,
+            },
+          ],
+          has_more: false,
+          next_cursor: null,
+        });
+      }),
+    );
+    const wrapper = mountPage();
+    await flushPromises();
+    await wrapper
+      .get('[data-testid="workspace-feed"]')
+      .findAll("button")
+      .find((button) => button.text() === "Likes")
+      .trigger("click");
+    await flushPromises();
+    const previous = feedRequests.length;
+    await selectWorkspace(wrapper, "org:deepghs");
+    await flushPromises();
+    expect(feedRequests.slice(previous)).toEqual([
+      {
+        scope: "organization",
+        organization: "deepghs",
+        repo_type: "all",
+        limit: "20",
+      },
+    ]);
+    const feed = wrapper.get('[data-testid="workspace-feed"]');
+    expect(feed.text()).toContain("deepghs/workspace-project");
+    expect(feed.text()).not.toContain("mai_lin/workspace-project");
+    expect(feed.find('[aria-label="Filter activity"]').exists()).toBe(false);
+    expect(feed.find('[aria-label="Activity category"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="workspace-trending"]').exists()).toBe(
+      false,
+    );
+    const sidebar = wrapper.get('[data-testid="workspace-personal"]');
+    expect(sidebar.findAll("a").map((link) => link.attributes("href"))).toEqual(
+      ["/organizations/deepghs", "/organizations/deepghs#repositories"],
+    );
+    expect(sidebar.find('input[aria-label="Find a repository"]').exists()).toBe(
+      false,
+    );
+    await selectWorkspace(wrapper, "org:second-team");
+    await flushPromises();
+    expect(feedRequests.at(-1)).toEqual({
+      scope: "organization",
+      organization: "second-team",
+      repo_type: "all",
+      limit: "20",
+    });
+    expect(feed.text()).toContain("second-team/workspace-project");
+    expect(feed.text()).not.toContain("deepghs/workspace-project");
+    await selectWorkspace(wrapper, "self");
+    await flushPromises();
+    expect(feedRequests.at(-1)).toEqual({
+      scope: "all",
+      repo_type: "all",
+      limit: "20",
+    });
+    expect(feed.get('[aria-label="Filter activity"]').text()).toBe("All");
+    expect(feed.find('[aria-label="Activity category"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="workspace-trending"]').exists()).toBe(
+      true,
+    );
+    expect(sidebar.find('input[aria-label="Find a repository"]').exists()).toBe(
+      true,
+    );
+  });
+
+  it("clears revoked organization activity and restores the personal workspace when membership is removed", async () => {
+    const auth = signIn();
+    let release;
+    let pendingEntered = false;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const feedRequests = [];
+    server.use(
+      http.get("/api/workspace/feed", async ({ request }) => {
+        const params = Object.fromEntries(
+          new URL(request.url).searchParams.entries(),
+        );
+        feedRequests.push(params);
+        if (params.organization) {
+          pendingEntered = true;
+          await gate;
+        }
+        return jsonResponse({
+          items: params.organization
+            ? [
+                {
+                  id: "commit:revoked-org",
+                  kind: "repo_created",
+                  created_at: "2026-10-04T01:30:00Z",
+                  actor: null,
+                  namespace: { username: "deepghs", is_org: true },
+                  repository: {
+                    id: "deepghs/revoked-secret",
+                    type: "model",
+                    private: true,
+                  },
+                  commit: null,
+                },
+              ]
+            : [],
+          has_more: false,
+          next_cursor: null,
+        });
+      }),
+    );
+    const wrapper = mountPage();
+    await flushPromises();
+    await selectWorkspace(wrapper, "org:deepghs");
+    await vi.waitFor(() => expect(pendingEntered).toBe(true));
+    auth.userOrganizations = [];
+    await flushPromises();
+    const sidebar = wrapper.get('[data-testid="workspace-personal"]');
+    expect(sidebar.get('[aria-label="Select workspace"]').text()).toContain(
+      "mai_lin",
+    );
+    expect(
+      sidebar.find('[aria-label="Organization workspace navigation"]').exists(),
+    ).toBe(false);
+    expect(wrapper.find('[data-testid="workspace-trending"]').exists()).toBe(
+      true,
+    );
+    expect(
+      wrapper
+        .get('[data-testid="workspace-feed"]')
+        .find('[aria-label="Activity category"]')
+        .exists(),
+    ).toBe(true);
+    expect(feedRequests.at(-1)).toEqual({
+      scope: "all",
+      repo_type: "all",
+      limit: "20",
+    });
+    release();
+    await flushPromises();
+    expect(wrapper.text()).not.toContain("deepghs/revoked-secret");
+  });
+
+  it("keeps the selected organization after a forbidden page, clears its private events, and retries without the cursor", async () => {
+    signIn();
+    const feedRequests = [];
+    server.use(
+      http.get("/api/workspace/feed", ({ request }) => {
+        const params = Object.fromEntries(
+          new URL(request.url).searchParams.entries(),
+        );
+        feedRequests.push(params);
+        if (params.cursor)
+          return jsonResponse({ detail: "Forbidden" }, { status: 403 });
+        return jsonResponse({
+          items: params.organization
+            ? [
+                {
+                  id: "commit:private-org",
+                  kind: "repo_created",
+                  created_at: "2026-10-04T01:30:00Z",
+                  actor: null,
+                  namespace: { username: "deepghs", is_org: true },
+                  repository: {
+                    id: "deepghs/private-org",
+                    type: "model",
+                    private: true,
+                  },
+                  commit: null,
+                },
+              ]
+            : [],
+          has_more: !!params.organization,
+          next_cursor: params.organization ? "org-page" : null,
+        });
+      }),
+    );
+    const wrapper = mountPage();
+    await flushPromises();
+    await selectWorkspace(wrapper, "org:deepghs");
+    await flushPromises();
+    const feed = wrapper.get('[data-testid="workspace-feed"]');
+    expect(feed.text()).toContain("deepghs/private-org");
+    await feed
+      .findAll("button")
+      .find((button) => button.text() === "Load more")
+      .trigger("click");
+    await flushPromises();
+    expect(feed.text()).not.toContain("deepghs/private-org");
+    expect(feed.text()).toContain("Could not load activity");
+    expect(wrapper.get('[aria-label="Select workspace"]').text()).toContain(
+      "deepghs",
+    );
+    expect(wrapper.find('[data-testid="workspace-trending"]').exists()).toBe(
+      false,
+    );
+    expect(feed.find('[aria-label="Activity category"]').exists()).toBe(false);
+    await feed
+      .findAll("button")
+      .find((button) => button.text() === "Try again")
+      .trigger("click");
+    await flushPromises();
+    expect(feedRequests.at(-1)).toEqual({
+      scope: "organization",
+      organization: "deepghs",
+      repo_type: "all",
+      limit: "20",
+    });
+    expect(feed.text()).toContain("deepghs/private-org");
+  });
+
+  it("returns from an organization to personal workspace when the authenticated account changes", async () => {
+    const auth = signIn();
+    const wrapper = mountPage();
+    await flushPromises();
+    await selectWorkspace(wrapper, "org:deepghs");
+    await flushPromises();
+    expect(wrapper.find('[data-testid="workspace-trending"]').exists()).toBe(
+      false,
+    );
+    auth.user = { username: "alice", email: "alice@example.com" };
+    await flushPromises();
+    expect(wrapper.get('[aria-label="Select workspace"]').text()).toContain(
+      "alice",
+    );
+    expect(
+      wrapper.find('[aria-label="Organization workspace navigation"]').exists(),
+    ).toBe(false);
+    expect(wrapper.find('[data-testid="workspace-trending"]').exists()).toBe(
+      true,
+    );
+    expect(wrapper.get('[aria-label="Filter activity"]').text()).toBe("All");
+    expect(wrapper.find('[aria-label="Activity category"]').exists()).toBe(
+      true,
+    );
+  });
+
   it("shows personal repositories and organization links in the authenticated workspace", async () => {
     signIn();
     const wrapper = mountPage();
     await flushPromises();
 
-    expect(wrapper.text()).toContain("Your workspace");
+    expect(wrapper.find(".feed-heading").exists()).toBe(false);
     expect(wrapper.find('[data-testid="homepage-hero"]').exists()).toBe(false);
     const workspace = wrapper.get('[data-testid="workspace"]');
     expect(wrapper.find(".discovery-section").exists()).toBe(false);
@@ -422,7 +799,7 @@ describe("home page", () => {
       {
         type: "personal",
         username: "mai_lin",
-        params: { sort: "recent", limit: "12" },
+        params: { sort: "updated", limit: "7" },
       },
     ]);
     expect(requests.filter((request) => request.type !== "personal")).toEqual([
@@ -431,6 +808,55 @@ describe("home page", () => {
         params: { limit: "3", sort: "trending", fallback: "false" },
       },
     ]);
+  });
+
+  it("uses the sidebar's embedded organization memberships for the feed dropdown and clears a removed selection", async () => {
+    const auth = signIn();
+    auth.user = {
+      ...auth.user,
+      organizations: [{ name: "embedded-lab", roleInOrg: "member" }],
+    };
+    const feedRequests = [];
+    server.use(
+      http.get("/api/workspace/feed", ({ request }) => {
+        feedRequests.push(
+          Object.fromEntries(new URL(request.url).searchParams.entries()),
+        );
+        return jsonResponse({ items: [], has_more: false, next_cursor: null });
+      }),
+    );
+    const wrapper = mountPage();
+    await flushPromises();
+    const feed = wrapper.get('[data-testid="workspace-feed"]');
+    const labels = feed
+      .findAll(".scope-option-label")
+      .map((item) => item.text());
+    expect(labels).toEqual(["All", "Self", "Following", "embedded-lab"]);
+    expect(wrapper.get('[data-testid="workspace-personal"]').text()).toContain(
+      "embedded-lab",
+    );
+    feed
+      .getComponent({ name: "ElDropdown" })
+      .vm.$emit("command", "org:embedded-lab");
+    await flushPromises();
+    expect(feed.get(".scope-label").text()).toBe("embedded-lab");
+    expect(feedRequests.at(-1)).toEqual({
+      scope: "organization",
+      organization: "embedded-lab",
+      repo_type: "all",
+      limit: "20",
+    });
+    auth.user.organizations = [];
+    await flushPromises();
+    expect(feed.get(".scope-label").text()).toBe("All");
+    expect(
+      feed.findAll(".scope-option-label").map((item) => item.text()),
+    ).toEqual(["All", "Self", "Following"]);
+    expect(feedRequests.at(-1)).toEqual({
+      scope: "all",
+      repo_type: "all",
+      limit: "20",
+    });
   });
 
   it("shows an empty workspace with a way to create a first repository", async () => {
@@ -515,7 +941,7 @@ describe("home page", () => {
     auth.user = null;
     await flushPromises();
     expect(wrapper.text()).not.toContain("mai_lin/private-work");
-    expect(wrapper.text()).not.toContain("Your workspace");
+    expect(wrapper.find('[data-testid="workspace"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="homepage-hero"]').exists()).toBe(true);
   });
 
@@ -577,6 +1003,28 @@ describe("home page", () => {
     expect(
       requests.filter((request) => request.type === "personal"),
     ).toHaveLength(1);
+  });
+
+  it("uses the project scrollbar for keyboard-accessible workspace navigation", async () => {
+    signIn();
+    const wrapper = mountPage();
+    await flushPromises();
+    const sidebar = wrapper.get('[data-testid="workspace-personal"]');
+    const scrollArea = sidebar.get(".el-scrollbar");
+    const wrap = scrollArea.get(".workspace-personal-wrap");
+    const content = scrollArea.get(".workspace-personal-view");
+    expect(wrap.attributes("tabindex")).toBe("0");
+    expect(content.attributes("role")).toBe("region");
+    expect(content.attributes("aria-label")).toBe("Workspace navigation");
+    expect(scrollArea.get(".workspace-personal-view").text()).toContain(
+      "Your organizations",
+    );
+    expect(scrollArea.get(".workspace-personal-view").text()).toContain(
+      "mai_lin/lineart-caption-base",
+    );
+    expect(scrollArea.find(".el-scrollbar__bar.is-vertical").exists()).toBe(
+      true,
+    );
   });
 
   it("sorts recent workspace repositories across all types and preserves private repository links", async () => {
@@ -722,6 +1170,7 @@ describe("home page", () => {
       .findAll("button")
       .find((button) => button.text() === "Datasets");
     await datasetFilter.trigger("click");
+    await flushPromises();
     expect(datasetFilter.attributes("aria-pressed")).toBe("true");
     expect(
       feed.find('a[href="/models/mai_lin/lineart-caption-base"]').exists(),
@@ -734,8 +1183,13 @@ describe("home page", () => {
     );
     await feed
       .findAll("button")
-      .find((button) => button.text() === "All")
+      .find(
+        (button) =>
+          button.text() === "All" &&
+          button.element.closest('[aria-label="Activity category"]'),
+      )
       .trigger("click");
+    await flushPromises();
     expect(
       feed.find('a[href="/models/mai_lin/lineart-caption-base"]').exists(),
     ).toBe(true);

@@ -4,6 +4,8 @@
 
 CheeseCave 的主站前端，基于 Vue 3，提供模型、数据集和 Spaces 仓库浏览、文件预览、上传、用户与组织管理等界面。API、存储和后台任务由独立后端提供，管理门户由 Admin 仓库提供。
 
+访客可以浏览可配置的首页及支持 README 元数据筛选的仓库发现页面。登录后进入个人工作区，查看仓库、动态、组织范围与关注动态；个人资料页提供关注操作。站点主题和 Footer 导航由 Admin 配置，原始署名保持受保护。
+
 | 仓库 | 职责 |
 | --- | --- |
 | [cheesecave-backend](https://github.com/cheesecave/cheesecave-backend) | API、worker、数据库迁移及整体部署的 Compose 配置 |
@@ -74,6 +76,8 @@ docker compose up -d --no-deps hub-web
 ## API 兼容与开发历史
 
 独立更新仍需后端支持所使用的 API。项目保留原有 API 路径、Git/LFS 协议和浏览器缓存键；修改接口时需协调相应后端与前端版本，并验证相关操作。
+
+首页与外观设置需要 `GET /api/site-homepage` 和 `GET /api/site-appearance`；仓库发现使用 `GET /api/{models,datasets,spaces}/discover`；关注功能使用 `/api/users/{username}/follow` 和 `/api/users/{username}/{followers,following}`；动态使用 `GET /api/workspace/feed`。启用这些界面前需部署对应的后端功能与数据库迁移，详情见后端的[外观指南](https://github.com/cheesecave/cheesecave-backend/blob/main/docs/deployment/site-appearance.md)、[仓库发现指南](https://github.com/cheesecave/cheesecave-backend/blob/main/docs/features/repository-discovery.md)和[关注功能指南](https://github.com/cheesecave/cheesecave-backend/blob/main/docs/features/following.md)。
 
 后端仓库保留完整原始 Git 提交历史；主站和 Admin 使用新的 Git 历史，首次提交均为「从原仓库分叉」。来源提交、拆分方式及原项目资料见 [provenance/UPSTREAM.md](provenance/UPSTREAM.md)。
 

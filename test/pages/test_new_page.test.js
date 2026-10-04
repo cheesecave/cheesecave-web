@@ -11,6 +11,7 @@ import {
   uiApiFixtures,
 } from "../helpers/api-fixtures";
 import { server } from "../setup/msw-server";
+import { CreationFormStub } from "../helpers/creation-form";
 import { createMemoryHistory, createRouter } from "@/testing/router";
 
 const mocks = vi.hoisted(() => ({
@@ -38,6 +39,11 @@ describe("new repository page", () => {
     createRequests.length = 0;
 
     server.use(
+      http.get("/org/users/:username/orgs", () =>
+        jsonResponse({
+          organizations: cloneFixture(useAuthStore().organizations),
+        }),
+      ),
       http.post("/api/repos/create", async ({ request }) => {
         createRequests.push(await readJsonBody(request));
         return jsonResponse(createResponse, { status: createStatus });
@@ -249,7 +255,9 @@ describe("new repository page", () => {
       .trigger("click");
     await flushPromises();
 
-    expect(mocks.elMessage.error).toHaveBeenCalledWith("Invalid repository name");
+    expect(mocks.elMessage.error).toHaveBeenCalledWith(
+      "Invalid repository name",
+    );
   });
 
   it("stops invalid submissions and handles fallback create errors", async () => {
@@ -295,4 +303,82 @@ describe("new repository page", () => {
       },
     ]);
   });
+
+  it.each(["a", "model.v1"])(
+    "validates and creates %s with the shared form rules",
+    async (name) => {
+      const router = await createTestRouter("/new");
+      useAuthStore().user = { username: "alice" };
+      const wrapper = mountPage(router, { ElForm: CreationFormStub });
+      try {
+        await wrapper
+          .get('input[placeholder="my-awesome-model"]')
+          .setValue(name);
+        await wrapper
+          .findAll("button")
+          .find((button) => button.text().includes("Create Model"))
+          .trigger("click");
+        await flushPromises();
+        expect(createRequests).toEqual([
+          { type: "model", name, organization: null, private: false },
+        ]);
+      } finally {
+        wrapper.unmount();
+      }
+    },
+  );
+
+  it.each(["", "bad/name"])(
+    "blocks %s through the shared form rules",
+    async (name) => {
+      const router = await createTestRouter("/new");
+      useAuthStore().user = { username: "alice" };
+      const wrapper = mountPage(router, { ElForm: CreationFormStub });
+      try {
+        await wrapper
+          .get('input[placeholder="my-awesome-model"]')
+          .setValue(name);
+        await wrapper
+          .findAll("button")
+          .find((button) => button.text().includes("Create Model"))
+          .trigger("click");
+        await flushPromises();
+        expect(createRequests).toEqual([]);
+        expect(wrapper.get("[data-validation-error]").text()).toBe(
+          name
+            ? "Only letters, numbers, hyphens, underscores, and dots allowed"
+            : "Please enter repository name",
+        );
+      } finally {
+        wrapper.unmount();
+      }
+    },
+  );
+
+  it.each([
+    [{ detail: { error: "Quota exceeded" } }, "Quota exceeded"],
+    [{ detail: [{ msg: "Invalid name" }] }, "Invalid name"],
+    [{ detail: {} }, "Failed to create model"],
+  ])(
+    "renders a textual create error for %j",
+    async (createResponse, message) => {
+      installHandlers({ createStatus: 422, createResponse });
+      const router = await createTestRouter("/new");
+      useAuthStore().user = { username: "alice" };
+      const wrapper = mountPage(router);
+      try {
+        await wrapper
+          .get('input[placeholder="my-awesome-model"]')
+          .setValue("model");
+        await wrapper
+          .findAll("button")
+          .find((button) => button.text().includes("Create Model"))
+          .trigger("click");
+        await flushPromises();
+        expect(mocks.elMessage.error).toHaveBeenCalledWith(message);
+      } finally {
+        wrapper.unmount();
+      }
+    },
+  );
 });

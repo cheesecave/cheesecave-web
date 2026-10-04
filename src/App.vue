@@ -4,9 +4,9 @@
     class="app-shell w-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors flex flex-col"
     :class="{ 'workspace-shell': isWorkspaceHome }"
   >
-    <TheHeader class="shrink-0" :expanded="isWorkspaceHome" />
+    <TheHeader class="shrink-0" :expanded="authStore.isAuthenticated" />
     <PageScrollArea>
-      <main class="flex-1 min-w-0">
+      <main class="site-main flex-1 min-w-0">
         <RouterView v-slot="{ Component, route }">
           <keep-alive :include="['RepoViewer']">
             <component :is="Component" :key="getRouteKey(route)" />
@@ -24,6 +24,7 @@ import TheFooter from "@/components/layout/TheFooter.vue";
 import PageScrollArea from "@/components/layout/PageScrollArea.vue";
 import { computed } from "vue";
 import { useAuthStore } from "@/stores/auth";
+import { getRouteViewKey } from "@/utils/repo-view-routes";
 
 const route = useRoute();
 const authStore = useAuthStore();
@@ -40,15 +41,7 @@ const isWorkspaceHome = computed(
  * Different repo = different key = new component instance
  */
 function getRouteKey(route) {
-  // Extract repo identifier from path
-  const match = route.path.match(
-    /^\/(models|datasets|spaces)\/([^/]+)\/([^/]+)/,
-  );
-  if (match) {
-    const [, type, namespace, name] = match;
-    return `${type}-${namespace}-${name}`;
-  }
-  return route.path;
+  return getRouteViewKey(route);
 }
 </script>
 
@@ -58,6 +51,10 @@ function getRouteKey(route) {
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
+}
+.site-main {
+  min-height: calc(100vh - var(--site-header-height));
+  min-height: calc(100dvh - var(--site-header-height));
 }
 @media (max-width: 767px) {
   .app-shell {

@@ -119,6 +119,10 @@
 import { ref, computed } from "vue";
 import "cropperjs";
 import { ElMessage, ElMessageBox } from "element-plus";
+import {
+  buildEntityAvatarUrl,
+  invalidateEntityAvatar,
+} from "@/utils/entity-avatar";
 
 const props = defineProps({
   entityType: {
@@ -149,15 +153,12 @@ const showCropDialog = ref(false);
 const imageSrc = ref("");
 const uploading = ref(false);
 const avatarError = ref(false);
-const avatarTimestamp = ref(Date.now());
-
-const currentAvatarUrl = computed(() => {
-  if (props.entityType === "user") {
-    return `/api/users/${props.entityName}/avatar?t=${avatarTimestamp.value}`;
-  } else {
-    return `/api/organizations/${props.entityName}/avatar?t=${avatarTimestamp.value}`;
-  }
-});
+const currentAvatarUrl = computed(() =>
+  buildEntityAvatarUrl({
+    username: props.entityName,
+    isOrg: props.entityType === "org",
+  }),
+);
 
 function triggerFileInput() {
   fileInput.value?.click();
@@ -235,7 +236,7 @@ async function handleCrop() {
     ElMessage.success("Avatar uploaded successfully");
     showCropDialog.value = false;
     avatarError.value = false;
-    avatarTimestamp.value = Date.now();
+    invalidateEntityAvatar(props.entityName, props.entityType === "org");
     emit("uploaded");
   } catch (error) {
     console.error("Failed to upload avatar:", error);
@@ -260,6 +261,7 @@ async function handleDelete() {
     await props.deleteFunction(props.entityName);
     ElMessage.success("Avatar deleted successfully");
     avatarError.value = true;
+    invalidateEntityAvatar(props.entityName, props.entityType === "org");
     emit("deleted");
   } catch (error) {
     if (error !== "cancel" && error !== "close") {

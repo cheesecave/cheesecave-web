@@ -97,6 +97,39 @@ describe("RepoViewer path handling", () => {
     });
   }
 
+  it("marks Viewer as a separate page action and navigates to its full-width view", async () => {
+    server.use(
+      http.get(
+        "/api/datasets/open-media-lab/hierarchy-crawl-fixtures/tree/main",
+        () => jsonResponse([]),
+      ),
+      http.post(
+        "/api/datasets/open-media-lab/hierarchy-crawl-fixtures/paths-info/main",
+        () => jsonResponse([]),
+      ),
+    );
+    const wrapper = mountViewer();
+    await flushPromises();
+    const viewerButton = wrapper.get('button[title="Open dataset viewer"]');
+    expect(viewerButton.text()).toBe("Viewer");
+    expect(viewerButton.get(".i-carbon-launch").attributes("aria-hidden")).toBe(
+      "true",
+    );
+    expect(viewerButton.attributes("aria-current")).toBeUndefined();
+    await viewerButton.trigger("click");
+    expect(mocks.router.push).toHaveBeenCalledWith({
+      path: "/datasets/open-media-lab/hierarchy-crawl-fixtures",
+      query: { tab: "viewer" },
+    });
+    await wrapper.setProps({ tab: "viewer" });
+    expect(
+      wrapper
+        .get('button[title="Open dataset viewer"]')
+        .attributes("aria-current"),
+    ).toBe("page");
+    wrapper.unmount();
+  });
+
   it("loads repo-root tree entries through the API client, merges expanded path info, and links commits", async () => {
     server.use(
       http.get(
@@ -354,11 +387,11 @@ describe("RepoViewer path handling", () => {
       http.get(
         "/api/datasets/open-media-lab/hierarchy-crawl-fixtures/tree/main/:path",
         ({ params }) => {
-        requestCount += 1;
-        if (requestCount === 1) {
-          return jsonResponse([]);
-        }
-        return jsonResponse({ detail: "tree failed" }, { status: 500 });
+          requestCount += 1;
+          if (requestCount === 1) {
+            return jsonResponse([]);
+          }
+          return jsonResponse({ detail: "tree failed" }, { status: 500 });
         },
       ),
     );
@@ -388,12 +421,12 @@ describe("RepoViewer path handling", () => {
       http.get(
         "/api/datasets/open-media-lab/hierarchy-crawl-fixtures/tree/main/:path",
         async ({ params }) => {
-        if (params.path === "catalog") {
-          const payload = await firstTree.promise;
+          if (params.path === "catalog") {
+            const payload = await firstTree.promise;
+            return jsonResponse(payload);
+          }
+          const payload = await secondTree.promise;
           return jsonResponse(payload);
-        }
-        const payload = await secondTree.promise;
-        return jsonResponse(payload);
         },
       ),
       http.post(
@@ -457,24 +490,24 @@ describe("RepoViewer path handling", () => {
       http.get(
         "/api/datasets/open-media-lab/hierarchy-crawl-fixtures/tree/main/:path",
         ({ params }) => {
-        if (params.path === "catalog") {
+          if (params.path === "catalog") {
+            return jsonResponse([
+              {
+                type: "file",
+                path: "catalog/old.txt",
+                size: 1,
+                lastModified: "2026-04-21T13:53:39.000000Z",
+              },
+            ]);
+          }
           return jsonResponse([
             {
               type: "file",
-              path: "catalog/old.txt",
+              path: "catalog-next/new.txt",
               size: 1,
               lastModified: "2026-04-21T13:53:39.000000Z",
             },
           ]);
-        }
-        return jsonResponse([
-          {
-            type: "file",
-            path: "catalog-next/new.txt",
-            size: 1,
-            lastModified: "2026-04-21T13:53:39.000000Z",
-          },
-        ]);
         },
       ),
       http.post(
@@ -821,10 +854,7 @@ describe("RepoViewer path handling", () => {
             );
           }
           if (secondCallShouldFail) {
-            return jsonResponse(
-              { detail: "transient" },
-              { status: 503 },
-            );
+            return jsonResponse({ detail: "transient" }, { status: 503 });
           }
           return jsonResponse([
             {
@@ -1162,10 +1192,7 @@ describe("RepoViewer path handling", () => {
 
     // Both probes should have fired exactly once (one per .tar row
     // whose sibling is not in the loaded page).
-    expect(headProbes.sort()).toEqual([
-      "no-sibling.json",
-      "with-sibling.json",
-    ]);
+    expect(headProbes.sort()).toEqual(["no-sibling.json", "with-sibling.json"]);
 
     // The confirmed tar gets the indexed-tar icon (Carbon's archive),
     // the unconfirmed one stays bare.
@@ -1232,7 +1259,9 @@ describe("RepoViewer path handling", () => {
     const previewBtn = wrapper
       .findAll("button")
       .find((b) =>
-        (b.attributes("aria-label") || "").startsWith("Preview metadata for bundle.tar"),
+        (b.attributes("aria-label") || "").startsWith(
+          "Preview metadata for bundle.tar",
+        ),
       );
     expect(previewBtn).toBeTruthy();
     expect(previewBtn.attributes("title")).toContain(

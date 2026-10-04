@@ -2,6 +2,10 @@ function trimPathSlashes(value) {
   return value.replace(/^\/+|\/+$/g, "");
 }
 
+export function buildRepositoryPath(repoType, fullId) {
+  return `/${repoType}s/${fullId.split("/").map(encodeURIComponent).join("/")}`;
+}
+
 export function normalizeCatchAllParam(value) {
   if (Array.isArray(value)) {
     return value

@@ -542,34 +542,34 @@ onMounted(() => {
 }
 
 /* Handle dark mode class from theme store */
-:global(.dark) .markdown-body :deep(h1),
-:global(.dark) .markdown-body :deep(h2) {
+.dark .markdown-body :deep(h1),
+.dark .markdown-body :deep(h2) {
   border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
-:global(.dark) .markdown-body :deep(pre) {
+.dark .markdown-body :deep(pre) {
   background-color: rgba(0, 0, 0, 0.3);
 }
 
-:global(.dark) .markdown-body :deep(code) {
+.dark .markdown-body :deep(code) {
   background-color: rgba(255, 255, 255, 0.1);
 }
 
-:global(.dark) .markdown-body :deep(table th) {
+.dark .markdown-body :deep(table th) {
   background-color: rgba(0, 0, 0, 0.3);
 }
 
-:global(.dark) .markdown-body :deep(table th),
-:global(.dark) .markdown-body :deep(table td) {
+.dark .markdown-body :deep(table th),
+.dark .markdown-body :deep(table td) {
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-:global(.dark) .markdown-body :deep(blockquote) {
+.dark .markdown-body :deep(blockquote) {
   color: #8b949e;
   border-left-color: rgba(255, 255, 255, 0.2);
 }
 
-:global(.dark) .markdown-body :deep(a) {
+.dark .markdown-body :deep(a) {
   color: #58a6ff;
 }
 

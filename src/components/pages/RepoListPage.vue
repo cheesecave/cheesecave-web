@@ -1,295 +1,433 @@
-<!-- src/kohaku-hub-ui/src/components/pages/RepoListPage.vue -->
 <template>
-  <div class="container-main">
-    <div
-      class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6"
-    >
-      <div>
-        <h1 class="text-2xl md:text-3xl font-bold mb-2">{{ pageTitle }}</h1>
-        <p class="text-sm md:text-base text-gray-600 dark:text-gray-400">
-          {{ pageDescription }}
-        </p>
+  <div class="repo-discovery">
+    <aside class="discovery-sidebar" aria-label="Repository filters">
+      <el-scrollbar max-height="calc(100dvh - 125px)" :tabindex="0">
+        <RepoFilterPanel
+          :facets="facets"
+          :selected="selectedFilters"
+          @toggle="toggleFilter"
+          @clear="clearFilters"
+        />
+      </el-scrollbar>
+    </aside>
+    <div class="discovery-main">
+      <header class="discovery-heading">
+        <div class="discovery-title">
+          <h1>{{ pageTitle }}</h1>
+          <span v-if="hasLoaded" class="repo-total">{{
+            total.toLocaleString()
+          }}</span>
+        </div>
+        <el-button
+          v-if="isAuthenticated"
+          type="primary"
+          @click="showCreateDialog = true"
+          ><span class="i-carbon-add mr-1" />New {{ repoTypeLabel }}</el-button
+        >
+      </header>
+      <p class="discovery-description">{{ pageDescription }}</p>
+      <div class="discovery-toolbar">
+        <el-input
+          v-model="searchQuery"
+          :placeholder="`Search ${repoType}s...`"
+          clearable
+          :maxlength="200"
+          aria-label="Search repositories"
+          ><template #prefix><span class="i-carbon-search" /></template
+        ></el-input>
+        <el-select
+          v-model="sortBy"
+          aria-label="Sort repositories"
+          @change="changeSort"
+        >
+          <el-option
+            v-for="sort in REPOSITORY_SORTS"
+            :key="sort.value"
+            :label="sort.label"
+            :value="sort.value"
+          />
+        </el-select>
+        <el-button class="mobile-filter-button" @click="showFilters = true"
+          ><span class="i-carbon-filter mr-1" />Filters<span
+            v-if="activeFilters.length"
+          >
+            ({{ activeFilters.length }})</span
+          ></el-button
+        >
       </div>
-
-      <el-button
-        v-if="isAuthenticated"
-        type="primary"
-        size="large"
-        @click="showCreateDialog = true"
-        class="w-full md:w-auto"
-      >
-        <div class="i-carbon-add inline-block mr-1" />
-        New {{ repoTypeLabel }}
-      </el-button>
-    </div>
-
-    <!-- Filters -->
-    <div class="card mb-6">
       <div
-        class="flex flex-col gap-4 md:flex-row md:items-center"
+        v-if="activeFilters.length"
+        class="selected-filters"
+        aria-label="Selected filters"
       >
-        <div class="w-full md:flex-1 md:min-w-0">
-          <el-input
-            v-model="searchQuery"
-            :placeholder="`Search ${repoType}s...`"
-            clearable
-            class="w-full"
-          >
-            <template #prefix>
-              <div class="i-carbon-search" />
-            </template>
-          </el-input>
-        </div>
-
-        <div class="w-full md:w-72 md:flex-none md:shrink-0">
-          <el-select
-            v-model="sortBy"
-            placeholder="Sort by"
-            class="w-full"
-          >
-            <el-option label="Recently Created" value="recent" />
-            <el-option label="Recently Updated" value="updated" />
-            <el-option label="Most Downloads" value="downloads" />
-            <el-option label="Most Likes" value="likes" />
-          </el-select>
-        </div>
+        <button
+          v-for="filter in activeFilters"
+          :key="`${filter.key}:${filter.value}`"
+          type="button"
+          :aria-label="`Remove ${filter.label} filter`"
+          @click="toggleFilter(filter)"
+        >
+          {{ filter.label }}<span class="i-carbon-close" aria-hidden="true" />
+        </button>
+        <button type="button" class="clear-selected" @click="clearFilters">
+          Clear all
+        </button>
       </div>
+      <div class="discovery-status" aria-live="polite">
+        <span v-if="loading && hasLoaded" class="repo-refreshing" role="status"
+          ><span
+            class="i-carbon-circle-dash animate-spin"
+            aria-hidden="true"
+          />Updating repositories</span
+        >
+        <span v-else-if="indexing.pending" role="status"
+          >Updating filters · {{ indexing.pending }} repositories
+          remaining</span
+        >
+      </div>
+      <section
+        class="repo-results"
+        :aria-busy="loading"
+        aria-label="Repositories"
+      >
+        <el-skeleton :loading="loading && !hasLoaded" animated>
+          <template #template
+            ><div class="discovery-grid" aria-hidden="true">
+              <div v-for="index in 12" :key="index" class="repo-skeleton-card">
+                <el-skeleton-item
+                  variant="h3"
+                  class="!w-3/4"
+                /><el-skeleton-item
+                  variant="text"
+                  class="!w-2/3"
+                /><el-skeleton-item variant="text" class="!w-1/2" />
+              </div></div
+          ></template>
+          <template #default>
+            <div v-if="loadError" class="discovery-error" role="alert">
+              {{ loadError }}<el-button @click="loadRepos">Retry</el-button>
+            </div>
+            <div v-if="repos.length" class="discovery-grid">
+              <RepoDiscoveryCard
+                v-for="repo in repos"
+                :key="repo.id"
+                :repo="repo"
+                :repo-type="repoType"
+              />
+            </div>
+            <div v-else-if="!loadError" class="discovery-empty">
+              <span class="i-carbon-search" aria-hidden="true" />
+              <h2>
+                {{
+                  indexing.pending
+                    ? "Preparing repository filters"
+                    : "No repositories found"
+                }}
+              </h2>
+              <p>
+                {{
+                  indexing.pending
+                    ? "Results will update as metadata is indexed."
+                    : "Try another search or clear the selected filters."
+                }}
+              </p>
+              <el-button
+                v-if="activeFilters.length || searchTerm"
+                @click="resetSearch"
+                >Clear filters</el-button
+              >
+            </div>
+          </template>
+        </el-skeleton>
+      </section>
+      <el-pagination
+        v-if="total > discoveryPageSize"
+        class="discovery-pagination"
+        :current-page="currentPage"
+        :page-size="discoveryPageSize"
+        :total="total"
+        layout="prev, pager, next"
+        :pager-count="5"
+        @current-change="changePage"
+      />
     </div>
-
-    <!-- Repository List -->
-    <el-skeleton :loading="loading" :rows="5" animated>
-      <RepoList :repos="filteredRepos" :type="repoType" />
-    </el-skeleton>
-
+    <el-drawer
+      v-model="showFilters"
+      title="Filters"
+      direction="btt"
+      size="85%"
+      class="discovery-filter-drawer"
+    >
+      <el-scrollbar height="100%" :tabindex="0">
+        <RepoFilterPanel
+          :facets="facets"
+          :selected="selectedFilters"
+          @toggle="toggleFilter"
+          @clear="clearFilters"
+        />
+      </el-scrollbar>
+      <template #footer
+        ><el-button type="primary" @click="showFilters = false"
+          >Show results</el-button
+        ></template
+      >
+    </el-drawer>
     <!-- Create Repository Dialog -->
     <el-dialog
       v-model="showCreateDialog"
       :title="`Create New ${repoTypeLabel}`"
-      width="500px"
+      width="min(500px, calc(100vw - 32px))"
     >
-      <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
-        <el-form-item :label="`${repoTypeLabel} Name`" prop="name">
-          <el-input v-model="form.name" :placeholder="`my-${repoType}`" />
-          <div class="text-xs text-gray-500 mt-1">
-            Full name: {{ currentUser }}/{{ form.name || `${repoType}-name` }}
-          </div>
-        </el-form-item>
-
-        <el-form-item label="Organization (Optional)" prop="organization">
-          <el-select
-            v-model="form.organization"
-            placeholder="Select organization or leave empty"
-            clearable
-            class="w-full"
-          >
-            <el-option
-              v-for="org in userOrgs"
-              :key="org.name"
-              :label="org.name"
-              :value="org.name"
-            />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item>
-          <el-checkbox v-model="form.private">
-            Make this {{ repoType }} private
-          </el-checkbox>
-        </el-form-item>
-      </el-form>
-
-      <template #footer>
-        <el-button @click="showCreateDialog = false">Cancel</el-button>
-        <el-button type="primary" :loading="creating" @click="handleCreate">
-          Create {{ repoTypeLabel }}
-        </el-button>
-      </template>
+      <CreateRepositoryForm
+        v-if="showCreateDialog"
+        :fixed-type="repoType"
+        compact
+        @cancel="showCreateDialog = false"
+        @created="showCreateDialog = false"
+      />
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { repoAPI, orgAPI } from "@/utils/api";
-import { useAuthStore } from "@/stores/auth";
-import RepoList from "@/components/repo/RepoList.vue";
-import {
-  getRepoSortPreference,
-  setRepoSortPreference,
-} from "@/utils/repoSortPreference";
-import { ElMessage } from "element-plus";
-
+import { computed, ref } from "vue";
+import RepoFilterPanel from "@/components/discovery/RepoFilterPanel.vue";
+import RepoDiscoveryCard from "@/components/discovery/RepoDiscoveryCard.vue";
+import CreateRepositoryForm from "@/components/repo/CreateRepositoryForm.vue";
+import { useRepositoryDiscovery } from "@/composables/useRepositoryDiscovery";
+import { discoveryPageSize } from "@/utils/repo-discovery";
+import { REPOSITORY_SORTS } from "@/utils/repository-sorts";
+import { getRepositoryType, isRepositoryType } from "@/utils/repository-types";
 const props = defineProps({
   repoType: {
     type: String,
     required: true,
-    validator: (value) => ["model", "dataset", "space"].includes(value),
+    validator: isRepositoryType,
   },
 });
-
-const router = useRouter();
-const authStore = useAuthStore();
-const { isAuthenticated, username: currentUser } = storeToRefs(authStore);
-
-const repoTypeLabel = computed(() => {
-  const labels = { model: "Model", dataset: "Dataset", space: "Space" };
-  return labels[props.repoType] || "Model";
-});
-
-const pageTitle = computed(() => {
-  const titles = { model: "Models", dataset: "Datasets", space: "Spaces" };
-  return titles[props.repoType] || "Models";
-});
-
-const pageDescription = computed(() => {
-  const descriptions = {
-    model: "Discover and share machine learning models",
-    dataset: "Discover and share datasets for machine learning",
-    space: "Discover ML demos and applications",
-  };
-  return descriptions[props.repoType] || "";
-});
-
-const loading = ref(true);
-const repos = ref([]);
-const searchQuery = ref("");
-const sortBy = ref(
-  getRepoSortPreference({
-    scope: "repo",
-    repoType: props.repoType,
-    allowedValues: ["recent", "updated", "downloads", "likes"],
-    fallback: "recent",
-  }),
+const repositoryType = computed(() => getRepositoryType(props.repoType));
+const repoTypeLabel = computed(() => repositoryType.value.label);
+const pageTitle = computed(() => repositoryType.value.plural);
+const pageDescription = computed(
+  () => repositoryType.value.discoveryDescription,
 );
+const {
+  isAuthenticated,
+  searchQuery,
+  searchTerm,
+  sortBy,
+  selectedFilters,
+  currentPage,
+  repos,
+  total,
+  facets,
+  indexing,
+  loading,
+  hasLoaded,
+  loadError,
+  activeFilters,
+  toggleFilter,
+  clearFilters,
+  resetSearch,
+  changeSort,
+  changePage,
+  loadRepos,
+} = useRepositoryDiscovery(() => props.repoType);
+const showFilters = ref(false);
 const showCreateDialog = ref(false);
-const creating = ref(false);
-const userOrgs = ref([]);
-const formRef = ref(null);
-
-const form = reactive({
-  name: "",
-  organization: "",
-  private: false,
-});
-
-const rules = {
-  name: [
-    {
-      required: true,
-      message: `Please enter ${props.repoType} name`,
-      trigger: "blur",
-    },
-    {
-      pattern: /^[a-zA-Z0-9_-]+$/,
-      message: "Only letters, numbers, hyphens and underscores allowed",
-      trigger: "blur",
-    },
-  ],
-};
-
-const filteredRepos = computed(() => {
-  let result = [...repos.value];
-
-  // Only filter by search query (sorting is done by backend)
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase();
-    result = result.filter(
-      (repo) =>
-        repo.id.toLowerCase().includes(query) ||
-        repo.author.toLowerCase().includes(query),
-    );
-  }
-
-  return result;
-});
-
-async function loadRepos() {
-  loading.value = true;
-  try {
-    const { data } = await repoAPI.listRepos(props.repoType, {
-      limit: 100,
-      sort: sortBy.value,
-      fallback: false, // Don't aggregate external repos on main list pages
-    });
-    repos.value = data;
-  } catch (err) {
-    console.error(`Failed to load ${props.repoType}s:`, err);
-    ElMessage.error(`Failed to load ${props.repoType}s`);
-  } finally {
-    loading.value = false;
-  }
-}
-
-async function loadUserOrgs() {
-  if (!currentUser.value) return;
-
-  try {
-    const { data } = await orgAPI.getUserOrgs(currentUser.value);
-    userOrgs.value = data.organizations || [];
-  } catch (err) {
-    console.error("Failed to load organizations:", err);
-  }
-}
-
-async function handleCreate() {
-  if (!formRef.value) return;
-
-  await formRef.value.validate(async (valid) => {
-    if (!valid) return;
-
-    creating.value = true;
-    try {
-      const { data } = await repoAPI.create({
-        type: props.repoType,
-        name: form.name,
-        organization: form.organization || null,
-        private: form.private,
-      });
-
-      ElMessage.success(`${repoTypeLabel.value} created successfully`);
-      showCreateDialog.value = false;
-
-      const repoId =
-        data.repo_id ||
-        `${form.organization || currentUser.value}/${form.name}`;
-      router.push(`/${props.repoType}s/${repoId}`);
-    } catch (err) {
-      // `POST /api/repos/create` returns a 409 with a top-level `{url,
-      // repo_id, error}` body when the repo already exists (HF-compatible
-      // exist-ok contract). Read `.error` before falling back to the
-      // legacy `.detail` shape so the user sees the actual conflict
-      // message instead of a generic "Failed to create ..." toast.
-      ElMessage.error(
-        err.response?.data?.error ||
-          err.response?.data?.detail ||
-          `Failed to create ${props.repoType}`,
-      );
-    } finally {
-      creating.value = false;
-    }
-  });
-}
-
-watch(showCreateDialog, (val) => {
-  if (val) {
-    loadUserOrgs();
-  } else {
-    form.name = "";
-    form.organization = "";
-    form.private = false;
-  }
-});
-
-// Reload repos when sort changes
-watch(sortBy, () => {
-  setRepoSortPreference({
-    scope: "repo",
-    repoType: props.repoType,
-    value: sortBy.value,
-  });
-  loadRepos();
-});
-
-onMounted(() => {
-  loadRepos();
-});
 </script>
+
+<style scoped>
+.repo-discovery {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 32px;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 32px 28px;
+}
+.discovery-sidebar {
+  min-width: 0;
+  align-self: start;
+  position: sticky;
+  top: 24px;
+  padding-right: 24px;
+  border-right: 1px solid var(--site-border);
+}
+.discovery-main {
+  min-width: 0;
+}
+.discovery-heading,
+.discovery-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.discovery-heading {
+  justify-content: space-between;
+}
+.discovery-title h1 {
+  font-size: 24px;
+  font-weight: 650;
+  margin: 0;
+}
+.repo-total {
+  font-size: 15px;
+  color: var(--site-page-muted);
+}
+.discovery-description {
+  color: var(--site-page-muted);
+  font-size: 13px;
+  margin: 6px 0 20px;
+}
+.discovery-toolbar {
+  display: flex;
+  gap: 12px;
+}
+.discovery-toolbar > .el-input {
+  flex: 1;
+  min-width: 0;
+}
+.discovery-toolbar > .el-select {
+  width: 185px;
+  flex-shrink: 0;
+}
+.mobile-filter-button {
+  display: none;
+}
+.selected-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.selected-filters button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 5px 8px;
+  border: 1px solid var(--site-primary);
+  border-radius: 7px;
+  background: var(--site-card);
+  color: var(--site-link);
+}
+.selected-filters button:focus-visible {
+  outline: 2px solid var(--site-primary);
+  outline-offset: 2px;
+}
+.selected-filters .clear-selected {
+  border-color: transparent;
+  background: transparent;
+}
+.discovery-status {
+  min-height: 30px;
+  padding-top: 8px;
+  color: var(--site-page-muted);
+  font-size: 12px;
+}
+.repo-refreshing {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.repo-results {
+  position: relative;
+}
+.discovery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.repo-skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 122px;
+  border-radius: var(--site-card-radius, 12px);
+  box-shadow: var(--site-card-shadow, none);
+  padding: 18px;
+  background: var(--site-card);
+  border: 1px solid var(--site-border);
+}
+.discovery-empty {
+  padding: 72px 16px;
+  text-align: center;
+  color: var(--site-page-muted);
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-card-radius, 12px);
+  box-shadow: var(--site-card-shadow, none);
+  background: var(--site-card);
+}
+.discovery-empty > span {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+}
+.discovery-empty h2 {
+  font-size: 17px;
+  margin: 16px 0 8px;
+  color: var(--site-card-text);
+}
+.discovery-empty p {
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.discovery-error {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border-radius: var(--site-card-radius, 12px);
+  box-shadow: var(--site-card-shadow, none);
+  background: var(--site-card);
+  border: 1px solid var(--site-border);
+}
+.discovery-pagination {
+  margin-top: 24px;
+  justify-content: center;
+}
+@media (max-width: 1100px) {
+  .repo-discovery {
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 24px;
+  }
+  .discovery-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 767px) {
+  .repo-discovery {
+    display: block;
+    padding: 24px 16px;
+  }
+  .discovery-sidebar {
+    display: none;
+  }
+  .mobile-filter-button {
+    display: inline-flex;
+  }
+  .discovery-toolbar {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .discovery-toolbar > .el-input {
+    flex: 1 1 100%;
+  }
+  .discovery-toolbar > .el-select {
+    flex: 1;
+    width: auto;
+  }
+  .discovery-title h1 {
+    font-size: 22px;
+  }
+  .discovery-heading > .el-button {
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+}
+</style>

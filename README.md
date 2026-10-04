@@ -4,6 +4,8 @@ English | [简体中文](README.zh-CN.md)
 
 The Vue 3 website for CheeseCave, with interfaces for browsing model, dataset and Spaces repositories, previewing and uploading files, and managing users and organizations. The separate backend provides APIs, storage and background tasks; the Admin repository provides the administration portal.
 
+Visitors see a configurable homepage and repository discovery with README metadata filters. Signed-in users get a personal workspace with repository and activity views, organization scopes and following feeds. Profiles include follow controls. Site theme and footer navigation are configured in Admin, while original attribution remains protected.
+
 | Repository | Responsibility |
 | --- | --- |
 | [cheesecave-backend](https://github.com/cheesecave/cheesecave-backend) | APIs, workers, database migrations and Compose configuration for the full deployment |
@@ -74,6 +76,8 @@ This replaces only the website service. If you maintain your own image registry,
 ## API compatibility and development history
 
 Independent updates still require backend support for the APIs in use. The project retains existing API paths, Git/LFS protocols and browser cache keys. Coordinate backend and frontend versions when changing interfaces, and verify the affected operations.
+
+Homepage and appearance settings require `GET /api/site-homepage` and `GET /api/site-appearance`. Discovery uses `GET /api/{models,datasets,spaces}/discover`; following uses `/api/users/{username}/follow` and `/api/users/{username}/{followers,following}`; activity feeds use `GET /api/workspace/feed`. Deploy the corresponding backend features and migrations before enabling these views. See the backend's [appearance guide](https://github.com/cheesecave/cheesecave-backend/blob/main/docs/deployment/site-appearance.md), [discovery guide](https://github.com/cheesecave/cheesecave-backend/blob/main/docs/features/repository-discovery.md) and [following guide](https://github.com/cheesecave/cheesecave-backend/blob/main/docs/features/following.md).
 
 The backend repository preserves the complete original Git commit history. The website and Admin start fresh Git histories, both with the first commit titled `从原仓库分叉` (forked from the original repository). See [provenance/UPSTREAM.md](provenance/UPSTREAM.md) for the source commit, split procedure and original project information.
 

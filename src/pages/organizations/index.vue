@@ -41,21 +41,12 @@
           @click="goToOrganization(org.name)"
         >
           <div class="flex items-start gap-3 mb-3">
-            <!-- Organization Avatar -->
-            <img
-              :src="`/api/organizations/${org.name}/avatar?t=${Date.now()}`"
+            <EntityAvatar
+              :username="org.name"
+              is-org
+              :name="org.name"
+              :size="64"
               :alt="`${org.name} avatar`"
-              class="w-16 h-16 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600 flex-shrink-0"
-              @error="
-                (e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextElementSibling.style.display = 'flex';
-                }
-              "
-            />
-            <div
-              class="i-carbon-group text-4xl text-blue-500 flex-shrink-0"
-              style="display: none"
             />
             <div class="flex-1 min-w-0">
               <h3 class="text-lg font-semibold truncate">
@@ -121,6 +112,7 @@
 </template>
 
 <script setup>
+import EntityAvatar from "@/components/common/EntityAvatar.vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { orgAPI, settingsAPI } from "@/utils/api";

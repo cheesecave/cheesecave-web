@@ -35,15 +35,12 @@
         <aside class="space-y-4 lg:sticky lg:top-4 lg:self-start">
           <div class="card">
             <div class="flex items-center gap-3 mb-4">
-              <!-- Avatar (always try API endpoint with fallback) -->
-              <img
-                v-if="hasAvatar"
-                :src="`/api/users/${username}/avatar?t=${Date.now()}`"
+              <EntityAvatar
+                :username="username"
+                :name="username"
+                :size="80"
                 :alt="`${username} avatar`"
-                class="w-20 h-20 rounded-full object-cover"
-                @error="hasAvatar = false"
               />
-              <div v-else class="i-carbon-user-avatar text-5xl text-gray-400" />
 
               <div>
                 <h2 class="text-xl font-bold">{{ username }}</h2>
@@ -63,6 +60,7 @@
               </div>
             </div>
 
+            <FollowControls v-if="!isExternalUser" :username="username" />
             <div v-if="profileInfo" class="space-y-3 text-sm">
               <!-- Bio -->
               <p
@@ -401,7 +399,9 @@
                     />
                   </el-select>
                 </div>
-                <el-tag type="info" size="large">{{ getCount("model") }}</el-tag>
+                <el-tag type="info" size="large">{{
+                  getCount("model")
+                }}</el-tag>
               </div>
             </div>
 
@@ -755,8 +755,10 @@
 
 <script setup>
 import { repoAPI, orgAPI, settingsAPI } from "@/utils/api";
+import EntityAvatar from "@/components/common/EntityAvatar.vue";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import SocialLinks from "@/components/profile/SocialLinks.vue";
+import FollowControls from "@/components/profile/FollowControls.vue";
 import { formatRelativeTime } from "@/utils/datetime";
 import {
   getRepoSortPreference,
@@ -775,7 +777,6 @@ const repos = ref({ models: [], datasets: [], spaces: [] });
 const userCard = ref("");
 const userNotFound = ref(false);
 const quotaInfo = ref(null);
-const hasAvatar = ref(true); // Assume avatar exists, will be set to false on error
 const selectedSorts = reactive({
   model: getRepoSortPreference({
     scope: "user",

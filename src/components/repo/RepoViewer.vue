@@ -1,7 +1,12 @@
 <!-- src/components/repo/RepoViewer.vue -->
 <template>
   <div class="container-main">
-    <el-breadcrumb separator="/" class="mb-6 text-gray-700 dark:text-gray-300">
+    <el-breadcrumb
+      v-if="activeTab === 'viewer' || error"
+      separator="/"
+      class="repo-breadcrumb mb-6 text-gray-700 dark:text-gray-300"
+      aria-label="Repository navigation"
+    >
       <el-breadcrumb-item>
         <RouterLink
           to="/"
@@ -60,42 +65,38 @@
       <!-- Main Content -->
       <main class="min-w-0">
         <!-- Repo Header (hidden for viewer tab) -->
-        <div v-if="activeTab !== 'viewer'" class="card mb-6">
+        <div v-if="activeTab !== 'viewer'" class="card repo-header mb-6">
           <div
             class="flex flex-col sm:flex-row items-start justify-between gap-4 mb-4"
           >
-            <div class="flex items-start gap-3">
+            <div class="flex items-start gap-3 min-w-0 flex-1">
               <div
                 :class="getIconClass(repoType)"
                 class="text-3xl sm:text-4xl flex-shrink-0"
               />
-              <div class="min-w-0">
+              <div class="min-w-0 flex items-start gap-2">
                 <h1
                   class="text-xl sm:text-2xl lg:text-3xl font-bold break-words"
                 >
-                  {{ repoInfo?.id }}
-                </h1>
-                <div class="flex items-center gap-2 mt-1">
                   <RouterLink
                     :to="namespaceLink"
-                    class="text-blue-600 dark:text-blue-400 hover:underline"
+                    class="font-bold text-blue-600 dark:text-blue-400 hover:underline"
                   >
                     {{ namespace }}
                   </RouterLink>
-                  <span class="text-gray-400 dark:text-gray-500">/</span>
-                  <span class="text-gray-700 dark:text-gray-300">{{
-                    name
-                  }}</span>
-                  <button
-                    @click="copyRepoId"
-                    class="ml-1 p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
-                    title="Copy repository ID"
-                  >
-                    <div
-                      class="i-carbon-copy text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                    />
-                  </button>
-                </div>
+                  <span class="text-gray-400 dark:text-gray-500"> / </span>
+                  <span>{{ name }}</span>
+                </h1>
+                <button
+                  @click="copyRepoId"
+                  class="mt-1 p-1 shrink-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+                  title="Copy repository ID"
+                  aria-label="Copy repository ID"
+                >
+                  <div
+                    class="i-carbon-copy text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                  />
+                </button>
               </div>
             </div>
 
@@ -205,7 +206,7 @@
         />
 
         <!-- Navigation Tabs -->
-        <div class="mb-6 -mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto">
+        <div class="repo-tabs mb-6 -mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto">
           <div
             class="flex gap-1 border-b border-gray-200 dark:border-gray-700 min-w-max sm:min-w-0"
           >
@@ -274,10 +275,14 @@
                   ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200',
               ]"
+              :aria-current="activeTab === 'viewer' ? 'page' : undefined"
+              title="Open dataset viewer"
               @click="navigateToTab('viewer')"
             >
-              <div class="i-carbon-data-table inline-block mr-1" />
-              Viewer
+              <span class="inline-flex items-center gap-2">
+                Viewer
+                <span class="i-carbon-launch text-sm" aria-hidden="true" />
+              </span>
             </button>
           </div>
         </div>
@@ -335,8 +340,16 @@
 
         <!-- Metadata Tab -->
         <div v-if="activeTab === 'metadata'">
+          <div
+            v-if="readmeLoading"
+            class="card"
+            role="status"
+            aria-label="Loading metadata"
+          >
+            <el-skeleton :rows="3" animated />
+          </div>
           <DetailedMetadataPanel
-            v-if="hasDetailedMetadata"
+            v-else-if="hasDetailedMetadata"
             :metadata="readmeMetadata"
             :repo-type="repoType"
           />
@@ -354,7 +367,22 @@
 
         <!-- Viewer Tab (for datasets only) -->
         <div v-if="activeTab === 'viewer' && repoType === 'dataset'">
+          <div
+            v-if="filesLoading"
+            class="card"
+            role="status"
+            aria-label="Loading dataset files"
+          >
+            <el-skeleton :rows="6" animated />
+          </div>
+          <ErrorState
+            v-else-if="treeErrorClassification"
+            :classification="treeErrorClassification"
+            mode="inline-panel"
+            :retry="loadFileTree"
+          />
           <DatasetViewerTab
+            v-else
             :repo-type="repoType"
             :namespace="namespace"
             :name="name"
@@ -381,11 +409,8 @@
                 data-testid="file-list-count"
               >
                 {{ fileTree.length }}
-                {{ fileTree.length === 1 ? "file" : "files" }}<template
-                  v-if="fileListHasMore"
-                >
-                  loaded
-                </template>
+                {{ fileTree.length === 1 ? "file" : "files"
+                }}<template v-if="fileListHasMore"> loaded </template>
               </span>
             </div>
 
@@ -422,7 +447,7 @@
             <div class="flex items-center justify-between">
               <el-breadcrumb
                 separator="/"
-                class="text-sm text-gray-700 dark:text-gray-300"
+                class="repo-file-breadcrumb text-sm text-gray-700 dark:text-gray-300"
               >
                 <el-breadcrumb-item>
                   <RouterLink
@@ -594,8 +619,8 @@
                   class="i-carbon-document-blank text-6xl mb-4 inline-block"
                 />
                 <p v-if="fileSearchQuery">
-                  No files in this directory start with
-                  "{{ fileSearchQuery }}" (case-sensitive prefix)
+                  No files in this directory start with "{{ fileSearchQuery }}"
+                  (case-sensitive prefix)
                 </p>
                 <p v-else>No files found</p>
               </div>
@@ -615,10 +640,7 @@
             Hidden when the listing is exhausted — at that point
             there is nothing to load.
           -->
-          <div
-            v-if="!filesLoading && fileListHasMore"
-            class="text-center pt-4"
-          >
+          <div v-if="!filesLoading && fileListHasMore" class="text-center pt-4">
             <el-button
               :loading="fileListLoadingMore"
               :disabled="fileListLoadingMore"
@@ -978,10 +1000,7 @@ huggingface-cli download {{ repoInfo?.id }}</pre
 <script setup>
 import { ElMessage, ElMessageBox } from "element-plus";
 import axios from "axios";
-import {
-  formatRelativeTime,
-  formatUnixRelativeTime,
-} from "@/utils/datetime";
+import { formatRelativeTime, formatUnixRelativeTime } from "@/utils/datetime";
 
 import { useAuthStore } from "@/stores/auth";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -1068,6 +1087,12 @@ const likesCount = ref(0);
 const likingInProgress = ref(false);
 const deletingFolder = ref(false);
 const fileTreeRequestId = ref(0);
+let fileTreeContext = null;
+let fileTreeInFlight = null;
+let readmeBranch = null;
+let readmeRequestId = 0;
+let commitsBranch = null;
+let commitsRequestId = 0;
 
 // Cursor-based "Load more" listing (issue #56). LakeFS exposes only
 // an opaque `next_offset` per response, so we cannot pre-compute a
@@ -1506,6 +1531,7 @@ async function toggleLike() {
 }
 
 function activeNamePrefix() {
+  if (activeTab.value !== "files") return null;
   // Trim like the backend's `_normalize_name_prefix` so a whitespace-
   // only entry never reaches the wire (response would be byte-
   // identical to the unfiltered listing, but it would muddle the
@@ -1563,7 +1589,25 @@ async function expandPathsInfoAndMerge(newEntries, requestId) {
   }
 }
 
-async function loadFileTree({ resetPagination = true } = {}) {
+function getFileTreeContext() {
+  return JSON.stringify([
+    currentBranch.value,
+    props.currentPath,
+    activeNamePrefix(),
+  ]);
+}
+
+function loadFileTree(options = {}) {
+  const context = getFileTreeContext();
+  if (fileTreeInFlight?.context === context) return fileTreeInFlight.promise;
+  const promise = fetchFileTree(options, context).finally(() => {
+    if (fileTreeInFlight?.promise === promise) fileTreeInFlight = null;
+  });
+  fileTreeInFlight = { context, promise };
+  return promise;
+}
+
+async function fetchFileTree({ resetPagination = true } = {}, context) {
   if (resetPagination) {
     fileListNextCursor.value = null;
   }
@@ -1595,6 +1639,7 @@ async function loadFileTree({ resetPagination = true } = {}) {
 
     sortedEntries = sortFileEntries(page.entries || []);
     fileTree.value = sortedEntries;
+    fileTreeContext = context;
     fileListNextCursor.value = page.nextCursor || null;
 
     if (sortedEntries.length === 0) {
@@ -1603,13 +1648,13 @@ async function loadFileTree({ resetPagination = true } = {}) {
   } catch (err) {
     console.error("Failed to load file tree:", err);
     if (requestId === fileTreeRequestId.value) {
+      fileTreeContext = context;
       fileTree.value = [];
       fileListNextCursor.value = null;
       // Axios interceptor in utils/api.js attaches `.classification`.
       // Prefer it; fall back to classifying the bare error ourselves
       // if a future refactor changes the interceptor.
-      treeErrorClassification.value =
-        err?.classification || classifyError(err);
+      treeErrorClassification.value = err?.classification || classifyError(err);
     }
   } finally {
     if (requestId === fileTreeRequestId.value) {
@@ -1665,10 +1710,7 @@ async function loadMoreFileTree() {
     // Sort across the union so the appended rows respect the same
     // directories-first / alphabetical ordering as the initial load.
     appendedEntries = page.entries || [];
-    fileTree.value = sortFileEntries([
-      ...fileTree.value,
-      ...appendedEntries,
-    ]);
+    fileTree.value = sortFileEntries([...fileTree.value, ...appendedEntries]);
     fileListNextCursor.value = page.nextCursor || null;
   } catch (err) {
     console.error("Failed to load more file tree entries:", err);
@@ -1757,14 +1799,19 @@ async function probeMissingIndexedTarSiblings(entries, requestId) {
 let readmeInFlight = null;
 
 function loadReadme() {
-  // The fileTree watcher and the card tab's mount both ask for it
-  readmeInFlight ??= fetchReadme().finally(() => {
-    readmeInFlight = null;
+  const branch = currentBranch.value;
+  if (readmeInFlight?.branch === branch) return readmeInFlight.promise;
+  const requestId = ++readmeRequestId;
+  const promise = fetchReadme(branch, requestId).finally(() => {
+    if (readmeInFlight?.promise === promise) readmeInFlight = null;
   });
-  return readmeInFlight;
+  readmeInFlight = { branch, promise };
+  return promise;
 }
 
-async function fetchReadme() {
+async function fetchReadme(branch, requestId) {
+  const isCurrent = () =>
+    requestId === readmeRequestId && branch === currentBranch.value;
   readmeLoading.value = true;
   readmeErrorClassification.value = null;
   try {
@@ -1777,8 +1824,10 @@ async function fetchReadme() {
     // tab does not silently render "No README" when one exists later
     // in the listing.
     if (!readmeFile) {
-      readmeFile = await findReadmeViaPathsInfo();
+      readmeFile = await findReadmeViaPathsInfo(branch);
     }
+
+    if (!isCurrent()) return;
 
     if (!readmeFile) {
       readmeContent.value = "";
@@ -1786,11 +1835,13 @@ async function fetchReadme() {
       return;
     }
 
-    const downloadUrl = `/${props.repoType}s/${props.namespace}/${props.name}/resolve/${currentBranch.value}/${readmeFile.path}`;
+    const downloadUrl = `/${props.repoType}s/${props.namespace}/${props.name}/resolve/${branch}/${readmeFile.path}`;
     const response = await fetch(downloadUrl);
+    if (!isCurrent()) return;
 
     if (response.ok) {
       const rawContent = await response.text();
+      if (!isCurrent()) return;
 
       // Parse YAML frontmatter
       const { metadata, content } = parseYAMLFrontmatter(rawContent);
@@ -1802,22 +1853,27 @@ async function fetchReadme() {
       // ErrorState instead of the "No README.md found" placeholder,
       // which would be misleading — the repo has a README, we just
       // couldn't read it.
-      readmeErrorClassification.value = await classifyResponse(response);
+      const classification = await classifyResponse(response);
+      if (!isCurrent()) return;
+      readmeErrorClassification.value = classification;
       readmeContent.value = "";
       readmeMetadata.value = {};
     }
   } catch (err) {
+    if (!isCurrent()) return;
     console.error("Failed to load README:", err);
-    readmeErrorClassification.value =
-      err?.classification || classifyError(err);
+    readmeErrorClassification.value = err?.classification || classifyError(err);
     readmeContent.value = "";
     readmeMetadata.value = {};
   } finally {
-    readmeLoading.value = false;
+    if (isCurrent()) {
+      readmeBranch = branch;
+      readmeLoading.value = false;
+    }
   }
 }
 
-async function findReadmeViaPathsInfo() {
+async function findReadmeViaPathsInfo(branch = currentBranch.value) {
   // README.md / readme.md / Readme.md cover the case-insensitive
   // variants seen in the wild. paths-info returns only the entries
   // that exist, so a single call is enough.
@@ -1827,7 +1883,7 @@ async function findReadmeViaPathsInfo() {
       props.repoType,
       props.namespace,
       props.name,
-      currentBranch.value,
+      branch,
       ["README.md", "readme.md", "Readme.md"],
       false,
     );
@@ -1862,7 +1918,8 @@ function unavailableOperations(commitId) {
 function filesUnavailableMessage(commitId) {
   const paths = commitUnavailableFiles.value[commitId];
   const shown = paths.slice(0, SHOWN_FILES).join(", ");
-  const more = paths.length > SHOWN_FILES ? ` and ${paths.length - SHOWN_FILES} more` : "";
+  const more =
+    paths.length > SHOWN_FILES ? ` and ${paths.length - SHOWN_FILES} more` : "";
   return `Files this commit committed are no longer stored (garbage collected): ${shown}${more}.`;
 }
 
@@ -1883,7 +1940,11 @@ async function loadUnavailableFiles(page) {
   }
 }
 
-async function loadCommitVerdicts(page) {
+async function loadCommitVerdicts(
+  page,
+  branch = currentBranch.value,
+  requestId = commitsRequestId,
+) {
   try {
     if (commitOperationCaps.value === null) {
       const { data } = await settingsAPI.getSiteConfig();
@@ -1895,9 +1956,11 @@ async function loadCommitVerdicts(page) {
       props.repoType,
       props.namespace,
       props.name,
-      currentBranch.value,
+      branch,
       page.map((commit) => commit.id),
     );
+    if (requestId !== commitsRequestId || branch !== currentBranch.value)
+      return;
     commitOperationVerdicts.value = {
       ...commitOperationVerdicts.value,
       ...data.commits,
@@ -1909,6 +1972,8 @@ async function loadCommitVerdicts(page) {
 }
 
 async function loadCommits() {
+  const branch = currentBranch.value;
+  const requestId = ++commitsRequestId;
   commitsLoading.value = true;
   commitOperationVerdicts.value = {};
   try {
@@ -1916,25 +1981,34 @@ async function loadCommits() {
       props.repoType,
       props.namespace,
       props.name,
-      currentBranch.value,
+      branch,
       { limit: 20 },
     );
+    if (requestId !== commitsRequestId || branch !== currentBranch.value)
+      return;
 
     commits.value = data.commits || [];
-    loadCommitVerdicts(commits.value);
+    loadCommitVerdicts(commits.value, branch, requestId);
     loadUnavailableFiles(commits.value);
     commitsHasMore.value = data.hasMore || false;
     commitsNextCursor.value = data.nextCursor || null;
   } catch (err) {
+    if (requestId !== commitsRequestId || branch !== currentBranch.value)
+      return;
     console.error("Failed to load commits:", err);
     commits.value = [];
   } finally {
-    commitsLoading.value = false;
+    if (requestId === commitsRequestId && branch === currentBranch.value) {
+      commitsBranch = branch;
+      commitsLoading.value = false;
+    }
   }
 }
 
 async function loadMoreCommits() {
   if (!commitsHasMore.value || commitsLoading.value) return;
+  const branch = currentBranch.value;
+  const requestId = commitsRequestId;
 
   commitsLoading.value = true;
   try {
@@ -1942,19 +2016,23 @@ async function loadMoreCommits() {
       props.repoType,
       props.namespace,
       props.name,
-      currentBranch.value,
+      branch,
       { limit: 20, after: commitsNextCursor.value },
     );
+    if (requestId !== commitsRequestId || branch !== currentBranch.value)
+      return;
 
     commits.value.push(...(data.commits || []));
-    loadCommitVerdicts(data.commits);
+    loadCommitVerdicts(data.commits, branch, requestId);
     loadUnavailableFiles(data.commits);
     commitsHasMore.value = data.hasMore || false;
     commitsNextCursor.value = data.nextCursor || null;
   } catch (err) {
     console.error("Failed to load more commits:", err);
   } finally {
-    commitsLoading.value = false;
+    if (requestId === commitsRequestId && branch === currentBranch.value) {
+      commitsLoading.value = false;
+    }
   }
 }
 
@@ -2140,49 +2218,55 @@ watch(fileSearchQuery, () => {
   }, FILE_SEARCH_DEBOUNCE_MS);
 });
 
-watch(
-  () => props.currentPath,
-  () => {
-    if (activeTab.value === "files") {
-      loadFileTree();
-    }
-  },
-);
+let tabLoadId = 0;
 
-watch(
-  () => props.branch,
-  (newBranch) => {
-    currentBranch.value = newBranch;
-    if (activeTab.value === "files") {
-      loadFileTree();
-    }
-  },
-);
-
-watch(
-  () => props.tab,
-  async (newTab) => {
-    if (newTab === "files" && fileTree.value.length === 0) {
+async function loadActiveTab() {
+  const requestId = ++tabLoadId;
+  const tab = activeTab.value;
+  if (["files", "card", "metadata", "viewer"].includes(tab)) {
+    const context = getFileTreeContext();
+    if (
+      fileTreeContext !== context ||
+      (fileTreeInFlight && fileTreeInFlight.context !== context)
+    ) {
       await loadFileTree();
-    } else if (newTab === "card" && !readmeContent.value) {
-      if (fileTree.value.length === 0) {
-        await loadFileTree();
-      }
+    }
+    if (requestId !== tabLoadId) return;
+    if (
+      ["card", "metadata"].includes(tab) &&
+      readmeBranch !== currentBranch.value
+    ) {
       await loadReadme();
-    } else if (newTab === "commits" && commits.value.length === 0) {
-      await loadCommits();
     }
-  },
-);
+  } else if (tab === "commits" && commitsBranch !== currentBranch.value) {
+    if (!commitsLoading.value) await loadCommits();
+  }
+}
 
+// Route pages share this instance; only a changed resource context reloads.
 watch(
-  fileTree,
-  () => {
-    if (activeTab.value === "card" && !readmeContent.value) {
-      loadReadme();
+  () => [props.tab, props.branch, props.currentPath],
+  ([, branch], [, previousBranch]) => {
+    currentBranch.value = branch;
+    if (branch !== previousBranch) {
+      fileTreeRequestId.value += 1;
+      fileTreeInFlight = null;
+      fileTreeContext = null;
+      fileTree.value = [];
+      filesLoading.value = false;
+      readmeRequestId += 1;
+      readmeBranch = null;
+      readmeInFlight = null;
+      readmeContent.value = "";
+      readmeMetadata.value = {};
+      readmeLoading.value = true;
+      commitsRequestId += 1;
+      commitsBranch = null;
+      commits.value = [];
+      commitsLoading.value = false;
     }
+    loadActiveTab();
   },
-  { immediate: false },
 );
 
 // Lifecycle
@@ -2190,16 +2274,6 @@ onMounted(async () => {
   // The tab's own data does not depend on repo info: load both at once
   const info = loadRepoInfo();
 
-  if (activeTab.value === "files") {
-    await loadFileTree();
-  } else if (activeTab.value === "card") {
-    await loadFileTree();
-    await loadReadme();
-  } else if (activeTab.value === "viewer") {
-    await loadFileTree();
-  } else if (activeTab.value === "commits") {
-    await loadCommits();
-  }
-  await info;
+  await Promise.all([info, loadActiveTab()]);
 });
 </script>

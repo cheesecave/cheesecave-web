@@ -25,7 +25,8 @@ vi.mock("vue-router/auto", () => ({
   useRoute: () => mocks.route,
 }));
 
-vi.mock("element-plus", () => ({
+vi.mock("element-plus", async (original) => ({
+  ...(await original()),
   ElMessage: mocks.elMessage,
 }));
 
@@ -57,7 +58,42 @@ describe("TheHeader", () => {
     });
   }
 
-  it("expands navigation width for the workspace without affecting other pages", async () => {
+  function authenticate() {
+    const authStore = useAuthStore();
+    authStore.user = { username: "alice" };
+    authStore.logout = vi.fn().mockResolvedValue(undefined);
+    return authStore;
+  }
+
+  async function openMobileMenu(wrapper) {
+    await wrapper
+      .findAll("button")
+      .find((button) => button.find(".i-carbon-menu").exists())
+      .trigger("click");
+    return wrapper.get('[data-el-drawer="true"]');
+  }
+
+  function mobileAction(drawer, label) {
+    return drawer
+      .findAll(".cursor-pointer")
+      .find((item) => item.text() === label);
+  }
+
+  const navigationEntries = [
+    ["Models", "/models", "i-carbon-model", "text-blue-500"],
+    ["Datasets", "/datasets", "i-carbon-data-table", "text-green-500"],
+    ["Spaces", "/spaces", "i-carbon-application", "text-purple-500"],
+    ["Organizations", "/organizations", "i-carbon-group", "text-orange-500"],
+  ];
+
+  const creationEntries = [
+    ["New Model", { path: "/new", query: { type: "model" } }],
+    ["New Dataset", { path: "/new", query: { type: "dataset" } }],
+    ["New Space", { path: "/new", query: { type: "space" } }],
+    ["New Organization", "/organizations/new"],
+  ];
+
+  it("switches between the expanded workspace layout and the visitor layout", async () => {
     const wrapper = mountHeader();
     expect(wrapper.get(".container-main").classes()).not.toContain(
       "workspace-header",
@@ -98,51 +134,170 @@ describe("TheHeader", () => {
     expect(mocks.router.push).toHaveBeenCalledWith("/register");
   });
 
-  it("renders authenticated actions and routes create/profile/logout flows", async () => {
-    const authStore = useAuthStore();
-    authStore.user = {
-      username: "alice",
-    };
-    authStore.logout = vi.fn().mockResolvedValue(undefined);
-
+  it("renders the same navigation destinations and authenticated menu entries on desktop and mobile", async () => {
+    authenticate();
     const wrapper = mountHeader();
+    const drawer = await openMobileMenu(wrapper);
+    const desktopLinks = wrapper
+      .get('nav[aria-label="Main navigation"]')
+      .findAll("a");
+    const mobileLinks = drawer.get("nav").findAll("a");
 
-    expect(wrapper.text()).toContain("alice");
-    expect(wrapper.text()).toContain("New Model");
-    expect(wrapper.text()).toContain("New Dataset");
-    expect(wrapper.text()).toContain("New Space");
-    expect(wrapper.text()).toContain("New Organization");
-
-    const buttons = wrapper.findAll("button");
-
-    await buttons
-      .find((button) => button.text().includes("New Model"))
-      .trigger("click");
-    await buttons
-      .find((button) => button.text().includes("New Organization"))
-      .trigger("click");
-    await buttons
-      .find((button) => button.text().includes("Profile"))
-      .trigger("click");
-    await buttons
-      .find((button) => button.text().includes("Settings"))
-      .trigger("click");
-    await buttons
-      .find((button) => button.text().includes("Logout"))
-      .trigger("click");
-
-    expect(mocks.router.push).toHaveBeenCalledWith({
-      path: "/new",
-      query: { type: "model" },
+    for (const links of [desktopLinks, mobileLinks]) {
+      expect(
+        links.map((link) => [link.text(), link.attributes("href")]),
+      ).toEqual(navigationEntries.map(([label, to]) => [label, to]));
+    }
+    navigationEntries.forEach(([, , icon, color], index) => {
+      expect(mobileLinks[index].get(`.${icon}`).classes()).toContain(color);
     });
-    expect(mocks.router.push).toHaveBeenCalledWith("/organizations/new");
-    expect(mocks.router.push).toHaveBeenCalledWith("/alice");
-    expect(mocks.router.push).toHaveBeenCalledWith("/settings");
-    expect(authStore.logout).toHaveBeenCalled();
-    expect(mocks.router.push).toHaveBeenCalledWith("/");
+
+    const desktopMenus = wrapper.findAll('[data-el-dropdown-menu="true"]');
+    const creationLabels = creationEntries.map(([label]) => label);
+    const accountLabels = ["Profile", "Settings", "Logout"];
+    expect(
+      desktopMenus[0].findAll("button").map((item) => item.text()),
+    ).toEqual(creationLabels);
+    expect(
+      desktopMenus[1].findAll("button").map((item) => item.text()),
+    ).toEqual(accountLabels);
+    expect(
+      drawer.findAll(".cursor-pointer").map((item) => item.text()),
+    ).toEqual([...creationLabels, ...accountLabels]);
+    navigationEntries.forEach(([, , icon, color], index) => {
+      for (const item of [
+        desktopMenus[0].findAll("button")[index],
+        mobileAction(drawer, creationLabels[index]),
+      ]) {
+        expect(item.get(`.${icon}`).classes()).toContain(color);
+      }
+    });
+    expect(mobileAction(drawer, "Logout").classes()).toContain("text-red-600");
+    wrapper.unmount();
   });
 
-  it("opens the mobile menu and falls back to the default avatar", async () => {
+  it.each(navigationEntries)(
+    "links to %s and closes the mobile drawer",
+    async (label, to) => {
+      const wrapper = mountHeader();
+      const drawer = await openMobileMenu(wrapper);
+      const link = drawer
+        .get("nav")
+        .findAll("a")
+        .find((item) => item.text() === label);
+      expect(link.attributes("href")).toBe(to);
+      // The RouterLink stub is a plain anchor; avoid jsdom document navigation.
+      link.element.addEventListener(
+        "click",
+        (event) => event.preventDefault(),
+        {
+          once: true,
+        },
+      );
+      await link.trigger("click");
+      expect(wrapper.find('[data-el-drawer="true"]').exists()).toBe(false);
+      wrapper.unmount();
+    },
+  );
+
+  it.each(creationEntries)(
+    "routes %s to the same destination on desktop and mobile",
+    async (label, to) => {
+      authenticate();
+      const wrapper = mountHeader();
+      await wrapper
+        .get('[data-el-dropdown-menu="true"]')
+        .findAll("button")
+        .find((item) => item.text() === label)
+        .trigger("click");
+      expect(mocks.router.push).toHaveBeenLastCalledWith(to);
+      mocks.router.push.mockClear();
+
+      const drawer = await openMobileMenu(wrapper);
+      await mobileAction(drawer, label).trigger("click");
+      expect(mocks.router.push).toHaveBeenCalledExactlyOnceWith(to);
+      expect(wrapper.find('[data-el-drawer="true"]').exists()).toBe(false);
+      wrapper.unmount();
+    },
+  );
+
+  it.each([
+    ["Profile", "/alice"],
+    ["Settings", "/settings"],
+    ["Logout", "/"],
+  ])(
+    "uses the same %s account action on desktop and mobile",
+    async (label, to) => {
+      const authStore = authenticate();
+      const wrapper = mountHeader();
+      await wrapper
+        .findAll('[data-el-dropdown-menu="true"]')[1]
+        .findAll("button")
+        .find((item) => item.text() === label)
+        .trigger("click");
+      await flushPromises();
+      expect(mocks.router.push).toHaveBeenCalledExactlyOnceWith(to);
+      expect(authStore.logout).toHaveBeenCalledTimes(
+        label === "Logout" ? 1 : 0,
+      );
+      mocks.router.push.mockClear();
+      authStore.logout.mockClear();
+
+      const drawer = await openMobileMenu(wrapper);
+      await mobileAction(drawer, label).trigger("click");
+      expect(wrapper.find('[data-el-drawer="true"]').exists()).toBe(false);
+      await flushPromises();
+      expect(mocks.router.push).toHaveBeenCalledExactlyOnceWith(to);
+      expect(authStore.logout).toHaveBeenCalledTimes(
+        label === "Logout" ? 1 : 0,
+      );
+      if (label === "Logout") {
+        expect(mocks.elMessage.success).toHaveBeenCalledWith(
+          "Logged out successfully",
+        );
+      }
+      wrapper.unmount();
+    },
+  );
+
+  it("updates both profile actions when the authenticated username changes", async () => {
+    const authStore = authenticate();
+    const wrapper = mountHeader();
+    authStore.user = { username: "bob" };
+    await nextTick();
+    await wrapper
+      .findAll('[data-el-dropdown-menu="true"]')[1]
+      .findAll("button")
+      .find((item) => item.text() === "Profile")
+      .trigger("click");
+    expect(mocks.router.push).toHaveBeenLastCalledWith("/bob");
+    const drawer = await openMobileMenu(wrapper);
+    await mobileAction(drawer, "Profile").trigger("click");
+    expect(mocks.router.push).toHaveBeenLastCalledWith("/bob");
+    wrapper.unmount();
+  });
+
+  it.each([
+    ["Login", "/login"],
+    ["Sign Up", "/register"],
+  ])(
+    "routes anonymous %s from the mobile drawer and closes it",
+    async (label, to) => {
+      const wrapper = mountHeader();
+      const drawer = await openMobileMenu(wrapper);
+      expect(drawer.text()).not.toContain("CREATE NEW");
+      const button = drawer
+        .findAll("button")
+        .find((item) => item.text() === label);
+      expect(button.classes()).toContain("w-full");
+      await button.trigger("click");
+      expect(mocks.router.push).toHaveBeenCalledExactlyOnceWith(to);
+      expect(wrapper.find('[data-el-drawer="true"]').exists()).toBe(false);
+      wrapper.unmount();
+    },
+  );
+
+  it("opens the mobile menu and uses the shared avatar fallback without changing its stable source", async () => {
     const authStore = useAuthStore();
     authStore.user = {
       username: "alice",
@@ -160,10 +315,17 @@ describe("TheHeader", () => {
     expect(wrapper.find('[data-el-drawer="true"]').exists()).toBe(true);
 
     const avatar = wrapper.get('img[alt="alice avatar"]');
+    expect(avatar.attributes("src")).toBe("/api/users/alice/avatar");
     await avatar.trigger("error");
     await nextTick();
 
-    expect(wrapper.find(".i-carbon-user-avatar").exists()).toBe(true);
+    expect(wrapper.findAllComponents({ name: "EntityAvatar" })[0].text()).toBe(
+      "AL",
+    );
+    const mobileAvatar = wrapper.get(
+      '[data-el-drawer="true"] img[alt="alice avatar"]',
+    );
+    expect(mobileAvatar.attributes("src")).toBe("/api/users/alice/avatar");
   });
 
   it("shows an error message when logout fails", async () => {
@@ -183,6 +345,21 @@ describe("TheHeader", () => {
 
     expect(authStore.logout).toHaveBeenCalled();
     expect(mocks.router.push).not.toHaveBeenCalledWith("/");
+    expect(mocks.elMessage.error).toHaveBeenCalledWith("Logout failed");
+  });
+
+  it("closes the mobile drawer immediately even when logout fails", async () => {
+    const authStore = authenticate();
+    authStore.logout = vi.fn().mockRejectedValue(new Error("network"));
+    const wrapper = mountHeader();
+    const drawer = await openMobileMenu(wrapper);
+    await mobileAction(drawer, "Logout").trigger("click");
+    expect(wrapper.find('[data-el-drawer="true"]').exists()).toBe(false);
+    await flushPromises();
+    expect(authStore.logout).toHaveBeenCalledOnce();
+    expect(mocks.router.push).not.toHaveBeenCalled();
+    expect(mocks.elMessage.error).toHaveBeenCalledWith("Logout failed");
+    wrapper.unmount();
   });
 
   it("reacts to branding updates, exposes full names, and falls back on image errors", async () => {
