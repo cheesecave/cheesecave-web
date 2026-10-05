@@ -1290,10 +1290,25 @@ describe("RepoViewer path handling", () => {
       "Preview metadata for parts.zip.001",
       "Preview metadata for parts.zip.002",
     ]);
-    expect(previewButtons[0].attributes("title")).toContain(
-      "Browse zip contents",
+    // Entry volumes share the indexed-tar icon; later volumes get a
+    // fainter link icon that points at the entry.
+    const icon = (b) => b.find("div").classes();
+    for (const b of [previewButtons[0], previewButtons[2]]) {
+      expect(b.attributes("title")).toContain("Browse zip contents");
+      expect(icon(b)).toContain("i-carbon-archive");
+      expect(icon(b)).not.toContain("opacity-60");
+    }
+    expect(previewButtons[1].attributes("title")).toBe(
+      "Part of a split zip: browse the whole set (entry volume: disks.zip)",
     );
-    expect(previewButtons[0].find(".i-carbon-archive").exists()).toBe(true);
+    expect(previewButtons[3].attributes("title")).toBe(
+      "Part of a split zip: browse the whole set (entry volume: parts.zip.001)",
+    );
+    for (const b of [previewButtons[1], previewButtons[3]]) {
+      expect(icon(b)).toEqual(
+        expect.arrayContaining(["i-carbon-link", "opacity-60"]),
+      );
+    }
 
     // A later volume opens the dialog too; zip-archive maps it to its set.
     await previewButtons[1].trigger("click");

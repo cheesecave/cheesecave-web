@@ -10,6 +10,14 @@ import { hasIndexSibling } from "@/utils/indexed-tar";
 // volume of a split set (7-Zip `.zip.001…`, Info-ZIP `.z01…` + `.zip`):
 // zip-archive.js opens the whole set from any of them.
 const SPLIT_VOLUME = /\.(zip\.\d{3}|z\d{2,})$/i;
+const LATER_VOLUME = /\.(zip\.(?!001$)\d{3}|z\d{2,})$/i;
+
+/** A split-set volume other than the one the set opens from. */
+export const isLaterZipVolume = (path) => LATER_VOLUME.test(path);
+
+/** The volume a split set opens from: `.zip.001`, or Info-ZIP's `.zip` disk. */
+export const zipEntryVolume = (path) =>
+  path.replace(/(\.zip\.)\d{3}$/i, "$1001").replace(/\.z\d{2,}$/i, ".zip");
 
 export const ZIP_ARCHIVE_EXTENSIONS = [
   ".zip",

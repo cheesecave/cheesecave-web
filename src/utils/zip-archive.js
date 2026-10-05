@@ -36,7 +36,7 @@ import {
 } from "@zip.js/zip.js";
 
 import { repoAPI } from "@/utils/api";
-import { buildResolveUrl } from "@/utils/file-preview";
+import { buildResolveUrl, zipEntryVolume } from "@/utils/file-preview";
 import { normalizeSegments } from "@/utils/indexed-tar";
 
 // The decoders run on the main thread like the indexed-tar reader; it
@@ -44,10 +44,6 @@ import { normalizeSegments } from "@/utils/indexed-tar";
 configure({ useWebWorkers: false });
 
 const FIRST_RAW_VOLUME = /\.zip\.001$/i;
-// Any volume opens the whole set: 7-Zip volumes from .001, Info-ZIP
-// disks from the .zip disk that holds the central directory.
-const entryVolume = (path) =>
-  path.replace(/(\.zip\.)\d{3}$/i, "$1001").replace(/\.z\d{2,}$/i, ".zip");
 const MAX_RAW_VOLUME = 999;
 const VOLUME_PROBE_BATCH = 16;
 const STRONG_ENCRYPTION_FLAG = 0x40;
@@ -784,7 +780,8 @@ export async function openZipArchive({
   sizeOf,
   lang = "en",
 }) {
-  path = entryVolume(path);
+  // Any volume opens the whole set.
+  path = zipEntryVolume(path);
   const toReader = (part) => new RangeReader(resolveUrl(part.path), part.size);
   let volumes = await resolveVolumes(path, sizeOf);
   const readers = volumes.map(toReader);

@@ -1024,6 +1024,8 @@ import {
   buildResolveUrl,
   canPreviewFile,
   getPreviewKind,
+  isLaterZipVolume,
+  zipEntryVolume,
 } from "@/utils/file-preview";
 import { tarSidecarPath } from "@/utils/indexed-tar";
 
@@ -1141,7 +1143,11 @@ const PREVIEW_ICON_BY_KIND = {
   zip: "i-carbon-archive",
 };
 
+// Later volumes of a split zip open the same set as its entry volume: a
+// smaller, fainter link icon keeps the entry (indexed tar's icon) the one
+// to spot.
 function previewIconClass(file) {
+  if (isLaterZipVolume(file.path)) return "i-carbon-link opacity-60 scale-85";
   const kind = getPreviewKind(
     file.path,
     fileTree.value,
@@ -1160,6 +1166,10 @@ function previewIconTitle(file) {
     return "Browse indexed tar contents (Range-read, no full download)";
   }
   if (kind === "zip") {
+    if (isLaterZipVolume(file.path)) {
+      const entry = getFileName(zipEntryVolume(file.path));
+      return `Part of a split zip: browse the whole set (entry volume: ${entry})`;
+    }
     return "Browse zip contents (Range-read, no full download)";
   }
   return `Preview ${kind} metadata (Range-read, no download)`;
