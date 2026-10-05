@@ -147,6 +147,12 @@ export default defineConfig({
       "highlight.js/lib/languages/xml",
       "highlight.js/lib/languages/yaml",
 
+      // Zip preview (loaded on demand by utils/zip-archive.js)
+      "@zip.js/zip.js",
+      "fzstd",
+      "lzma1",
+      "xz-decompress",
+
       // Misc
       "cropperjs",
       "hyparquet",
