@@ -143,9 +143,43 @@ export class RangeReader extends Reader {
   }
 }
 
+// Stream [offset, offset + size) of consecutive `parts` (RangeReaders),
+// to the end when `size` is omitted: one streamed request per part touched.
+function streamParts(parts, offset, size) {
+  const stop = offset + (size ?? Infinity);
+  const pending = [];
+  let base = 0;
+  for (const part of parts) {
+    const from = Math.max(offset - base, 0);
+    const to = Math.min(stop - base, part.size);
+    if (to > from)
+      pending.push(() =>
+        part.createReadable({ offset: from, size: to - from }),
+      );
+    base += part.size;
+  }
+  let current = null;
+  return new ReadableStream({
+    async pull(controller) {
+      for (;;) {
+        if (!current) {
+          if (!pending.length) return controller.close();
+          current = pending.shift()().getReader();
+        }
+        const { done, value } = await current.read();
+        if (!done) return controller.enqueue(value);
+        current = null;
+      }
+    },
+    cancel(reason) {
+      return current?.cancel(reason);
+    },
+  });
+}
+
 // 7-Zip `.zip.001/.002` volumes are a byte split of one ordinary zip (its
 // EOCD says disk 0), so they read as one file. Info-ZIP `.z01 … .zip` disk
-// sets keep per-disk offsets and use zip.js's SplitDataReader instead.
+// sets keep per-disk offsets and use DiskSetReader instead.
 export class ConcatReader extends Reader {
   constructor(readers) {
     super();
@@ -170,6 +204,18 @@ export class ConcatReader extends Reader {
       base += reader.size;
     }
     return out;
+  }
+
+  createReadable({ offset = 0, size } = {}) {
+    return streamParts(this.readers, offset, size);
+  }
+}
+
+// zip.js's SplitDataReader maps per-disk offsets onto the concatenated
+// disks; stream member bodies across them like ConcatReader does.
+class DiskSetReader extends SplitDataReader {
+  createReadable({ offset = 0, size } = {}) {
+    return streamParts(this.readers, offset, size);
   }
 }
 
@@ -229,6 +275,11 @@ export async function repairMissingZip64Records(reader) {
         if (at >= 0 && at < out.length) out[at] = patch[k];
       }
       return out;
+    }
+
+    // Member bodies never overlap the patched EOCD bytes.
+    createReadable(options) {
+      return reader.createReadable(options);
     }
   })();
 }
@@ -361,21 +412,8 @@ export function decodeFilename(entry, encoding) {
 const isPasswordProtected = (entry) =>
   entry.encrypted && !(entry.rawBitFlag & STRONG_ENCRYPTION_FLAG);
 
-/**
- * True when `err` means the password did not open `entry`. ZipCrypto
- * checks a single byte, so 1 in 256 wrong passwords passes it and only
- * fails the CRC; AES verifies 2 bytes and then its HMAC.
- */
-export function isWrongPassword(err, entry) {
-  const message = err?.message;
-  if (message === ERR_INVALID_PASSWORD || message === ERR_ENCRYPTED)
-    return true;
-  return (
-    Boolean(entry.encrypted) &&
-    (message === ERR_INVALID_CRC32 ||
-      message === ERR_INVALID_AUTHENTICATION_CODE)
-  );
-}
+// The password verifier said no.
+const PASSWORD_REJECTED = new Set([ERR_INVALID_PASSWORD, ERR_ENCRYPTED]);
 
 // zip.js throws plain Errors identified by message; aborts surface as
 // DOMException("AbortError") and pass through untouched.
@@ -391,7 +429,49 @@ function toArchiveError(err) {
   if (message === ERR_INVALID_CRC32) {
     return new ZipArchiveError("The member is corrupted (CRC-32 mismatch)");
   }
+  if (message === ERR_INVALID_AUTHENTICATION_CODE) {
+    return new ZipArchiveError(
+      "The member is corrupted (AES authentication code mismatch)",
+    );
+  }
   return new ZipArchiveError(message);
+}
+
+/**
+ * Try `password` on an encrypted entry: { ok, bytes } on success, else
+ * { ok: false, failure, err } where failure is "rejected" (the verifier
+ * said no) or "mismatch" (the verifier said yes but the CRC, the AES HMAC
+ * or the decompressor did not). ZipCrypto verifies one byte, so 1 in 256
+ * wrong passwords is a mismatch; AES verifies two and then an HMAC, so a
+ * mismatch there means the member is damaged. Transport errors and
+ * aborts throw.
+ */
+async function tryPassword(entry, password, options) {
+  try {
+    return { ok: true, bytes: await extract(entry, { password, ...options }) };
+  } catch (err) {
+    if (err instanceof ZipArchiveError || err.name === "AbortError") throw err;
+    const failure = PASSWORD_REJECTED.has(err.message)
+      ? "rejected"
+      : "mismatch";
+    return { ok: false, failure, err };
+  }
+}
+
+// Cheap check for members too large (or impossible) to decode just to
+// test a password: the verifier only.
+async function verifyPassword(entry, password) {
+  try {
+    await entry.getData(new Uint8ArrayWriter(), {
+      password,
+      checkPasswordOnly: true,
+    });
+    return { ok: true };
+  } catch (err) {
+    if (PASSWORD_REJECTED.has(err.message))
+      return { ok: false, failure: "rejected", err };
+    throw toArchiveError(err);
+  }
 }
 
 async function extract(entry, { password, limit, signal }) {
@@ -468,7 +548,11 @@ class ZipArchive {
     this.byPath = new Map();
     this.files = {};
     for (const entry of this.entries) {
-      const path = normalizeSegments(decodeFilename(entry, encoding)).join("/");
+      let name = decodeFilename(entry, encoding);
+      // Some Windows tools write `\` separators; read a name with no `/` that way.
+      if (!name.includes("/")) name = name.replaceAll("\\", "/");
+      if (name.endsWith("/")) continue; // a directory written without the directory flag
+      const path = normalizeSegments(name).join("/");
       if (!path || this.byPath.has(path)) continue; // first duplicate wins, like the tar tree
       this.byPath.set(path, entry);
       this.files[path] = { offset: entry.offset, size: entry.uncompressedSize };
@@ -488,32 +572,33 @@ class ZipArchive {
    * remembered passwords are tried for every later read.
    */
   async unlock(password, path) {
-    const entry = path
-      ? this.entryFor(path)
-      : await this.findEntryOpenedBy(password);
-    if (!entry) return false;
-    const checkPasswordOnly =
-      !SUPPORTED_METHODS.has(entry.compressionMethod) ||
-      entry.uncompressedSize > FULL_VERIFY_MAX_BYTES;
-    try {
-      await entry.getData(new Uint8ArrayWriter(), {
-        password,
-        checkCrc32: true,
-        checkPasswordOnly,
-      });
-    } catch (err) {
-      if (isWrongPassword(err, entry)) return false;
-      throw toArchiveError(err);
+    const entries = path
+      ? [this.entryFor(path)]
+      : await this.verifierMatches(password);
+    for (const entry of entries) {
+      const verifyOnly =
+        !SUPPORTED_METHODS.has(entry.compressionMethod) ||
+        entry.uncompressedSize > FULL_VERIFY_MAX_BYTES;
+      const result = verifyOnly
+        ? await verifyPassword(entry, password)
+        : await tryPassword(entry, password, {});
+      if (result.ok) {
+        if (!this.passwords.includes(password)) this.passwords.push(password);
+        return true;
+      }
+      if (result.failure === "mismatch" && !entry.zipCrypto)
+        throw toArchiveError(result.err);
     }
-    if (!this.passwords.includes(password)) this.passwords.push(password);
-    return true;
+    return false;
   }
 
   // Archives built in several passes mix passwords, so the one typed at
-  // entry may not open the smallest member. Run the cheap verifier-only
-  // check on the few smallest encrypted members in parallel and pick the
-  // first it opens; unlock() then decrypts that one in full.
-  async findEntryOpenedBy(password) {
+  // entry may not open the smallest member. Run the verifier-only check
+  // on the few smallest encrypted members in parallel and return those it
+  // accepts, smallest first; unlock() then decrypts them in turn until
+  // one checks out. A member that fails to download does not block the
+  // others; it only surfaces when nothing matched.
+  async verifierMatches(password) {
     const encrypted = this.entries
       .filter(isPasswordProtected)
       .sort((a, b) => a.uncompressedSize - b.uncompressedSize);
@@ -524,23 +609,15 @@ class ZipArchive {
       0,
       UNLOCK_SAMPLE_SIZE,
     );
-    const opens = await Promise.all(
-      sample.map((entry) =>
-        entry
-          .getData(new Uint8ArrayWriter(), {
-            password,
-            checkPasswordOnly: true,
-          })
-          .then(
-            () => true,
-            (err) => {
-              if (isWrongPassword(err, entry)) return false;
-              throw toArchiveError(err);
-            },
-          ),
-      ),
+    const results = await Promise.allSettled(
+      sample.map((entry) => verifyPassword(entry, password)),
     );
-    return sample.find((_, i) => opens[i]) ?? null;
+    const matches = sample.filter(
+      (_, i) => results[i].status === "fulfilled" && results[i].value.ok,
+    );
+    const failed = results.find((r) => r.status === "rejected");
+    if (!matches.length && failed) throw failed.reason;
+    return matches;
   }
 
   /**
@@ -562,13 +639,23 @@ class ZipArchive {
         { kind: "unsupported", method },
       );
     }
-    const passwords = isPasswordProtected(entry) ? this.passwords : [undefined];
-    for (const password of passwords) {
-      try {
-        return await extract(entry, { password, limit, signal });
-      } catch (err) {
-        if (!isWrongPassword(err, entry)) throw toArchiveError(err);
-      }
+    if (!isPasswordProtected(entry)) {
+      return extract(entry, { limit, signal }).catch((err) => {
+        throw toArchiveError(err);
+      });
+    }
+    // A partial read skips the CRC, the only thing that tells several
+    // remembered passwords apart for a ZipCrypto member: read it in full.
+    const partial =
+      entry.zipCrypto && this.passwords.length > 1 ? undefined : limit;
+    for (const password of this.passwords) {
+      const result = await tryPassword(entry, password, {
+        limit: partial,
+        signal,
+      });
+      if (result.ok) return result.bytes.subarray(0, limit);
+      if (result.failure === "mismatch" && !entry.zipCrypto)
+        throw toArchiveError(result.err);
     }
     throw new ZipArchiveError("This member needs a password", {
       kind: "password",
@@ -639,7 +726,7 @@ async function infoZipDisks(reader, path, resolveUrl, sizeOf) {
   const missing = names.filter((name) => !sizes.has(name));
   if (missing.length)
     throw new ZipArchiveError(`Missing split volume ${missing.join(", ")}`);
-  return new SplitDataReader([
+  return new DiskSetReader([
     ...names.map((name) => new RangeReader(resolveUrl(name), sizes.get(name))),
     reader,
   ]);

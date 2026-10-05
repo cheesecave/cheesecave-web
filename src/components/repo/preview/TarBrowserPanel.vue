@@ -18,7 +18,7 @@
 -->
 
 <script setup>
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, shallowRef, watch } from "vue";
 import {
   parseTarIndex,
   buildTreeFromIndex,
@@ -87,10 +87,14 @@ const INLINE_BLOB_MAX_BYTES = 200 * 1024 * 1024;
 
 const innerPreviewProps = ref(null);
 
+// What members are read from, set once a tar index or a zip has loaded:
+// { url, read(node, size, options) } returning the member's first `size`
+// bytes. Previews, downloads and thumbnails all go through it.
+const memberSource = shallowRef(null);
+
 // Zip mode. The archive object is not reactive state (zip.js entries are
 // large); the refs mirror what the template needs.
 let zipArchive = null;
-const zipUrl = ref("");
 const zipVolumes = ref(1);
 const zipLegacyNames = ref(false);
 const zipEncoding = ref("");
@@ -157,6 +161,7 @@ async function startLoad() {
   tree.value = null;
   errorClassification.value = null;
   zipArchive = null;
+  memberSource.value = null;
   passwordError.value = "";
 
   if (props.zip) {
@@ -179,6 +184,12 @@ async function startLoad() {
     });
     if (requestId !== currentRequestId) return;
     indexPayload.value = payload;
+    const { tarUrl } = props;
+    memberSource.value = {
+      url: tarUrl,
+      read: (node, size, options) =>
+        extractMemberBytes(tarUrl, { offset: node.offset, size }, options),
+    };
     tree.value = buildTreeFromIndex(payload.files);
     state.value = "ready";
   } catch (err) {
@@ -200,7 +211,11 @@ async function loadZip(requestId) {
     const archive = await openRepoZip(props.zip, { lang: navigator.language });
     if (requestId !== currentRequestId) return;
     zipArchive = archive;
-    zipUrl.value = archive.url;
+    memberSource.value = {
+      url: archive.url,
+      read: (node, size, options) =>
+        archive.read(node.path, { limit: size, ...options }),
+    };
     zipVolumes.value = archive.volumes;
     zipLegacyNames.value = archive.legacyNames;
     zipEncoding.value = archive.encoding;
@@ -251,20 +266,6 @@ watch(zipEncoding, (encoding) => {
   pathStack.value = [];
   tree.value = buildTreeFromIndex(zipArchive.files);
 });
-
-// First `size` bytes of a member (all of it when size === node.size).
-function readMemberBytes(node, size, options) {
-  if (zipArchive)
-    return zipArchive.read(node.path, { limit: size, ...options });
-  return extractMemberBytes(
-    props.tarUrl,
-    { offset: node.offset, size },
-    options,
-  );
-}
-
-const archiveUrl = computed(() => (props.zip ? zipUrl.value : props.tarUrl));
-const thumbnailRead = computed(() => (props.zip ? readMemberBytes : null));
 
 function retry() {
   startLoad();
@@ -424,7 +425,7 @@ async function openMember(node) {
   }
 
   try {
-    const bytes = await readMemberBytes(node, node.size, {
+    const bytes = await memberSource.value.read(node, node.size, {
       signal: controller.signal,
     });
     if (memberAbortController !== controller) return; // superseded
@@ -478,9 +479,16 @@ async function downloadMember(node) {
     // Range read makes the saved file byte-identical to what the
     // user just previewed and avoids re-paying the round-trip.
     let bytes = node && node.bytes ? node.bytes : null;
-    if (!bytes) bytes = await readMemberBytes(node, node.size);
+    if (!bytes) bytes = await memberSource.value.read(node, node.size);
     downloadBytesAs(bytes, node.name, guessMimeType(node.name));
   } catch (err) {
+    // A zip member that is never previewed (binary, too large) first
+    // learns here that it uses another password: ask for it.
+    if (err?.kind === "password" && memberView.value?.path === node.path) {
+      passwordError.value = "";
+      memberView.value.state = "password";
+      return;
+    }
     ElMessage.error(`Download failed: ${err.message || err}`);
   }
 }
@@ -926,8 +934,8 @@ watch(innerPreviewProps, (val) => {
           >
             <TarMemberThumbnail
               v-if="shouldRenderThumbnail(entry)"
-              :tar-url="archiveUrl"
-              :read="thumbnailRead"
+              :tar-url="memberSource.url"
+              :read="memberSource.read"
               :member="entry"
               :placeholder-icon="iconForFile(entry.name)"
               :size="48"
@@ -981,8 +989,8 @@ watch(innerPreviewProps, (val) => {
           >
             <TarMemberThumbnail
               v-if="shouldRenderThumbnail(entry)"
-              :tar-url="archiveUrl"
-              :read="thumbnailRead"
+              :tar-url="memberSource.url"
+              :read="memberSource.read"
               :member="entry"
               :placeholder-icon="iconForFile(entry.name)"
               class="mb-2"

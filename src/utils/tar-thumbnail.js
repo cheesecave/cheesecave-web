@@ -287,8 +287,10 @@ class ThumbnailCache {
     this.map = new Map();
   }
 
+  // The path keeps zip members apart: Info-ZIP disk sets count offsets
+  // from the start of each disk, so two members can share offset + size.
   cacheKey(tarUrl, member) {
-    return `${tarUrl} ${member.offset} ${member.size}`;
+    return `${tarUrl} ${member.path} ${member.offset} ${member.size}`;
   }
 
   get(tarUrl, member) {

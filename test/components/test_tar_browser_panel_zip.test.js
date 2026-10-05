@@ -250,6 +250,39 @@ describe("TarBrowserPanel · zip mode", () => {
     await until(() => expect(wrapper.text()).toContain("row-199"));
   });
 
+  it("asks for another password when a binary member using it is downloaded", async () => {
+    const writer = new zip.ZipWriter(new zip.Uint8ArrayWriter());
+    await writer.add("hello.txt", new zip.Uint8ArrayReader(text("hi")), {
+      password: "alpha",
+    });
+    await writer.add(
+      "model.bin",
+      new zip.Uint8ArrayReader(Uint8Array.of(1, 2, 3, 4)),
+      { password: "beta" },
+    );
+    serveRepo({ "bin.zip": await writer.close() });
+    const wrapper = mountPanel("bin.zip");
+    await until(() => expect(passwordForm(wrapper).exists()).toBe(true));
+    await submitPassword(wrapper, "alpha");
+    await until(() => expect(wrapper.text()).toContain("files in archive"));
+
+    await rowFor(wrapper, "model.bin").trigger("click");
+    await until(() => expect(wrapper.text()).toContain("Binary member"));
+    const download = () =>
+      wrapper.findAll("button").find((b) => b.text().includes("Download"));
+    await download().trigger("click");
+    await until(() => expect(passwordForm(wrapper).exists()).toBe(true));
+    expect(wrapper.text()).toContain("different password");
+
+    await submitPassword(wrapper, "beta");
+    await until(() => expect(wrapper.text()).toContain("Binary member"));
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+    await download().trigger("click");
+    await until(() => expect(click).toHaveBeenCalledTimes(1));
+  });
+
   it("explains unsupported compression methods without offering a download", async () => {
     serveRepo({ "ppmd.zip": fixture("methods-ppmd.zip") });
     const wrapper = mountPanel("ppmd.zip");

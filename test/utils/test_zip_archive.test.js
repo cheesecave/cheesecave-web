@@ -21,7 +21,6 @@ import {
   ZipArchiveError,
   decodeFilename,
   guessFilenameEncoding,
-  isWrongPassword,
   openRepoZip,
   repairMissingZip64Records,
   repoZipLocator,
@@ -441,6 +440,22 @@ describe("layout and names", () => {
     });
   });
 
+  it("reads backslash separators written by Windows tools", async () => {
+    serveRepo({
+      "w.zip": await makeZip([
+        ["win\\dir\\a.txt", text("a")],
+        ["win\\dir\\", new Uint8Array(0)],
+        ["unix/b\\c.txt", text("b")],
+      ]),
+    });
+    const archive = await open("w.zip");
+    expect(Object.keys(archive.files).sort()).toEqual([
+      "unix/b\\c.txt",
+      "win/dir/a.txt",
+    ]);
+    expect(decode(await archive.read("win/dir/a.txt"))).toBe("a");
+  });
+
   it("opens an empty archive", async () => {
     serveRepo({ "empty.zip": fixture("empty.zip") });
     const archive = await open("empty.zip");
@@ -701,24 +716,146 @@ describe("encryption", () => {
     await expect(open("h.zip")).rejects.toMatchObject({ kind: "unsupported" });
   });
 
-  it("treats a check-byte false accept caught by CRC or HMAC as a wrong password", () => {
-    const zipCrypto = { encrypted: true, zipCrypto: true };
-    const aes = { encrypted: true, zipCrypto: false };
-    expect(isWrongPassword(new Error(zip.ERR_INVALID_PASSWORD), aes)).toBe(
-      true,
+  // A wrong password that passes the 1-byte ZipCrypto check of `entry`.
+  async function falseAccept(entry) {
+    for (let i = 0; i < 20_000; i++) {
+      const candidate = `guess-${i}`;
+      const ok = await entry
+        .getData(new zip.Uint8ArrayWriter(), {
+          password: candidate,
+          checkPasswordOnly: true,
+        })
+        .then(
+          () => true,
+          () => false,
+        );
+      if (ok) return candidate;
+    }
+    throw new Error("no false accept found");
+  }
+
+  async function zipCryptoEntries(bytes) {
+    return new zip.ZipReader(new zip.Uint8ArrayReader(bytes)).getEntries();
+  }
+
+  it("tries the next remembered password after a ZipCrypto false accept", async () => {
+    const body = text("deflated payload ".repeat(400));
+    const bytes = await makeZip([["a.txt", body]], {
+      password: "secret",
+      zipCrypto: true,
+      level: 9,
+    });
+    const [entry] = await zipCryptoEntries(bytes);
+    const wrong = await falseAccept(entry);
+    serveRepo({ "z.zip": bytes });
+    const archive = await open("z.zip");
+    expect(await archive.unlock(wrong)).toBe(false); // the CRC catches it
+    archive.passwords.push(wrong); // as if another member had accepted it
+    expect(await archive.unlock("secret")).toBe(true);
+    expect(decode(await archive.read("a.txt"))).toBe(decode(body));
+    // Partial reads cannot check the CRC: with two candidates they read in full.
+    expect(decode(await archive.read("a.txt", { limit: 8 }))).toBe("deflated");
+  });
+
+  it("accepts the right password when a smaller member false-accepts it", async () => {
+    let bytes;
+    let password;
+    for (let i = 0; !password; i++) {
+      const candidate = `beta-${i}`;
+      const writer = new zip.ZipWriter(new zip.Uint8ArrayWriter(), {
+        zipCrypto: true,
+      });
+      await writer.add("small.txt", new zip.Uint8ArrayReader(text("a")), {
+        password: "alpha",
+      });
+      await writer.add(
+        "large.txt",
+        new zip.Uint8ArrayReader(text("large member ".repeat(50))),
+        { password: candidate },
+      );
+      bytes = await writer.close();
+      const [small] = await zipCryptoEntries(bytes);
+      const ok = await small
+        .getData(new zip.Uint8ArrayWriter(), {
+          password: candidate,
+          checkPasswordOnly: true,
+        })
+        .then(
+          () => true,
+          () => false,
+        );
+      if (ok) password = candidate;
+    }
+    serveRepo({ "two.zip": bytes });
+    const archive = await open("two.zip");
+    expect(await archive.unlock(password)).toBe(true);
+    expect(decode(await archive.read("large.txt"))).toBe(
+      "large member ".repeat(50),
     );
-    expect(isWrongPassword(new Error(zip.ERR_ENCRYPTED), aes)).toBe(true);
-    expect(isWrongPassword(new Error(zip.ERR_INVALID_CRC32), zipCrypto)).toBe(
-      true,
+    await expect(archive.read("small.txt")).rejects.toMatchObject({
+      kind: "password",
+    });
+  }, 30_000); // ~256 tries to hit a 1-in-256 false accept
+
+  it("reports a damaged AES member as corrupted, not as a password problem", async () => {
+    const writer = new zip.ZipWriter(new zip.Uint8ArrayWriter(), {
+      password: "pw",
+      level: 0,
+    });
+    await writer.add("good.txt", new zip.Uint8ArrayReader(text("ok")));
+    await writer.add(
+      "bad.txt",
+      new zip.Uint8ArrayReader(text("this member gets damaged ".repeat(20))),
     );
-    expect(
-      isWrongPassword(new Error(zip.ERR_INVALID_AUTHENTICATION_CODE), aes),
-    ).toBe(true);
-    expect(
-      isWrongPassword(new Error(zip.ERR_INVALID_CRC32), { encrypted: false }),
-    ).toBe(false);
-    expect(isWrongPassword(new Error("boom"), aes)).toBe(false);
-    expect(isWrongPassword(undefined, aes)).toBe(false);
+    const bytes = await writer.close();
+    const bad = (await zipCryptoEntries(bytes)).find(
+      (e) => e.filename === "bad.txt",
+    );
+    const view = new DataView(bytes.buffer, bytes.byteOffset);
+    const dataStart =
+      bad.offset +
+      30 +
+      view.getUint16(bad.offset + 26, true) +
+      view.getUint16(bad.offset + 28, true);
+    bytes[dataStart + 18 + 5] ^= 0xff; // past the 16-byte salt and 2-byte verifier
+    serveRepo({ "aes.zip": bytes });
+    const archive = await open("aes.zip");
+    expect(await archive.unlock("pw")).toBe(true);
+    await expect(archive.read("bad.txt")).rejects.toMatchObject({
+      kind: "format",
+      message: expect.stringContaining("corrupted"),
+    });
+    await expect(archive.unlock("pw", "bad.txt")).rejects.toMatchObject({
+      kind: "format",
+    });
+    expect(await archive.unlock("nope", "bad.txt")).toBe(false);
+  });
+
+  it("keeps unlocking when one sampled member fails to download", async () => {
+    const writer = new zip.ZipWriter(new zip.Uint8ArrayWriter(), {
+      password: "pw",
+    });
+    await writer.add("a.txt", new zip.Uint8ArrayReader(text("a")));
+    await writer.add("bb.txt", new zip.Uint8ArrayReader(text("bb")));
+    const bytes = await writer.close();
+    serveRepo({ "s.zip": bytes });
+    const archive = await open("s.zip");
+    const smallest = archive.entries.find((e) => e.filename === "a.txt");
+    server.use(
+      http.get(`${RESOLVE_PREFIX}s.zip`, ({ request }) => {
+        const [, a, b] = /^bytes=(\d+)-(\d+)$/.exec(
+          request.headers.get("range"),
+        );
+        if (Number(a) === smallest.offset)
+          return new HttpResponse("x", { status: 500, statusText: "Boom" });
+        return new HttpResponse(
+          bytes.slice(Number(a), Math.min(Number(b), bytes.length - 1) + 1),
+          { status: 206 },
+        );
+      }),
+    );
+    expect(await archive.unlock("pw")).toBe(true);
+    expect(decode(await archive.read("bb.txt"))).toBe("bb");
   });
 
   it("maps a corrupted member to a format error", async () => {
@@ -789,6 +926,82 @@ describe("volumes and damaged archives", () => {
     const parts = await resolveVolumes("x.zip.001", locator.sizeOf);
     expect(parts).toHaveLength(999);
     expect(parts.at(-1).path).toBe("x.zip.999");
+  });
+
+  const pattern = (n, step) => {
+    const out = new Uint8Array(n);
+    for (let i = 0; i < n; i++) out[i] = (i * step) & 0xff;
+    return out;
+  };
+  const same = (a, b) => Buffer.from(a).equals(Buffer.from(b));
+
+  async function bigStoredZip() {
+    const big = pattern(1_600_000, 7);
+    return { big, bytes: await makeZip([["big.bin", big]], { level: 0 }) };
+  }
+
+  it("streams a member across 7-Zip volumes with one request per volume", async () => {
+    const { big, bytes } = await bigStoredZip();
+    const cut = [0, 500_000, 1_100_000, bytes.length];
+    serveRepo(
+      Object.fromEntries(
+        [1, 2, 3].map((n) => [`r.zip.00${n}`, bytes.slice(cut[n - 1], cut[n])]),
+      ),
+    );
+    const archive = await open("r.zip.001");
+    requests.length = 0;
+    expect(same(await archive.read("big.bin"), big)).toBe(true);
+    // The local header (fixed part, then name + extra), then one stream per volume.
+    expect(requests).toHaveLength(2 + 3);
+  });
+
+  it("streams a member across Info-ZIP disks with one request per disk", async () => {
+    const big = pattern(1_600_000, 5);
+    const disks = [];
+    async function* writers() {
+      for (;;) {
+        const writer = new zip.Uint8ArrayWriter();
+        disks.push(writer);
+        yield writer;
+      }
+    }
+    const zipWriter = new zip.ZipWriter(
+      new zip.SplitDataWriter(writers(), 600_000),
+      { level: 0 },
+    );
+    await zipWriter.add("big.bin", new zip.Uint8ArrayReader(big));
+    await zipWriter.close();
+    const parts = await Promise.all(disks.map((w) => w.getData()));
+    const files = Object.fromEntries(
+      parts.map((p, i) => [
+        i === parts.length - 1 ? "d.zip" : `d.z0${i + 1}`,
+        p,
+      ]),
+    );
+    serveRepo(files);
+    const archive = await open("d.zip");
+    expect(archive.volumes).toBe(parts.length);
+    requests.length = 0;
+    expect(same(await archive.read("big.bin"), big)).toBe(true);
+    expect(requests).toHaveLength(2 + parts.length);
+  });
+
+  it("cancels a stream that spans volumes", async () => {
+    const parts = [Uint8Array.of(1, 2, 3), Uint8Array.of(4, 5)];
+    serveRepo({ p1: parts[0], p2: parts[1] });
+    const reader = new ConcatReader(
+      parts.map(
+        (p, i) => new RangeReader(`${RESOLVE_PREFIX}p${i + 1}`, p.length),
+      ),
+    );
+    await reader.createReadable({ offset: 0, size: 5 }).cancel();
+    const stream = reader.createReadable({ offset: 1, size: 4 }).getReader();
+    expect(Array.from((await stream.read()).value)).toEqual([2, 3]);
+    await stream.cancel();
+    expect(
+      (await new Response(reader.createReadable({ offset: 3 })).arrayBuffer())
+        .byteLength,
+    ).toBe(2);
   });
 
   it("reads archives with prepended data", async () => {
