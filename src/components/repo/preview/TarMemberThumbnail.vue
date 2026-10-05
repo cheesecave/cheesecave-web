@@ -30,6 +30,9 @@ const props = defineProps({
   // stretches to its parent's width and forces a 1:1 aspect ratio
   // — useful in grid view where each card sets the container width.
   size: { type: Number, default: null },
+  // Optional `read(member, size, { signal })`; the zip browser passes its
+  // archive reader, indexed tars Range-read from `tarUrl`.
+  read: { type: Function, default: null },
 });
 
 const rootRef = ref(null);
@@ -42,6 +45,7 @@ const { state, thumbUrl } = useTarThumbnail({
   tarUrl: props.tarUrl,
   member: props.member,
   rootRef,
+  read: props.read,
 });
 
 // Fixed-size mode (list view) sets explicit width/height in px.

@@ -233,7 +233,7 @@ export function buildTreeFromIndex(files) {
   return root;
 }
 
-function normalizeSegments(path) {
+export function normalizeSegments(path) {
   if (typeof path !== "string") return [];
   return path
     .split("/")

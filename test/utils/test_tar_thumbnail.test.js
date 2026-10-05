@@ -573,3 +573,13 @@ describe("useThumbnailToggle", () => {
     wrapperB.unmount();
   });
 });
+
+describe("thumbnail cache keys", () => {
+  it("tells apart members that share an offset and size", () => {
+    // Info-ZIP disk sets count offsets from the start of each disk.
+    const cache = _createCache(10);
+    cache.set(TAR_URL, { path: "disk1/a.png", offset: 40, size: 5 }, "blob:a");
+    expect(cache.get(TAR_URL, { path: "disk3/b.png", offset: 40, size: 5 })).toBeUndefined();
+    expect(cache.get(TAR_URL, { path: "disk1/a.png", offset: 40, size: 5 })).toBe("blob:a");
+  });
+});

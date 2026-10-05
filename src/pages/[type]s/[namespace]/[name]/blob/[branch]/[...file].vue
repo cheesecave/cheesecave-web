@@ -181,6 +181,13 @@
           :filename="fileName"
           :tar-tree-entry="indexedTarTreeEntry"
         />
+        <!-- Zip inline browser: same panel in zip mode. The central
+             directory is the index, so no sibling lookup is needed. -->
+        <TarBrowserPanel
+          v-else-if="isZipArchive"
+          :zip="zipTarget"
+          :filename="fileName"
+        />
         <!-- Image Preview -->
         <div v-else-if="isImage" class="text-center">
           <img
@@ -312,6 +319,7 @@ import CodeViewer from "@/components/common/CodeViewer.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import TarBrowserPanel from "@/components/repo/preview/TarBrowserPanel.vue";
 import { hasIndexSibling, tarSidecarPath } from "@/utils/indexed-tar";
+import { isZipArchivePath } from "@/utils/file-preview";
 import { mediaKind } from "@/utils/media-types";
 import { copyToClipboard } from "@/utils/clipboard";
 import { normalizeCatchAllParam } from "@/utils/repo-paths";
@@ -370,6 +378,14 @@ const deleting = ref(false);
 // sidecar.
 const indexedTarTreeEntry = ref(null);
 const isIndexedTar = ref(false);
+const isZipArchive = computed(() => isZipArchivePath(filePath.value));
+const zipTarget = computed(() => ({
+  repoType: repoType.value,
+  namespace: namespace.value,
+  name: name.value,
+  branch: branch.value,
+  path: filePath.value,
+}));
 
 // Computed
 const repoTypeLabel = computed(() => {

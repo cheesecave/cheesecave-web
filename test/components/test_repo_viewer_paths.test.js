@@ -1216,6 +1216,115 @@ describe("RepoViewer path handling", () => {
     wrapper.unmount();
   });
 
+  it("zip rows get the archive icon and open the browser dialog in zip mode", async () => {
+    const entry = (path) => ({
+      type: "file",
+      path,
+      size: 100,
+      lastModified: "2026-04-21T13:53:39.000000Z",
+    });
+    server.use(
+      http.get(
+        "/api/datasets/open-media-lab/hierarchy-crawl-fixtures/tree/main",
+        () =>
+          jsonResponse([
+            entry("bundle.zip"),
+            entry("parts.zip.001"),
+            entry("parts.zip.002"),
+            entry("disks.z01"),
+            entry("notes.txt"),
+          ]),
+      ),
+      http.post(
+        "/api/datasets/open-media-lab/hierarchy-crawl-fixtures/paths-info/main",
+        () => jsonResponse([]),
+      ),
+    );
+    const TarBrowserDialogStub = {
+      name: "TarBrowserDialog",
+      props: [
+        "visible",
+        "tarUrl",
+        "indexUrl",
+        "filename",
+        "tarTreeEntry",
+        "zip",
+      ],
+      template:
+        '<div data-stub="TarBrowserDialog" :data-visible="String(visible)" :data-filename="filename" />',
+    };
+    const wrapper = mount(RepoViewer, {
+      props: {
+        repoType: "dataset",
+        namespace: "open-media-lab",
+        name: "hierarchy-crawl-fixtures",
+        branch: "main",
+        currentPath: "",
+        tab: "files",
+      },
+      global: {
+        stubs: {
+          ...ElementPlusStubs,
+          RouterLink: RouterLinkStub,
+          MarkdownViewer: true,
+          MetadataHeader: true,
+          DetailedMetadataPanel: true,
+          ReferencedDatasetsCard: true,
+          SidebarRelationshipsCard: true,
+          DatasetViewerTab: true,
+          TarBrowserDialog: TarBrowserDialogStub,
+        },
+      },
+    });
+    await flushPromises();
+    await flushPromises();
+
+    const previewButtons = wrapper
+      .findAll("button")
+      .filter((b) =>
+        (b.attributes("aria-label") || "").startsWith("Preview metadata for"),
+      );
+    expect(previewButtons.map((b) => b.attributes("aria-label"))).toEqual([
+      "Preview metadata for bundle.zip",
+      "Preview metadata for disks.z01",
+      "Preview metadata for parts.zip.001",
+      "Preview metadata for parts.zip.002",
+    ]);
+    // Entry volumes share the indexed-tar icon; later volumes get a
+    // fainter link icon that points at the entry.
+    const icon = (b) => b.find("div").classes();
+    for (const b of [previewButtons[0], previewButtons[2]]) {
+      expect(b.attributes("title")).toContain("Browse zip contents");
+      expect(icon(b)).toContain("i-carbon-archive");
+      expect(icon(b)).not.toContain("opacity-60");
+    }
+    expect(previewButtons[1].attributes("title")).toBe(
+      "Part of a split zip: browse the whole set (entry volume: disks.zip)",
+    );
+    expect(previewButtons[3].attributes("title")).toBe(
+      "Part of a split zip: browse the whole set (entry volume: parts.zip.001)",
+    );
+    for (const b of [previewButtons[1], previewButtons[3]]) {
+      expect(icon(b)).toEqual(
+        expect.arrayContaining(["i-carbon-link", "opacity-60"]),
+      );
+    }
+
+    // A later volume opens the dialog too; zip-archive maps it to its set.
+    await previewButtons[1].trigger("click");
+    const dialog = wrapper.findComponent(TarBrowserDialogStub);
+    expect(dialog.props("visible")).toBe(true);
+    expect(dialog.props("filename")).toBe("disks.z01");
+    expect(dialog.props("zip")).toEqual({
+      repoType: "dataset",
+      namespace: "open-media-lab",
+      name: "hierarchy-crawl-fixtures",
+      branch: "main",
+      path: "disks.z01",
+    });
+    wrapper.unmount();
+  });
+
   it("indexed-tar sibling icon short-circuits when the .json is in the loaded page (no HEAD probe issued)", async () => {
     const headSpy = vi.fn(() => new HttpResponse(null, { status: 500 }));
     server.use(

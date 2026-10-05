@@ -4,9 +4,28 @@ import {
   buildResolveUrl,
   canPreviewFile,
   getPreviewKind,
+  isLaterZipVolume,
+  zipEntryVolume,
 } from "@/utils/file-preview";
 
 describe("file-preview helpers", () => {
+  describe("split zip volumes", () => {
+    it("tells later volumes from the volume a set opens from", () => {
+      for (const p of ["s/set.zip.002", "SET.ZIP.017", "set.z01", "set.Z100"])
+        expect(isLaterZipVolume(p), p).toBe(true);
+      for (const p of ["s/set.zip.001", "set.zip", "a.zip.json", "x.z1"])
+        expect(isLaterZipVolume(p), p).toBe(false);
+    });
+
+    it("maps every volume to the entry volume of its set", () => {
+      expect(zipEntryVolume("s/set.zip.003")).toBe("s/set.zip.001");
+      expect(zipEntryVolume("s/SET.ZIP.017")).toBe("s/SET.ZIP.001");
+      expect(zipEntryVolume("s/set.z02")).toBe("s/set.zip");
+      expect(zipEntryVolume("s/set.zip")).toBe("s/set.zip");
+      expect(zipEntryVolume("s/set.zip.001")).toBe("s/set.zip.001");
+    });
+  });
+
   describe("getPreviewKind", () => {
     it("recognizes .safetensors and .parquet by suffix", () => {
       expect(getPreviewKind("model.safetensors")).toBe("safetensors");
@@ -35,6 +54,30 @@ describe("file-preview helpers", () => {
       // dark unless the same listing carries a sibling .json that
       // looks like an hfutils.index sidecar.
       expect(getPreviewKind("archives/bundle.tar")).toBeNull();
+    });
+
+    it("returns 'zip' for zip-based archives and every split volume", () => {
+      for (const p of [
+        "a.zip",
+        "dir/B.ZIP",
+        "x.zipx",
+        "comic.cbz",
+        "arrays.npz",
+        "lib.jar",
+        "pkg.whl",
+        "book.epub",
+        "parts/set.zip.001",
+        "parts/set.zip.002",
+        "parts/set.z01",
+      ]) {
+        expect(getPreviewKind(p), p).toBe("zip");
+      }
+      for (const p of ["set.zip.json", "notes.zip.json"]) {
+        expect(getPreviewKind(p), p).toBeNull();
+      }
+      expect(canPreviewFile({ type: "file", path: "data/archive.zip" })).toBe(
+        true,
+      );
     });
 
     it("returns 'indexed-tar' when the listing contains a sibling .json", () => {

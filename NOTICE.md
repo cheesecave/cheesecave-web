@@ -12,6 +12,15 @@ CheeseCave modifications dated 2026-10-04 include repository splitting and namin
 The Dataset Viewer component at `src/components/DatasetViewer/` retains its separate Kohaku Software License 1.0.
 See [LICENSING.md](LICENSING.md).
 
+## Vendored third-party code
+
+The zip preview vendors two decoders under `src/vendor/`, each file keeping its original notice:
+
+- `src/vendor/seek-bzip/`: bzip2 decoder from [seek-bzip](https://github.com/cscott/seek-bzip) 2.0.0, MIT License, Copyright (C) 2013 C. Scott Ananian, (C) 2012 Eli Skeggs, (C) 2011 Kevin Kwok. Merged into one ES module and switched from Node `Buffer` to `Uint8Array`.
+- `src/vendor/hwzip/`: Shrink, Reduce and Implode decoders, JavaScript ports of [hwzip](https://www.hanshq.net/zip.html) 2.4 by Hans Wennborg (public domain), taken from the [zip.js](https://github.com/gildas-lormeau/zip.js) test suite (BSD-3-Clause).
+
+It also depends on `@zip.js/zip.js` (BSD-3-Clause), `fzstd` (MIT), `lzma1` (Apache-2.0) and `xz-decompress` (MIT, bundling xz-embedded, public domain, and walloc, MIT), installed through `package.json`.
+
 ## Source and build information
 
 The complete application is assembled from [backend](https://github.com/cheesecave/cheesecave-backend), [website](https://github.com/cheesecave/cheesecave-web) and [Admin](https://github.com/cheesecave/cheesecave-admin). Their README files, lock files, build scripts and Docker/Compose files contain build and installation instructions. The repositories currently remain private; this does not constitute a public source offer to users without repository access. Before serving outside users or distributing builds, provide recipients access to the corresponding deployed source, including the relevant components and build configuration.

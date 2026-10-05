@@ -287,8 +287,10 @@ class ThumbnailCache {
     this.map = new Map();
   }
 
+  // The path keeps zip members apart: Info-ZIP disk sets count offsets
+  // from the start of each disk, so two members can share offset + size.
   cacheKey(tarUrl, member) {
-    return `${tarUrl} ${member.offset} ${member.size}`;
+    return `${tarUrl} ${member.path} ${member.offset} ${member.size}`;
   }
 
   get(tarUrl, member) {
@@ -339,10 +341,17 @@ export function _resetThumbnailCache() {
 // -----------------------------------------------------------------------
 
 class ExtractionContext {
-  constructor({ tarUrl, member, signal }) {
+  constructor({ tarUrl, member, signal, read }) {
     this.tarUrl = tarUrl;
     this.member = member;
     this.signal = signal;
+    // `read(member, size, { signal })` returns the member's first `size`
+    // bytes. The zip browser passes its own; the default Range-reads an
+    // indexed-tar member straight from the .tar.
+    this.read =
+      read ||
+      ((m, size, options) =>
+        extractMemberBytes(tarUrl, { offset: m.offset, size }, options));
     this._head = null;
     this._full = null;
   }
@@ -355,11 +364,9 @@ class ExtractionContext {
     }
     const headSize = Math.min(bytes, this.member.size);
     if (headSize === 0) return new Uint8Array(0);
-    const slice = await extractMemberBytes(
-      this.tarUrl,
-      { offset: this.member.offset, size: headSize },
-      { signal: this.signal },
-    );
+    const slice = await this.read(this.member, headSize, {
+      signal: this.signal,
+    });
     this._head = slice;
     return slice;
   }
@@ -371,11 +378,9 @@ class ExtractionContext {
       this._full = new Uint8Array(0);
       return this._full;
     }
-    const slice = await extractMemberBytes(
-      this.tarUrl,
-      { offset: this.member.offset, size: this.member.size },
-      { signal: this.signal },
-    );
+    const slice = await this.read(this.member, this.member.size, {
+      signal: this.signal,
+    });
     this._full = slice;
     return slice;
   }
@@ -510,7 +515,7 @@ function loadImageElement(src) {
 // Orchestrator — runs the strategy chain inside the pool
 // -----------------------------------------------------------------------
 
-export async function extractThumbnail({ tarUrl, member, signal, pool, cache }) {
+export async function extractThumbnail({ tarUrl, member, signal, pool, cache, read }) {
   const c = cache || defaultCache;
   const cached = c.get(tarUrl, member);
   if (cached) return cached;
@@ -523,7 +528,7 @@ export async function extractThumbnail({ tarUrl, member, signal, pool, cache }) 
       throw err;
     }
 
-    const ctx = new ExtractionContext({ tarUrl, member, signal });
+    const ctx = new ExtractionContext({ tarUrl, member, signal, read });
     let resultBlob = null;
     for (const strategy of STRATEGIES) {
       if (signal?.aborted) {
@@ -622,7 +627,7 @@ export function _resetThumbnailToggle() {
  * if the row scrolls out before extraction completes, and returns
  * reactive `state` + `thumbUrl` refs the template can render against.
  */
-export function useTarThumbnail({ tarUrl, member, rootRef }) {
+export function useTarThumbnail({ tarUrl, member, rootRef, read }) {
   const state = ref("idle"); // idle | loading | ready | fallback
   const thumbUrl = ref(null);
   let observer = null;
@@ -638,7 +643,7 @@ export function useTarThumbnail({ tarUrl, member, rootRef }) {
     }
     state.value = "loading";
     controller = new AbortController();
-    extractThumbnail({ tarUrl, member, signal: controller.signal })
+    extractThumbnail({ tarUrl, member, signal: controller.signal, read })
       .then((url) => {
         if (controller && controller.signal.aborted) return;
         if (url) {

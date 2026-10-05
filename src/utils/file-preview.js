@@ -6,6 +6,38 @@
 
 import { hasIndexSibling } from "@/utils/indexed-tar";
 
+// Zip-based formats browsable in TarBrowserPanel's zip mode, plus every
+// volume of a split set (7-Zip `.zip.001…`, Info-ZIP `.z01…` + `.zip`):
+// zip-archive.js opens the whole set from any of them.
+const SPLIT_VOLUME = /\.(zip\.\d{3}|z\d{2,})$/i;
+const LATER_VOLUME = /\.(zip\.(?!001$)\d{3}|z\d{2,})$/i;
+
+/** A split-set volume other than the one the set opens from. */
+export const isLaterZipVolume = (path) => LATER_VOLUME.test(path);
+
+/** The volume a split set opens from: `.zip.001`, or Info-ZIP's `.zip` disk. */
+export const zipEntryVolume = (path) =>
+  path.replace(/(\.zip\.)\d{3}$/i, "$1001").replace(/\.z\d{2,}$/i, ".zip");
+
+export const ZIP_ARCHIVE_EXTENSIONS = [
+  ".zip",
+  ".zipx",
+  ".cbz",
+  ".npz",
+  ".jar",
+  ".whl",
+  ".epub",
+];
+
+export function isZipArchivePath(path) {
+  if (typeof path !== "string") return false;
+  const lower = path.toLowerCase();
+  return (
+    SPLIT_VOLUME.test(path) ||
+    ZIP_ARCHIVE_EXTENSIONS.some((ext) => lower.endsWith(ext))
+  );
+}
+
 const SUFFIX_PREVIEW_KINDS = new Map([
   [".safetensors", "safetensors"],
   [".parquet", "parquet"],
@@ -15,6 +47,9 @@ const SUFFIX_PREVIEW_KINDS = new Map([
  * Return the preview kind for a given file path, or null if the file is
  * not a kind we know how to preview. Uses a case-insensitive suffix match
  * so `MODEL.SAFETENSORS` and `shard.SAFETENSORS` both count.
+ *
+ * Zip-based archives resolve to "zip" on their own: the central
+ * directory is the index.
  *
  * `.tar` files only resolve to "indexed-tar" when a `.json` sibling
  * exists in the same listing (passed via `siblings`) or has been
@@ -33,6 +68,7 @@ export function getPreviewKind(path, siblings = null, confirmedTarPaths = null) 
   for (const [ext, kind] of SUFFIX_PREVIEW_KINDS) {
     if (lower.endsWith(ext)) return kind;
   }
+  if (isZipArchivePath(path)) return "zip";
   if (lower.endsWith(".tar")) {
     if (siblings && hasIndexSibling(path, siblings)) return "indexed-tar";
     if (confirmedTarPaths && hasInSet(confirmedTarPaths, path)) {

@@ -993,6 +993,7 @@ huggingface-cli download {{ repoInfo?.id }}</pre
       :index-url="tarBrowserTarget.indexUrl"
       :filename="tarBrowserTarget.filename"
       :tar-tree-entry="tarBrowserTarget.tarTreeEntry"
+      :zip="tarBrowserTarget.zip"
     />
   </div>
 </template>
@@ -1023,6 +1024,8 @@ import {
   buildResolveUrl,
   canPreviewFile,
   getPreviewKind,
+  isLaterZipVolume,
+  zipEntryVolume,
 } from "@/utils/file-preview";
 import { tarSidecarPath } from "@/utils/indexed-tar";
 
@@ -1126,19 +1129,25 @@ let pendingIndexedTarProbeId = 0;
 //
 // Indexed-tar (.tar + sibling .json) reuses the same icon-on-row idiom
 // but routes to TarBrowserDialog — the icon only lights up when the
-// sibling .json sits in the same fileTree listing.
+// sibling .json sits in the same fileTree listing. Zip archives use the
+// same dialog in zip mode; their icon needs no sibling.
 const previewDialogVisible = ref(false);
 const previewTarget = ref(null); // { kind, resolveUrl, filename }
 const tarBrowserDialogVisible = ref(false);
-const tarBrowserTarget = ref(null); // { tarUrl, indexUrl, filename, tarTreeEntry }
+const tarBrowserTarget = ref(null); // { tarUrl, indexUrl, filename, tarTreeEntry } or { zip, filename }
 
 const PREVIEW_ICON_BY_KIND = {
   safetensors: "i-carbon-chart-line-data",
   parquet: "i-carbon-chart-line-data",
   "indexed-tar": "i-carbon-archive",
+  zip: "i-carbon-archive",
 };
 
+// Later volumes of a split zip open the same set as its entry volume: a
+// smaller, fainter link icon keeps the entry (indexed tar's icon) the one
+// to spot.
 function previewIconClass(file) {
+  if (isLaterZipVolume(file.path)) return "i-carbon-link opacity-60 scale-85";
   const kind = getPreviewKind(
     file.path,
     fileTree.value,
@@ -1155,6 +1164,13 @@ function previewIconTitle(file) {
   );
   if (kind === "indexed-tar") {
     return "Browse indexed tar contents (Range-read, no full download)";
+  }
+  if (kind === "zip") {
+    if (isLaterZipVolume(file.path)) {
+      const entry = getFileName(zipEntryVolume(file.path));
+      return `Part of a split zip: browse the whole set (entry volume: ${entry})`;
+    }
+    return "Browse zip contents (Range-read, no full download)";
   }
   return `Preview ${kind} metadata (Range-read, no download)`;
 }
@@ -1181,6 +1197,20 @@ function openFilePreview(file) {
     confirmedIndexedTars.value,
   );
   if (!kind) return;
+  if (kind === "zip") {
+    tarBrowserTarget.value = {
+      zip: {
+        repoType: props.repoType,
+        namespace: props.namespace,
+        name: props.name,
+        branch: currentBranch.value,
+        path: file.path,
+      },
+      filename: getFileName(file.path),
+    };
+    tarBrowserDialogVisible.value = true;
+    return;
+  }
   if (kind === "indexed-tar") {
     const dot = file.path.lastIndexOf(".");
     const indexPath = `${file.path.slice(0, dot)}.json`;
