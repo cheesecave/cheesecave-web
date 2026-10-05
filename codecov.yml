@@ -1,0 +1,15 @@
+coverage:
+  status:
+    project:
+      default:
+        # A small drop from base is not a regression on its own.
+        threshold: 1%
+        # RepoViewer.vue is orchestration without a clean unit-test surface;
+        # its behaviour is covered by the dedicated RepoViewer component tests.
+        paths:
+          - "!src/components/repo/RepoViewer.vue"
+    patch:
+      default:
+        threshold: 1%
+        paths:
+          - "!src/components/repo/RepoViewer.vue"

@@ -43,6 +43,16 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Run the complete regression suite with coverage
         run: pnpm test --maxWorkers=2
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage/cobertura-coverage.xml
+          flags: frontend
+          name: web-vitest
+          disable_search: true
+          fail_ci_if_error: false
 
   build:
     name: Production build
