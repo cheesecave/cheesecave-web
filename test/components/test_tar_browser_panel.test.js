@@ -904,3 +904,24 @@ describe("TarBrowserPanel · hash banner", () => {
     );
   });
 });
+
+describe("TarBrowserPanel · thumbnails in tar mode", () => {
+  it("hands image rows the .tar URL and no custom reader", async () => {
+    const png = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    ]);
+    serveArchive(buildArchive([["pics/a.png", png]]));
+    // The suite disables thumbnails in beforeEach; this test needs them.
+    localStorage.setItem("kohaku-tar-thumbnail-enabled", "1");
+    const wrapper = mountPanel();
+    await flushPromises();
+    await wrapper
+      .findAll(".cursor-pointer")
+      .find((r) => r.text().includes("pics"))
+      .trigger("click");
+    const thumb = wrapper.findComponent({ name: "TarMemberThumbnail" });
+    expect(thumb.exists()).toBe(true);
+    expect(thumb.props("tarUrl")).toBe(TAR_URL);
+    expect(thumb.props("read")).toBeNull();
+  });
+});

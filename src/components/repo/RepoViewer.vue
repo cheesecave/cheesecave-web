@@ -993,6 +993,7 @@ huggingface-cli download {{ repoInfo?.id }}</pre
       :index-url="tarBrowserTarget.indexUrl"
       :filename="tarBrowserTarget.filename"
       :tar-tree-entry="tarBrowserTarget.tarTreeEntry"
+      :zip="tarBrowserTarget.zip"
     />
   </div>
 </template>
@@ -1126,16 +1127,18 @@ let pendingIndexedTarProbeId = 0;
 //
 // Indexed-tar (.tar + sibling .json) reuses the same icon-on-row idiom
 // but routes to TarBrowserDialog — the icon only lights up when the
-// sibling .json sits in the same fileTree listing.
+// sibling .json sits in the same fileTree listing. Zip archives use the
+// same dialog in zip mode; their icon needs no sibling.
 const previewDialogVisible = ref(false);
 const previewTarget = ref(null); // { kind, resolveUrl, filename }
 const tarBrowserDialogVisible = ref(false);
-const tarBrowserTarget = ref(null); // { tarUrl, indexUrl, filename, tarTreeEntry }
+const tarBrowserTarget = ref(null); // { tarUrl, indexUrl, filename, tarTreeEntry } or { zip, filename }
 
 const PREVIEW_ICON_BY_KIND = {
   safetensors: "i-carbon-chart-line-data",
   parquet: "i-carbon-chart-line-data",
   "indexed-tar": "i-carbon-archive",
+  zip: "i-carbon-archive",
 };
 
 function previewIconClass(file) {
@@ -1155,6 +1158,9 @@ function previewIconTitle(file) {
   );
   if (kind === "indexed-tar") {
     return "Browse indexed tar contents (Range-read, no full download)";
+  }
+  if (kind === "zip") {
+    return "Browse zip contents (Range-read, no full download)";
   }
   return `Preview ${kind} metadata (Range-read, no download)`;
 }
@@ -1181,6 +1187,20 @@ function openFilePreview(file) {
     confirmedIndexedTars.value,
   );
   if (!kind) return;
+  if (kind === "zip") {
+    tarBrowserTarget.value = {
+      zip: {
+        repoType: props.repoType,
+        namespace: props.namespace,
+        name: props.name,
+        branch: currentBranch.value,
+        path: file.path,
+      },
+      filename: getFileName(file.path),
+    };
+    tarBrowserDialogVisible.value = true;
+    return;
+  }
   if (kind === "indexed-tar") {
     const dot = file.path.lastIndexOf(".");
     const indexPath = `${file.path.slice(0, dot)}.json`;

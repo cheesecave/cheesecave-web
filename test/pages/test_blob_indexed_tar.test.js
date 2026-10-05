@@ -68,9 +68,9 @@ vi.mock("@/utils/http-errors", () => ({
 vi.mock("@/components/repo/preview/TarBrowserPanel.vue", () => ({
   default: {
     name: "TarBrowserPanel",
-    props: ["tarUrl", "indexUrl", "filename", "tarTreeEntry"],
+    props: ["tarUrl", "indexUrl", "filename", "tarTreeEntry", "zip"],
     template:
-      '<div data-stub="TarBrowserPanel" :data-tar-url="tarUrl" :data-index-url="indexUrl" :data-filename="filename" :data-has-tree-entry="tarTreeEntry ? \'true\' : \'false\'" />',
+      '<div data-stub="TarBrowserPanel" :data-tar-url="tarUrl" :data-index-url="indexUrl" :data-filename="filename" :data-has-tree-entry="tarTreeEntry ? \'true\' : \'false\'" :data-zip="zip ? JSON.stringify(zip) : \'\'" />',
   },
 }));
 
@@ -245,6 +245,62 @@ describe("blob page · indexed-tar inline detection", () => {
     // Detection failure must not flip isIndexedTar — the panel
     // should NOT mount; the page renders the regular binary
     // fallback instead.
+    expect(wrapper.find('[data-stub="TarBrowserPanel"]').exists()).toBe(false);
+  });
+});
+
+describe("blob page · zip inline browser", () => {
+  it.each([
+    [
+      "/datasets/open-media-lab/showcase/blob/main/archives/models/bundle.zip",
+      "archives/models/bundle.zip",
+      "dataset",
+    ],
+    [
+      "/models/aurora/lab/blob/release%2Fv1/weights.npz",
+      "weights.npz",
+      "model",
+    ],
+    [
+      "/spaces/team/demo/blob/main/parts/set.zip.001",
+      "parts/set.zip.001",
+      "space",
+    ],
+  ])(
+    "renders TarBrowserPanel in zip mode for %s",
+    async (path, file, repoType) => {
+      const branch = path.includes("release") ? "release/v1" : "main";
+      const [, , namespace, name] = path.split("/");
+      mocks.route.path = path;
+      mocks.route.params = { namespace, name, branch, file };
+      const wrapper = mountBlob();
+      await flushPromises();
+      const panel = wrapper.find('[data-stub="TarBrowserPanel"]');
+      expect(panel.exists()).toBe(true);
+      expect(JSON.parse(panel.attributes("data-zip"))).toEqual({
+        repoType,
+        namespace,
+        name,
+        branch,
+        path: file,
+      });
+      expect(panel.attributes("data-filename")).toBe(file.split("/").pop());
+      // Zip detection needs no sibling lookup.
+      expect(mocks.listTreeImpl).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps later volumes on the binary fallback", async () => {
+    mocks.route.path =
+      "/datasets/open-media-lab/showcase/blob/main/parts/set.zip.002";
+    mocks.route.params = {
+      namespace: "open-media-lab",
+      name: "showcase",
+      branch: "main",
+      file: "parts/set.zip.002",
+    };
+    const wrapper = mountBlob();
+    await flushPromises();
     expect(wrapper.find('[data-stub="TarBrowserPanel"]').exists()).toBe(false);
   });
 });

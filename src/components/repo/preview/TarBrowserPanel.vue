@@ -2,9 +2,9 @@
   TarBrowserPanel.vue
 
   Self-contained read-only browser for hfutils.index TAR + JSON
-  pairs. Renders without any dialog/modal wrapper so it can be
-  mounted inline on the standalone blob page or wrapped inside an
-  <el-dialog> by TarBrowserDialog.
+  pairs and for zip archives (the `zip` prop). Renders without any
+  dialog/modal wrapper so it can be mounted inline on the standalone
+  blob page or wrapped inside an <el-dialog> by TarBrowserDialog.
 
   Lifecycle: loads the sidecar JSON on mount (and on indexUrl
   change), exposes the listing + member view through internal state,
@@ -12,7 +12,9 @@
   safetensors / parquet metadata previews.
 
   No backend code path: index JSON and member ranges are both
-  fetched via /resolve/.
+  fetched via /resolve/. In zip mode utils/zip-archive.js (loaded on
+  demand) reads the central directory and single members the same
+  way; an encrypted zip asks for its password once before listing.
 -->
 
 <script setup>
@@ -36,6 +38,7 @@ import {
   writePageSize,
 } from "@/utils/tar-listing-prefs";
 import ErrorState from "@/components/common/ErrorState.vue";
+import ZipPasswordForm from "@/components/repo/preview/ZipPasswordForm.vue";
 import CodeViewer from "@/components/common/CodeViewer.vue";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import FilePreviewDialog from "@/components/repo/preview/FilePreviewDialog.vue";
@@ -43,8 +46,10 @@ import TarMemberThumbnail from "@/components/repo/preview/TarMemberThumbnail.vue
 import { ElMessage } from "element-plus";
 
 const props = defineProps({
-  tarUrl: { type: String, required: true },
-  indexUrl: { type: String, required: true },
+  tarUrl: { type: String, default: "" },
+  indexUrl: { type: String, default: "" },
+  // Zip mode: { repoType, namespace, name, branch, path } of the archive.
+  zip: { type: Object, default: null },
   filename: { type: String, required: true },
   // Tree-API entry for the .tar file. Used to compare its on-disk
   // hash against the hashes inside the sidecar index — drives the
@@ -82,12 +87,27 @@ const INLINE_BLOB_MAX_BYTES = 200 * 1024 * 1024;
 
 const innerPreviewProps = ref(null);
 
+// Zip mode. The archive object is not reactive state (zip.js entries are
+// large); the refs mirror what the template needs.
+let zipArchive = null;
+const zipUrl = ref("");
+const zipVolumes = ref(1);
+const zipLegacyNames = ref(false);
+const zipEncoding = ref("");
+const zipEncodingOptions = ref([]);
+const unlocking = ref(false);
+const passwordError = ref("");
+const zipKey = computed(() => (props.zip ? JSON.stringify(props.zip) : ""));
+
 // Load on mount and re-load if the source URL changes. The blob-page
 // surface keeps this component mounted while the user navigates
 // inside the archive, so a fresh indexUrl (e.g. switching to a
 // different .tar in the same repo) needs to trigger a reload.
 onMounted(() => {
-  if (props.indexUrl) startLoad();
+  if (props.indexUrl || props.zip) startLoad();
+});
+watch(zipKey, (next, prev) => {
+  if (next && next !== prev) startLoad();
 });
 watch(
   () => props.indexUrl,
@@ -136,6 +156,13 @@ async function startLoad() {
   indexPayload.value = null;
   tree.value = null;
   errorClassification.value = null;
+  zipArchive = null;
+  passwordError.value = "";
+
+  if (props.zip) {
+    await loadZip(requestId);
+    return;
+  }
 
   const controller = new AbortController();
   currentController = controller;
@@ -163,6 +190,81 @@ async function startLoad() {
     if (requestId === currentRequestId) currentController = null;
   }
 }
+
+async function loadZip(requestId) {
+  phase.value = "Reading the zip central directory…";
+  try {
+    const { openRepoZip, FILENAME_ENCODINGS } = await import(
+      "@/utils/zip-archive"
+    );
+    const archive = await openRepoZip(props.zip, { lang: navigator.language });
+    if (requestId !== currentRequestId) return;
+    zipArchive = archive;
+    zipUrl.value = archive.url;
+    zipVolumes.value = archive.volumes;
+    zipLegacyNames.value = archive.legacyNames;
+    zipEncoding.value = archive.encoding;
+    zipEncodingOptions.value = FILENAME_ENCODINGS;
+    if (archive.needsPassword) {
+      state.value = "password";
+      return;
+    }
+    tree.value = buildTreeFromIndex(archive.files);
+    state.value = "ready";
+  } catch (err) {
+    if (requestId !== currentRequestId) return;
+    errorClassification.value = classifyError(err);
+    state.value = "error";
+  }
+}
+
+// Remembered by the archive: one accepted password opens every member
+// that shares it, so the user is never asked again for those.
+async function checkPassword(password, path) {
+  unlocking.value = true;
+  passwordError.value = "";
+  const ok = await zipArchive.unlock(password, path).catch((err) => {
+    passwordError.value = err.message;
+    return null;
+  });
+  unlocking.value = false;
+  if (ok === false) passwordError.value = "Wrong password, try again.";
+  return ok === true;
+}
+
+async function unlockArchive(password) {
+  if (!(await checkPassword(password))) return;
+  tree.value = buildTreeFromIndex(zipArchive.files);
+  state.value = "ready";
+}
+
+// Only for a member encrypted with a different password than the one
+// given at entry (rare: archives built in several passes).
+async function unlockMember(node, password) {
+  if (await checkPassword(password, node.path)) openMember(node);
+}
+
+watch(zipEncoding, (encoding) => {
+  if (!zipArchive || encoding === zipArchive.encoding) return;
+  zipArchive.setEncoding(encoding);
+  resetMember();
+  pathStack.value = [];
+  tree.value = buildTreeFromIndex(zipArchive.files);
+});
+
+// First `size` bytes of a member (all of it when size === node.size).
+function readMemberBytes(node, size, options) {
+  if (zipArchive)
+    return zipArchive.read(node.path, { limit: size, ...options });
+  return extractMemberBytes(
+    props.tarUrl,
+    { offset: node.offset, size },
+    options,
+  );
+}
+
+const archiveUrl = computed(() => (props.zip ? zipUrl.value : props.tarUrl));
+const thumbnailRead = computed(() => (props.zip ? readMemberBytes : null));
 
 function retry() {
   startLoad();
@@ -322,11 +424,9 @@ async function openMember(node) {
   }
 
   try {
-    const bytes = await extractMemberBytes(
-      props.tarUrl,
-      { offset: node.offset, size: node.size },
-      { signal: controller.signal },
-    );
+    const bytes = await readMemberBytes(node, node.size, {
+      signal: controller.signal,
+    });
     if (memberAbortController !== controller) return; // superseded
 
     // Cache the in-memory bytes on the memberView so the Download
@@ -360,6 +460,12 @@ async function openMember(node) {
     }
   } catch (err) {
     if (err?.name === "AbortError") return;
+    passwordError.value = "";
+    if (err?.kind === "password" || err?.kind === "unsupported") {
+      memberView.value.state = err.kind;
+      memberView.value.message = err.message;
+      return;
+    }
     memberView.value.state = "error";
     memberView.value.error = classifyError(err);
   }
@@ -372,12 +478,7 @@ async function downloadMember(node) {
     // Range read makes the saved file byte-identical to what the
     // user just previewed and avoids re-paying the round-trip.
     let bytes = node && node.bytes ? node.bytes : null;
-    if (!bytes) {
-      bytes = await extractMemberBytes(props.tarUrl, {
-        offset: node.offset,
-        size: node.size,
-      });
-    }
+    if (!bytes) bytes = await readMemberBytes(node, node.size);
     downloadBytesAs(bytes, node.name, guessMimeType(node.name));
   } catch (err) {
     ElMessage.error(`Download failed: ${err.message || err}`);
@@ -431,6 +532,14 @@ watch(innerPreviewProps, (val) => {
         {{ phase }}
       </p>
       <p
+        v-if="props.zip"
+        class="mt-1 text-xs text-gray-400 dark:text-gray-500 max-w-md text-center"
+      >
+        Only the central directory at the end of the zip is read. Files are
+        Range-read one at a time when you open them.
+      </p>
+      <p
+        v-else
         class="mt-1 text-xs text-gray-400 dark:text-gray-500 max-w-md text-center"
       >
         Reading the index sidecar (.json next to the .tar). The .tar
@@ -443,6 +552,14 @@ watch(innerPreviewProps, (val) => {
       :classification="errorClassification"
       mode="inline-panel"
       :retry="retry"
+    />
+
+    <ZipPasswordForm
+      v-else-if="state === 'password'"
+      message="This zip is password-protected. Enter the password once to browse and preview its files."
+      :busy="unlocking"
+      :error="passwordError"
+      @submit="unlockArchive"
     />
 
     <div v-else-if="state === 'ready' && tree">
@@ -525,6 +642,10 @@ watch(innerPreviewProps, (val) => {
           </span>
           <span class="flex-1" />
           <el-button
+            v-if="
+              memberView.state !== 'password' &&
+              memberView.state !== 'unsupported'
+            "
             size="small"
             type="primary"
             @click="downloadMember(memberView)"
@@ -552,6 +673,27 @@ watch(innerPreviewProps, (val) => {
           :classification="memberView.error"
           mode="inline-panel"
         />
+
+        <ZipPasswordForm
+          v-else-if="memberView.state === 'password'"
+          message="This file uses a different password from the rest of the archive."
+          :busy="unlocking"
+          :error="passwordError"
+          @submit="(password) => unlockMember(memberView, password)"
+        />
+
+        <div
+          v-else-if="memberView.state === 'unsupported'"
+          class="text-center py-10"
+        >
+          <div
+            class="i-carbon-warning-alt text-6xl text-gray-300 dark:text-gray-600 mb-2 inline-block"
+          />
+          <p class="text-sm text-gray-600 dark:text-gray-400">
+            {{ memberView.message }}. Download the whole archive and open it
+            locally (for example with 7-Zip) to extract this file.
+          </p>
+        </div>
 
         <div v-else-if="memberView.state === 'too-large-text'" class="text-center py-10">
           <p class="text-sm text-gray-600 dark:text-gray-300 mb-3">
@@ -705,6 +847,26 @@ watch(innerPreviewProps, (val) => {
           </el-button>
           <span class="flex-1" />
           <el-tooltip
+            v-if="zipLegacyNames"
+            content="Code page used to decode file names stored without the UTF-8 flag"
+            placement="top"
+          >
+            <el-select
+              v-model="zipEncoding"
+              size="small"
+              class="!w-48"
+              data-testid="zip-encoding"
+              placeholder="File name encoding"
+            >
+              <el-option
+                v-for="option in zipEncodingOptions"
+                :key="option.value"
+                :value="option.value"
+                :label="option.label"
+              />
+            </el-select>
+          </el-tooltip>
+          <el-tooltip
             content="Toggle in-listing thumbnails (saved across sessions)"
             placement="top"
           >
@@ -740,6 +902,9 @@ watch(innerPreviewProps, (val) => {
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
           {{ totalEntries }} entries · {{ tree.fileCount }} files in archive ·
           {{ formatBytes(tree.size) }} total
+          <span v-if="props.zip && zipVolumes > 1">
+            · {{ zipVolumes }} volumes
+          </span>
         </p>
 
         <!-- List view. -->
@@ -761,7 +926,8 @@ watch(innerPreviewProps, (val) => {
           >
             <TarMemberThumbnail
               v-if="shouldRenderThumbnail(entry)"
-              :tar-url="props.tarUrl"
+              :tar-url="archiveUrl"
+              :read="thumbnailRead"
               :member="entry"
               :placeholder-icon="iconForFile(entry.name)"
               :size="48"
@@ -815,7 +981,8 @@ watch(innerPreviewProps, (val) => {
           >
             <TarMemberThumbnail
               v-if="shouldRenderThumbnail(entry)"
-              :tar-url="props.tarUrl"
+              :tar-url="archiveUrl"
+              :read="thumbnailRead"
               :member="entry"
               :placeholder-icon="iconForFile(entry.name)"
               class="mb-2"

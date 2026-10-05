@@ -21,11 +21,12 @@ import TarBrowserDialog from "@/components/repo/preview/TarBrowserDialog.vue";
 // assert the wiring is intact.
 const TarBrowserPanelStub = defineComponent({
   name: "TarBrowserPanel",
-  props: ["tarUrl", "indexUrl", "filename", "tarTreeEntry"],
+  props: ["tarUrl", "indexUrl", "filename", "tarTreeEntry", "zip"],
   setup(props) {
     return () =>
       h("div", {
         "data-stub": "TarBrowserPanel",
+        "data-zip-path": props.zip ? props.zip.path : "",
         "data-tar-url": props.tarUrl,
         "data-index-url": props.indexUrl,
         "data-filename": props.filename,
@@ -93,5 +94,34 @@ describe("TarBrowserDialog", () => {
     expect(wrapper.text()).toContain(
       "Indexed tar · archives/models/bundle.tar",
     );
+  });
+
+  it("titles an indexed tar and forwards no zip target", () => {
+    const wrapper = mountDialog();
+    expect(wrapper.text()).toContain("Indexed tar · archive.tar");
+    expect(
+      wrapper.find('[data-stub="TarBrowserPanel"]').attributes("data-zip-path"),
+    ).toBe("");
+  });
+
+  it("titles a zip archive and forwards its repo target", () => {
+    const zip = {
+      repoType: "dataset",
+      namespace: "o",
+      name: "r",
+      branch: "main",
+      path: "a/b.zip",
+    };
+    const wrapper = mountDialog({
+      tarUrl: undefined,
+      indexUrl: undefined,
+      tarTreeEntry: null,
+      filename: "b.zip",
+      zip,
+    });
+    expect(wrapper.text()).toContain("Zip archive · b.zip");
+    expect(
+      wrapper.find('[data-stub="TarBrowserPanel"]').attributes("data-zip-path"),
+    ).toBe("a/b.zip");
   });
 });
