@@ -1,6 +1,9 @@
-name: Web CI (manual)
+name: Web CI
 
 "on":
+  pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       category:
@@ -20,7 +23,7 @@ permissions:
 jobs:
   regression:
     name: Frontend regression and coverage
-    if: ${{ inputs.category == 'all' || inputs.category == 'regression' }}
+    if: ${{ (inputs.category || 'all') == 'all' || (inputs.category || 'all') == 'regression' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -43,7 +46,7 @@ jobs:
 
   build:
     name: Production build
-    if: ${{ inputs.category == 'all' || inputs.category == 'build' }}
+    if: ${{ (inputs.category || 'all') == 'all' || (inputs.category || 'all') == 'build' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -66,7 +69,7 @@ jobs:
 
   docker:
     name: Container build
-    if: ${{ inputs.category == 'docker' }}
+    if: ${{ (inputs.category || 'all') == 'docker' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
