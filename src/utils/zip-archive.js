@@ -16,10 +16,17 @@ import {
   ERR_ENCRYPTED,
   ERR_ENCRYPTED_CENTRAL_DIRECTORY,
   ERR_EOCDR_LOCATOR_ZIP64_NOT_FOUND,
+  ERR_EXTRAFIELD_ZIP64_NOT_FOUND,
   ERR_INVALID_AUTHENTICATION_CODE,
   ERR_INVALID_CRC32,
   ERR_INVALID_PASSWORD,
+  ERR_LOCAL_FILE_HEADER_NOT_FOUND,
+  ERR_OVERLAPPING_ENTRY,
   ERR_SPLIT_ZIP_FILE,
+  ERR_UNSUPPORTED_COMPRESSION,
+  ERR_UNSUPPORTED_CRYPTO_API,
+  ERR_UNSUPPORTED_ENCRYPTION,
+  ERR_UNSUPPORTED_UINT64,
   Reader,
   SplitDataReader,
   Uint8ArrayWriter,
@@ -65,6 +72,16 @@ export class ZipArchiveError extends Error {
   }
 }
 
+// A network failure rejects fetch (or a body read) with a bare TypeError,
+// the same type a DecompressionStream throws on bad data: wrap it so it
+// cannot pass for a wrong password. Aborts pass through.
+function transportError(err) {
+  if (err.name === "AbortError") return err;
+  return new ZipArchiveError(`Failed to fetch the zip: ${err.message}`, {
+    kind: "fetch",
+  });
+}
+
 async function rangeFetch(url, start, end, signal) {
   // `same-origin` forwards the session cookie on the /resolve/ hop and the
   // browser drops it on the cross-origin redirect to the presigned URL.
@@ -76,6 +93,8 @@ async function rangeFetch(url, start, end, signal) {
     mode: "cors",
     credentials: "same-origin",
     signal,
+  }).catch((err) => {
+    throw transportError(err);
   });
   if (response.status !== 206 && response.status !== 200) {
     throw new ZipArchiveError(
@@ -132,7 +151,9 @@ export class RangeReader extends Reader {
             : response.body.getReader();
       },
       async pull(stream) {
-        const { done, value } = await body.read();
+        const { done, value } = await body.read().catch((err) => {
+          throw transportError(err);
+        });
         if (done) stream.close();
         else stream.enqueue(value);
       },
@@ -414,6 +435,16 @@ const isPasswordProtected = (entry) =>
 
 // The password verifier said no.
 const PASSWORD_REJECTED = new Set([ERR_INVALID_PASSWORD, ERR_ENCRYPTED]);
+// Raised before decryption: no password changes them.
+const STRUCTURAL = new Set([
+  ERR_LOCAL_FILE_HEADER_NOT_FOUND,
+  ERR_OVERLAPPING_ENTRY,
+  ERR_EXTRAFIELD_ZIP64_NOT_FOUND,
+  ERR_UNSUPPORTED_COMPRESSION,
+  ERR_UNSUPPORTED_CRYPTO_API,
+  ERR_UNSUPPORTED_ENCRYPTION,
+  ERR_UNSUPPORTED_UINT64,
+]);
 
 // zip.js throws plain Errors identified by message; aborts surface as
 // DOMException("AbortError") and pass through untouched.
@@ -443,14 +474,15 @@ function toArchiveError(err) {
  * said no) or "mismatch" (the verifier said yes but the CRC, the AES HMAC
  * or the decompressor did not). ZipCrypto verifies one byte, so 1 in 256
  * wrong passwords is a mismatch; AES verifies two and then an HMAC, so a
- * mismatch there means the member is damaged. Transport errors and
- * aborts throw.
+ * mismatch there means the member is damaged. Transport and structural
+ * errors and aborts throw.
  */
 async function tryPassword(entry, password, options) {
   try {
     return { ok: true, bytes: await extract(entry, { password, ...options }) };
   } catch (err) {
     if (err instanceof ZipArchiveError || err.name === "AbortError") throw err;
+    if (STRUCTURAL.has(err.message)) throw toArchiveError(err);
     const failure = PASSWORD_REJECTED.has(err.message)
       ? "rejected"
       : "mismatch";
@@ -644,15 +676,12 @@ class ZipArchive {
         throw toArchiveError(err);
       });
     }
-    // A partial read skips the CRC, the only thing that tells several
-    // remembered passwords apart for a ZipCrypto member: read it in full.
-    const partial =
-      entry.zipCrypto && this.passwords.length > 1 ? undefined : limit;
     for (const password of this.passwords) {
-      const result = await tryPassword(entry, password, {
-        limit: partial,
-        signal,
-      });
+      // ponytail: a partial (thumbnail) read skips the CRC, so with several
+      // remembered passwords a 1-in-256 ZipCrypto false accept can garble a
+      // head read; the thumbnail then falls back to its icon. Full reads
+      // verify the CRC. Remember the password per member if that matters.
+      const result = await tryPassword(entry, password, { limit, signal });
       if (result.ok) return result.bytes.subarray(0, limit);
       if (result.failure === "mismatch" && !entry.zipCrypto)
         throw toArchiveError(result.err);

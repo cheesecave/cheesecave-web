@@ -390,6 +390,45 @@ describe("transport", () => {
     await streamReader.cancel();
   });
 
+  it("reports a body that breaks off mid-stream as a transport error", async () => {
+    server.use(
+      http.get(`${RESOLVE_PREFIX}cut.bin`, () => {
+        const body = new ReadableStream({
+          start(controller) {
+            controller.enqueue(new Uint8Array(4));
+            controller.error(new TypeError("network connection lost"));
+          },
+        });
+        return new HttpResponse(body, { status: 206 });
+      }),
+    );
+    const reader = new RangeReader(`${RESOLVE_PREFIX}cut.bin`, 64);
+    const read = new Response(
+      reader.createReadable({ offset: 0, size: 64 }),
+    ).arrayBuffer();
+    await expect(read).rejects.toMatchObject({
+      name: "ZipArchiveError",
+      kind: "fetch",
+    });
+  });
+
+  it("lets an abort through when a stream is cancelled before its response", async () => {
+    let respond;
+    server.use(
+      http.get(`${RESOLVE_PREFIX}slow.bin`, async () => {
+        await new Promise((r) => (respond = r));
+        return new HttpResponse(new Uint8Array(8), { status: 206 });
+      }),
+    );
+    const reader = new RangeReader(`${RESOLVE_PREFIX}slow.bin`, 8);
+    const stream = reader.createReadable({ offset: 0, size: 8 }).getReader();
+    const pending = stream.read();
+    await vi.waitFor(() => expect(respond).toBeTypeOf("function"));
+    await stream.cancel();
+    respond();
+    expect(await pending).toEqual({ done: true, value: undefined });
+  });
+
   it("streams from a server that ignores Range", async () => {
     const body = new Uint8Array(32).map((_, i) => i);
     serveRepo({ "s.bin": body }, { ignoreRange: true });
@@ -753,8 +792,40 @@ describe("encryption", () => {
     archive.passwords.push(wrong); // as if another member had accepted it
     expect(await archive.unlock("secret")).toBe(true);
     expect(decode(await archive.read("a.txt"))).toBe(decode(body));
-    // Partial reads cannot check the CRC: with two candidates they read in full.
-    expect(decode(await archive.read("a.txt", { limit: 8 }))).toBe("deflated");
+  });
+
+  it("reports a dropped connection as a transport error, not a password problem", async () => {
+    serveRepo({ "c.zip": fixture("crypto-zipcrypto.zip") });
+    const archive = await open("c.zip");
+    expect(await archive.unlock("secret")).toBe(true);
+    server.use(http.get(`${RESOLVE_PREFIX}c.zip`, () => HttpResponse.error()));
+    await expect(archive.read("hello.txt")).rejects.toMatchObject({
+      kind: "fetch",
+    });
+    await expect(archive.unlock("secret", "hello.txt")).rejects.toMatchObject({
+      kind: "fetch",
+    });
+    await expect(archive.unlock("secret")).rejects.toMatchObject({
+      kind: "fetch",
+    });
+  });
+
+  it("reports a damaged local header of a ZipCrypto member as a format error", async () => {
+    const bytes = await makeZip([["a.txt", text("payload")]], {
+      password: "pw",
+      zipCrypto: true,
+    });
+    serveRepo({ "h.zip": bytes });
+    const archive = await open("h.zip");
+    expect(await archive.unlock("pw")).toBe(true);
+    bytes[archive.entries[0].offset] = 0; // break the "PK\x03\x04" signature
+    await expect(archive.read("a.txt")).rejects.toMatchObject({
+      kind: "format",
+      message: expect.stringContaining("Local file header"),
+    });
+    await expect(archive.unlock("pw", "a.txt")).rejects.toMatchObject({
+      kind: "format",
+    });
   });
 
   it("accepts the right password when a smaller member false-accepts it", async () => {
