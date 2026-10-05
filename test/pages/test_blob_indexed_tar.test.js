@@ -266,6 +266,17 @@ describe("blob page · zip inline browser", () => {
       "parts/set.zip.001",
       "space",
     ],
+    // Later volumes open the whole set too (zip-archive maps them).
+    [
+      "/datasets/open-media-lab/showcase/blob/main/parts/set.zip.002",
+      "parts/set.zip.002",
+      "dataset",
+    ],
+    [
+      "/datasets/open-media-lab/showcase/blob/main/parts/set.z01",
+      "parts/set.z01",
+      "dataset",
+    ],
   ])(
     "renders TarBrowserPanel in zip mode for %s",
     async (path, file, repoType) => {
@@ -290,17 +301,4 @@ describe("blob page · zip inline browser", () => {
     },
   );
 
-  it("keeps later volumes on the binary fallback", async () => {
-    mocks.route.path =
-      "/datasets/open-media-lab/showcase/blob/main/parts/set.zip.002";
-    mocks.route.params = {
-      namespace: "open-media-lab",
-      name: "showcase",
-      branch: "main",
-      file: "parts/set.zip.002",
-    };
-    const wrapper = mountBlob();
-    await flushPromises();
-    expect(wrapper.find('[data-stub="TarBrowserPanel"]').exists()).toBe(false);
-  });
 });

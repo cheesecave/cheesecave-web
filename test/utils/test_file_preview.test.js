@@ -37,7 +37,7 @@ describe("file-preview helpers", () => {
       expect(getPreviewKind("archives/bundle.tar")).toBeNull();
     });
 
-    it("returns 'zip' for zip-based archives and the first 7-Zip volume", () => {
+    it("returns 'zip' for zip-based archives and every split volume", () => {
       for (const p of [
         "a.zip",
         "dir/B.ZIP",
@@ -48,10 +48,12 @@ describe("file-preview helpers", () => {
         "pkg.whl",
         "book.epub",
         "parts/set.zip.001",
+        "parts/set.zip.002",
+        "parts/set.z01",
       ]) {
         expect(getPreviewKind(p), p).toBe("zip");
       }
-      for (const p of ["set.zip.002", "set.z01", "notes.zip.json"]) {
+      for (const p of ["set.zip.json", "notes.zip.json"]) {
         expect(getPreviewKind(p), p).toBeNull();
       }
       expect(canPreviewFile({ type: "file", path: "data/archive.zip" })).toBe(

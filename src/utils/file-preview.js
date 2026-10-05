@@ -6,9 +6,11 @@
 
 import { hasIndexSibling } from "@/utils/indexed-tar";
 
-// Zip-based formats browsable in TarBrowserPanel's zip mode, plus the
-// first volume of a 7-Zip split (`.zip.001`). Info-ZIP disk sets open
-// from their last `.zip` disk; the other volumes get no icon.
+// Zip-based formats browsable in TarBrowserPanel's zip mode, plus every
+// volume of a split set (7-Zip `.zip.001…`, Info-ZIP `.z01…` + `.zip`):
+// zip-archive.js opens the whole set from any of them.
+const SPLIT_VOLUME = /\.(zip\.\d{3}|z\d{2,})$/i;
+
 export const ZIP_ARCHIVE_EXTENSIONS = [
   ".zip",
   ".zipx",
@@ -23,7 +25,7 @@ export function isZipArchivePath(path) {
   if (typeof path !== "string") return false;
   const lower = path.toLowerCase();
   return (
-    lower.endsWith(".zip.001") ||
+    SPLIT_VOLUME.test(path) ||
     ZIP_ARCHIVE_EXTENSIONS.some((ext) => lower.endsWith(ext))
   );
 }

@@ -16,6 +16,7 @@ import {
   ERR_ENCRYPTED,
   ERR_ENCRYPTED_CENTRAL_DIRECTORY,
   ERR_EOCDR_LOCATOR_ZIP64_NOT_FOUND,
+  ERR_EOCDR_NOT_FOUND,
   ERR_EXTRAFIELD_ZIP64_NOT_FOUND,
   ERR_INVALID_AUTHENTICATION_CODE,
   ERR_INVALID_CRC32,
@@ -43,6 +44,10 @@ import { normalizeSegments } from "@/utils/indexed-tar";
 configure({ useWebWorkers: false });
 
 const FIRST_RAW_VOLUME = /\.zip\.001$/i;
+// Any volume opens the whole set: 7-Zip volumes from .001, Info-ZIP
+// disks from the .zip disk that holds the central directory.
+const entryVolume = (path) =>
+  path.replace(/(\.zip\.)\d{3}$/i, "$1001").replace(/\.z\d{2,}$/i, ".zip");
 const MAX_RAW_VOLUME = 999;
 const VOLUME_PROBE_BATCH = 16;
 const STRONG_ENCRYPTION_FLAG = 0x40;
@@ -741,8 +746,8 @@ const listEntries = (reader) =>
   new ZipReader(reader, { strictness: "tolerant" }).getEntries();
 
 // `last.zip` alone throws ERR_SPLIT_ZIP_FILE: its EOCD names the disk it
-// sits on, so disks .z01 … .zNN must precede it.
-async function infoZipDisks(reader, path, resolveUrl, sizeOf) {
+// sits on, so disks .z01 … .zNN must precede it. Returns their parts.
+async function infoZipDisks(reader, path, sizeOf) {
   const eocd = await findEndOfCentralDirectory(reader);
   const lastDisk = eocd ? eocd.view.getUint16(4, true) : 0;
   if (!lastDisk) return null;
@@ -755,16 +760,23 @@ async function infoZipDisks(reader, path, resolveUrl, sizeOf) {
   const missing = names.filter((name) => !sizes.has(name));
   if (missing.length)
     throw new ZipArchiveError(`Missing split volume ${missing.join(", ")}`);
-  return new DiskSetReader([
-    ...names.map((name) => new RangeReader(resolveUrl(name), sizes.get(name))),
-    reader,
-  ]);
+  return names.map((name) => ({ path: name, size: sizes.get(name) }));
+}
+
+// Volumes are probed up to the first gap, so a set without its directory
+// is missing exactly the volume after the last one found.
+function missingRawVolume(volumes) {
+  const next = String(volumes.length + 1).padStart(3, "0");
+  return new ZipArchiveError(
+    `Missing split volume ${volumes[0].path.slice(0, -3)}${next}: the zip directory is in the last volume`,
+  );
 }
 
 /**
- * Open the zip at repo `path`. `resolveUrl(path)` builds the /resolve/
- * URL, `sizeOf(paths)` resolves sizes (Map path -> size, missing paths
- * absent). Returns a ZipArchive.
+ * Open the zip at repo `path`, or the whole set it is a volume of.
+ * `resolveUrl(path)` builds the /resolve/ URL, `sizeOf(paths)` resolves
+ * sizes (Map path -> size, missing paths absent). Returns a ZipArchive
+ * whose `volumes` lists every part as { path, size }.
  */
 export async function openZipArchive({
   path,
@@ -772,20 +784,24 @@ export async function openZipArchive({
   sizeOf,
   lang = "en",
 }) {
-  const parts = await resolveVolumes(path, sizeOf);
-  const readers = parts.map(
-    (part) => new RangeReader(resolveUrl(part.path), part.size),
-  );
+  path = entryVolume(path);
+  const toReader = (part) => new RangeReader(resolveUrl(part.path), part.size);
+  let volumes = await resolveVolumes(path, sizeOf);
+  const readers = volumes.map(toReader);
   let reader = readers.length > 1 ? new ConcatReader(readers) : readers[0];
-  let volumes = parts.length;
   let entries;
   try {
     entries = await listEntries(reader);
   } catch (err) {
     let recovered = null;
-    if (err?.message === ERR_SPLIT_ZIP_FILE && readers.length === 1) {
-      recovered = await infoZipDisks(reader, path, resolveUrl, sizeOf);
-      volumes = recovered ? recovered.readers.length : volumes;
+    if (err?.message === ERR_EOCDR_NOT_FOUND && FIRST_RAW_VOLUME.test(path)) {
+      throw missingRawVolume(volumes);
+    } else if (err?.message === ERR_SPLIT_ZIP_FILE && readers.length === 1) {
+      const disks = await infoZipDisks(reader, path, sizeOf);
+      if (disks) {
+        volumes = [...disks, ...volumes];
+        recovered = new DiskSetReader([...disks.map(toReader), reader]);
+      }
     } else if (err?.message === ERR_EOCDR_LOCATOR_ZIP64_NOT_FOUND) {
       recovered = await repairMissingZip64Records(reader);
     }
@@ -802,7 +818,7 @@ export async function openZipArchive({
   }
   return new ZipArchive({
     entries,
-    url: resolveUrl(parts[0].path),
+    url: resolveUrl(volumes[0].path),
     volumes,
     lang,
   });

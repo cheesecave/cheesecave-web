@@ -78,8 +78,8 @@ function serveRepo(files) {
   );
 }
 
-async function makeZip(entries) {
-  const writer = new zip.ZipWriter(new zip.Uint8ArrayWriter());
+async function makeZip(entries, options) {
+  const writer = new zip.ZipWriter(new zip.Uint8ArrayWriter(), options);
   for (const [name, data] of entries)
     await writer.add(name, new zip.Uint8ArrayReader(data));
   return writer.close();
@@ -334,14 +334,53 @@ describe("TarBrowserPanel · zip mode", () => {
     expect(wrapper.find('[data-testid="zip-encoding"]').exists()).toBe(false);
   });
 
-  it("reports how many volumes a split archive spans", async () => {
+  it("lists every volume of a split archive opened from any of them", async () => {
     serveRepo({
       "split-7z.zip.001": fixture("split-7z.zip.001"),
       "split-7z.zip.002": fixture("split-7z.zip.002"),
       "split-7z.zip.003": fixture("split-7z.zip.003"),
     });
-    const wrapper = mountPanel("split-7z.zip.001");
-    await until(() => expect(wrapper.text()).toContain("3 volumes"));
+    const wrapper = mountPanel("split-7z.zip.002");
+    await until(() => expect(wrapper.text()).toContain("files in archive"));
+    const volumes = wrapper.get('[data-testid="zip-volumes"]');
+    expect(volumes.get("summary").text()).toBe(
+      "Split archive · 3 volumes · 186.04 KB",
+    );
+    expect(volumes.findAll("li").map((li) => li.text())).toEqual([
+      "split-7z.zip.001 · 64.00 KB",
+      "split-7z.zip.002 · 64.00 KB",
+      "split-7z.zip.003 · 58.04 KB",
+    ]);
+  });
+
+  it("names an unreadable zip instead of reporting a failed request", async () => {
+    serveRepo({ "junk.zip": new Uint8Array(4096) });
+    const wrapper = mountPanel("junk.zip");
+    await until(() =>
+      expect(wrapper.find('[data-testid="error-title"]').text()).toBe(
+        "Cannot read this zip",
+      ),
+    );
+    expect(wrapper.text()).toContain("End of central directory not found");
+  });
+
+  it("names a corrupted member instead of reporting a failed request", async () => {
+    const bytes = await makeZip([["a.txt", text("hello hello hello")]], {
+      level: 0,
+    });
+    const header = new DataView(bytes.buffer);
+    // The first stored byte: after the 30-byte local header, name and extra.
+    bytes[30 + header.getUint16(26, true) + header.getUint16(28, true)] ^= 0xff;
+    serveRepo({ "crc.zip": bytes });
+    const wrapper = mountPanel("crc.zip");
+    await until(() => expect(wrapper.text()).toContain("files in archive"));
+    await rowFor(wrapper, "a.txt").trigger("click");
+    await until(() =>
+      expect(wrapper.find('[data-testid="error-title"]').text()).toBe(
+        "Cannot read this zip",
+      ),
+    );
+    expect(wrapper.text()).toContain("CRC-32 mismatch");
   });
 
   it("shows an ErrorState when the zip cannot be opened, and retries", async () => {

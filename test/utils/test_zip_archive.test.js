@@ -111,7 +111,7 @@ beforeEach(() => {
 });
 
 describe("isZipArchivePath", () => {
-  it("accepts zip-based extensions and the first 7-Zip volume", () => {
+  it("accepts zip-based extensions and every volume of a split set", () => {
     for (const p of [
       "a.zip",
       "dir/B.ZIP",
@@ -122,15 +122,19 @@ describe("isZipArchivePath", () => {
       "pkg.whl",
       "book.epub",
       "parts/set.zip.001",
+      "parts/SET.ZIP.017",
+      "set.z01",
+      "disks/set.Z100",
     ]) {
       expect(isZipArchivePath(p), p).toBe(true);
     }
   });
 
-  it("rejects later volumes, Info-ZIP disks and other files", () => {
+  it("rejects other files", () => {
     for (const p of [
-      "set.zip.002",
-      "set.z01",
+      "set.zip.1",
+      "set.z1",
+      "notes.zip.json",
       "bundle.tar",
       "notes.json",
       "",
@@ -934,7 +938,9 @@ describe("encryption", () => {
       [["a.txt", text("payload that will be corrupted")]],
       { level: 0 },
     );
-    const at = decode(bytes).indexOf("payload");
+    // Byte search: the header's DOS timestamp can decode as a multi-byte
+    // UTF-8 character and shift a string index.
+    const at = Buffer.from(bytes).indexOf("payload");
     bytes[at] ^= 0xff;
     serveRepo({ "c.zip": bytes });
     const archive = await open("c.zip");
@@ -952,12 +958,25 @@ describe("volumes and damaged archives", () => {
     "sets/split-infozip.zip": fixture("split-infozip.zip"),
   };
 
+  const volumesOf = (files) =>
+    Object.entries(files).map(([path, bytes]) => ({
+      path,
+      size: bytes.length,
+    }));
+
   it("joins an Info-ZIP disk set opened from its last .zip disk", async () => {
     serveRepo(infoZip);
     const archive = await open("sets/split-infozip.zip");
-    expect(archive.volumes).toBe(3);
+    expect(archive.volumes).toEqual(volumesOf(infoZip));
     expect((await archive.read("blob.bin")).length).toBe(BLOB);
     expect(decode(await archive.read("data/table.csv"))).toBe(CSV);
+  });
+
+  it("opens the whole Info-ZIP set from any of its disks", async () => {
+    serveRepo(infoZip);
+    const archive = await open("sets/split-infozip.z01");
+    expect(archive.volumes).toEqual(volumesOf(infoZip));
+    expect((await archive.read("blob.bin")).length).toBe(BLOB);
   });
 
   it("names the missing disk of an incomplete set", async () => {
@@ -969,15 +988,43 @@ describe("volumes and damaged archives", () => {
     });
   });
 
+  const sevenZip = {
+    "v/split-7z.zip.001": fixture("split-7z.zip.001"),
+    "v/split-7z.zip.002": fixture("split-7z.zip.002"),
+    "v/split-7z.zip.003": fixture("split-7z.zip.003"),
+  };
+
   it("joins 7-Zip volumes opened from .001", async () => {
-    serveRepo({
-      "v/split-7z.zip.001": fixture("split-7z.zip.001"),
-      "v/split-7z.zip.002": fixture("split-7z.zip.002"),
-      "v/split-7z.zip.003": fixture("split-7z.zip.003"),
-    });
+    serveRepo(sevenZip);
     const archive = await open("v/split-7z.zip.001");
-    expect(archive.volumes).toBe(3);
+    expect(archive.volumes).toEqual(volumesOf(sevenZip));
     expect((await archive.read("blob.bin")).length).toBe(BLOB);
+  });
+
+  it("opens the whole 7-Zip set from any volume", async () => {
+    serveRepo(sevenZip);
+    const archive = await open("v/split-7z.zip.003");
+    expect(archive.volumes).toEqual(volumesOf(sevenZip));
+    expect((await archive.read("blob.bin")).length).toBe(BLOB);
+  });
+
+  it("names the first missing 7-Zip volume", async () => {
+    for (const missing of ["v/split-7z.zip.002", "v/split-7z.zip.003"]) {
+      const { [missing]: _gone, ...rest } = sevenZip;
+      serveRepo(rest);
+      await expect(open("v/split-7z.zip.001"), missing).rejects.toMatchObject({
+        kind: "format",
+        message: `Missing split volume ${missing}: the zip directory is in the last volume`,
+      });
+    }
+  });
+
+  it("keeps the plain message when a lone zip has no directory", async () => {
+    serveRepo({ "junk.zip": new Uint8Array(4096) });
+    await expect(open("junk.zip")).rejects.toMatchObject({
+      kind: "format",
+      message: "End of central directory not found",
+    });
   });
 
   it("stops probing 7-Zip volumes after the last possible number", async () => {
@@ -1051,7 +1098,7 @@ describe("volumes and damaged archives", () => {
     );
     serveRepo(files);
     const archive = await open("d.zip");
-    expect(archive.volumes).toBe(parts.length);
+    expect(archive.volumes.map((v) => v.path)).toEqual(Object.keys(files));
     requests.length = 0;
     expect(same(await archive.read("big.bin"), big)).toBe(true);
     expect(requests).toHaveLength(2 + parts.length);

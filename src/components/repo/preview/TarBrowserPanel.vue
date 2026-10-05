@@ -95,7 +95,7 @@ const memberSource = shallowRef(null);
 // Zip mode. The archive object is not reactive state (zip.js entries are
 // large); the refs mirror what the template needs.
 let zipArchive = null;
-const zipVolumes = ref(1);
+const zipVolumes = ref([]);
 const zipLegacyNames = ref(false);
 const zipEncoding = ref("");
 const zipEncodingOptions = ref([]);
@@ -202,6 +202,18 @@ async function startLoad() {
   }
 }
 
+// A zip that does not parse is not a failed request: retrying the same
+// bytes will not help, so say what is wrong instead.
+function classifyZipError(err) {
+  const classification = classifyError(err);
+  if (err?.kind !== "format") return classification;
+  return {
+    ...classification,
+    title: "Cannot read this zip",
+    hint: "The archive is damaged or incomplete.",
+  };
+}
+
 async function loadZip(requestId) {
   phase.value = "Reading the zip central directory…";
   try {
@@ -228,7 +240,7 @@ async function loadZip(requestId) {
     state.value = "ready";
   } catch (err) {
     if (requestId !== currentRequestId) return;
-    errorClassification.value = classifyError(err);
+    errorClassification.value = classifyZipError(err);
     state.value = "error";
   }
 }
@@ -468,7 +480,7 @@ async function openMember(node) {
       return;
     }
     memberView.value.state = "error";
-    memberView.value.error = classifyError(err);
+    memberView.value.error = classifyZipError(err);
   }
 }
 
@@ -558,6 +570,8 @@ watch(innerPreviewProps, (val) => {
     <ErrorState
       v-else-if="state === 'error' && errorClassification"
       :classification="errorClassification"
+      :title-override="errorClassification.title"
+      :hint-override="errorClassification.hint"
       mode="inline-panel"
       :retry="retry"
     />
@@ -679,6 +693,8 @@ watch(innerPreviewProps, (val) => {
         <ErrorState
           v-else-if="memberView.state === 'error'"
           :classification="memberView.error"
+          :title-override="memberView.error.title"
+          :hint-override="memberView.error.hint"
           mode="inline-panel"
         />
 
@@ -910,10 +926,23 @@ watch(innerPreviewProps, (val) => {
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
           {{ totalEntries }} entries · {{ tree.fileCount }} files in archive ·
           {{ formatBytes(tree.size) }} total
-          <span v-if="props.zip && zipVolumes > 1">
-            · {{ zipVolumes }} volumes
-          </span>
         </p>
+        <details
+          v-if="props.zip && zipVolumes.length > 1"
+          class="text-xs text-gray-500 dark:text-gray-400 mb-2"
+          data-testid="zip-volumes"
+        >
+          <summary class="cursor-pointer select-none">
+            Split archive · {{ zipVolumes.length }} volumes ·
+            {{ formatBytes(zipVolumes.reduce((n, v) => n + v.size, 0)) }}
+          </summary>
+          <ol class="mt-1 ml-5 list-decimal font-mono">
+            <li v-for="volume in zipVolumes" :key="volume.path">
+              {{ volume.path.split("/").pop() }} ·
+              {{ formatBytes(volume.size) }}
+            </li>
+          </ol>
+        </details>
 
         <!-- List view. -->
         <div

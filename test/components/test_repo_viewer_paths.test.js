@@ -1286,23 +1286,26 @@ describe("RepoViewer path handling", () => {
       );
     expect(previewButtons.map((b) => b.attributes("aria-label"))).toEqual([
       "Preview metadata for bundle.zip",
+      "Preview metadata for disks.z01",
       "Preview metadata for parts.zip.001",
+      "Preview metadata for parts.zip.002",
     ]);
     expect(previewButtons[0].attributes("title")).toContain(
       "Browse zip contents",
     );
     expect(previewButtons[0].find(".i-carbon-archive").exists()).toBe(true);
 
+    // A later volume opens the dialog too; zip-archive maps it to its set.
     await previewButtons[1].trigger("click");
     const dialog = wrapper.findComponent(TarBrowserDialogStub);
     expect(dialog.props("visible")).toBe(true);
-    expect(dialog.props("filename")).toBe("parts.zip.001");
+    expect(dialog.props("filename")).toBe("disks.z01");
     expect(dialog.props("zip")).toEqual({
       repoType: "dataset",
       namespace: "open-media-lab",
       name: "hierarchy-crawl-fixtures",
       branch: "main",
-      path: "parts.zip.001",
+      path: "disks.z01",
     });
     wrapper.unmount();
   });
