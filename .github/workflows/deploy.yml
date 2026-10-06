@@ -1,0 +1,75 @@
+name: Manual production deployment
+run-name: Deploy web ${{ github.sha }} by @${{ github.actor }}
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require a manual run on main
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: test "$EVENT" = workflow_dispatch && test "$REF" = refs/heads/main
+
+  deploy:
+    needs: guard
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 60
+    env:
+      CI: true
+      VITE_GIT_COMMIT: ${{ github.sha }}
+      VITE_GIT_DIRTY: 'false'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          version: 10.18.1
+          run_install: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Check the deployment client
+        run: python -m unittest discover -s test/deployment -v
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build static files with exact commit identity
+        run: pnpm build
+      - name: Package static files and license notices
+        run: >-
+          python scripts/ci_deploy.py package-static --component web
+          --commit "$GITHUB_SHA" --output "$RUNNER_TEMP/deployment.tar.gz"
+      - name: Upload, verify and publish through restricted SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: >-
+          python scripts/ci_deploy.py deploy --component web
+          --commit "$GITHUB_SHA" --archive "$RUNNER_TEMP/deployment.tar.gz"
+          --receipt "$RUNNER_TEMP/deployment-receipt.json"
+      - name: Retain deployment receipt
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: web-deployment-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/deployment-receipt.json
+          if-no-files-found: ignore
+          retention-days: 30
