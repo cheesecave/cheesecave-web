@@ -188,6 +188,14 @@
           :zip="zipTarget"
           :filename="fileName"
         />
+        <!-- Parquet: the same metadata view as the file-list icon (rows,
+             columns, row groups), range-read from the footer. -->
+        <FileMetadataPanel
+          v-else-if="isParquet"
+          kind="parquet"
+          :resolve-url="parquetResolveUrl"
+          :filename="fileName"
+        />
         <!-- Image Preview -->
         <div v-else-if="isImage" class="text-center">
           <img
@@ -318,8 +326,13 @@ import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import CodeViewer from "@/components/common/CodeViewer.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import TarBrowserPanel from "@/components/repo/preview/TarBrowserPanel.vue";
+import FileMetadataPanel from "@/components/repo/preview/FileMetadataPanel.vue";
 import { hasIndexSibling, tarSidecarPath } from "@/utils/indexed-tar";
-import { isZipArchivePath } from "@/utils/file-preview";
+import {
+  buildResolveUrl,
+  getPreviewKind,
+  isZipArchivePath,
+} from "@/utils/file-preview";
 import { mediaKind } from "@/utils/media-types";
 import { copyToClipboard } from "@/utils/clipboard";
 import { normalizeCatchAllParam } from "@/utils/repo-paths";
@@ -379,6 +392,20 @@ const deleting = ref(false);
 const indexedTarTreeEntry = ref(null);
 const isIndexedTar = ref(false);
 const isZipArchive = computed(() => isZipArchivePath(filePath.value));
+const isParquet = computed(() => getPreviewKind(filePath.value) === "parquet");
+// Absolute, like the file-list preview: hyparquet range-reads this URL
+const parquetResolveUrl = computed(() =>
+  isParquet.value
+    ? buildResolveUrl({
+        baseUrl: window.location.origin,
+        repoType: repoType.value,
+        namespace: namespace.value,
+        name: name.value,
+        branch: branch.value,
+        path: filePath.value,
+      })
+    : "",
+);
 const zipTarget = computed(() => ({
   repoType: repoType.value,
   namespace: namespace.value,
