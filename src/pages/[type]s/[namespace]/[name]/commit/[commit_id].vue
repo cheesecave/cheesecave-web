@@ -54,14 +54,12 @@
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="text-center py-20">
-      <div class="i-carbon-warning text-6xl text-red-500 mb-4 inline-block" />
-      <h2 class="text-2xl font-bold mb-2">Failed to Load Commit</h2>
-      <p class="text-gray-600 dark:text-gray-400">{{ error }}</p>
-      <el-button type="primary" @click="$router.back()" class="mt-4">
-        Go Back
-      </el-button>
-    </div>
+    <ErrorState
+      v-else-if="error"
+      :error="error"
+      :context="errorContext('commit')"
+      :retry="loadCommitDetails"
+    />
 
     <!-- Commit Details -->
     <div v-else-if="commitData">
@@ -645,6 +643,9 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { ElMessage } from "element-plus";
 import { repoAPI, settingsAPI } from "@/utils/api";
+import ErrorState from "@/components/common/ErrorState.vue";
+import { KIND, decodeError, notifyError } from "@/errors";
+import { useErrorContext } from "@/composables/useErrorContext";
 import { getRepositoryOperationCapabilities } from "@/utils/repositoryOperationCapabilities";
 
 dayjs.extend(relativeTime);
@@ -660,6 +661,7 @@ const repoId = computed(() => `${namespace.value}/${name.value}`);
 
 const loading = ref(true);
 const error = ref(null);
+const errorContext = useErrorContext();
 const commitData = ref(null);
 const revertEnabled = ref(false);
 const resetEnabled = ref(false);
@@ -759,8 +761,8 @@ async function loadCommitDetails() {
     };
   } catch (err) {
     console.error("Failed to load commit:", err);
-    error.value =
-      err.response?.data?.detail?.error || "Failed to load commit details";
+    const decoded = decodeError(err);
+    if (decoded.kind !== KIND.CANCELLED) error.value = decoded;
   } finally {
     loading.value = false;
   }
@@ -837,14 +839,12 @@ async function doRevert() {
     );
   } catch (err) {
     console.error("Revert failed:", err);
-    const errorMsg =
-      err.response?.data?.detail?.error || "Failed to revert commit";
-
-    if (err.response?.status === 409) {
-      ElMessage.error("Revert conflict: " + errorMsg);
-    } else {
-      ElMessage.error(errorMsg);
-    }
+    notifyError(err, {
+      fallback:
+        err.response?.status === 409
+          ? "Revert conflict"
+          : "Failed to revert commit",
+    });
   } finally {
     reverting.value = false;
   }
@@ -882,14 +882,13 @@ async function doReset() {
     );
   } catch (err) {
     console.error("Reset failed:", err);
-    const errorMsg =
-      err.response?.data?.detail?.error || "Failed to reset branch";
-
-    if (err.response?.status === 400 && errorMsg.includes("LFS")) {
-      ElMessage.error("LFS files missing: " + errorMsg);
-    } else {
-      ElMessage.error(errorMsg);
-    }
+    notifyError(err, {
+      fallback:
+        err.response?.status === 400 &&
+        decodeError(err).serverMessage?.includes("LFS")
+          ? "LFS files missing"
+          : "Failed to reset branch",
+    });
   } finally {
     resetting.value = false;
   }

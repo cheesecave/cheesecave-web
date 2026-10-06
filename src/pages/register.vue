@@ -98,6 +98,7 @@
 </template>
 
 <script setup>
+import { notifyError, safeReturn } from "@/errors";
 import { useAuthStore } from "@/stores/auth";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
@@ -151,6 +152,7 @@ async function loadSiteConfig() {
     }
   } catch (err) {
     console.error("Failed to load site config:", err);
+    notifyError(err, { fallback: "Failed to load site settings" });
   }
 }
 
@@ -181,7 +183,7 @@ async function handleSubmit() {
         // Redirect based on context
         const returnUrl = route.query.return;
         if (returnUrl) {
-          router.push(decodeURIComponent(returnUrl));
+          router.push(safeReturn(returnUrl));
         } else if (invitationToken.value) {
           // If registered with invitation, redirect to home
           router.push("/");
@@ -192,7 +194,7 @@ async function handleSubmit() {
         router.push("/login");
       }
     } catch (err) {
-      ElMessage.error(err.response?.data?.detail || "Registration failed");
+      notifyError(err, { fallback: "Registration failed" });
     } finally {
       loading.value = false;
     }

@@ -47,20 +47,12 @@
     </div>
 
     <ErrorState
-      v-else-if="errorClassification"
-      :classification="errorClassification"
+      v-else-if="loadError"
+      :error="loadError"
+      :context="errorContext('file')"
       mode="full-page"
       :retry="loadFileContent"
-    >
-      <template #actions>
-        <div class="flex items-center gap-2 mt-4">
-          <el-button type="primary" plain @click="loadFileContent">
-            Retry
-          </el-button>
-          <el-button @click="$router.back()">Go Back</el-button>
-        </div>
-      </template>
-    </ErrorState>
+    />
 
     <div v-else>
       <!-- File Header -->
@@ -147,7 +139,8 @@ import CodeEditor from "@/components/common/CodeEditor.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import { repoAPI } from "@/utils/api";
 import { normalizeCatchAllParam } from "@/utils/repo-paths";
-import { classifyError, classifyResponse } from "@/utils/http-errors";
+import { KIND, decodeError, hubFetch, notifyError } from "@/errors";
+import { useErrorContext } from "@/composables/useErrorContext";
 import { useAuthStore } from "@/stores/auth";
 
 const route = useRoute();
@@ -169,10 +162,10 @@ const filePath = computed(() => normalizeCatchAllParam(route.params.file));
 
 // State
 const loading = ref(true);
-// HF-aligned error classification (see utils/http-errors.js). Replaces
-// the old "error string → generic File Not Found" state so a gated
-// upstream surfaces the real remediation instead of a misleading 404.
-const errorClassification = ref(null);
+// Why the file did not load (an AppError): a gated upstream, a missing file
+// and an unreachable server each get their own words, not a generic 404.
+const loadError = ref(null);
+const errorContext = useErrorContext();
 const fileContent = ref("");
 const originalContent = ref("");
 const editorRef = ref(null);
@@ -215,24 +208,16 @@ const blobUrl = computed(() => {
 // Methods
 async function loadFileContent() {
   loading.value = true;
-  errorClassification.value = null;
+  loadError.value = null;
 
   try {
-    const response = await fetch(fileUrl.value);
-
-    if (!response.ok) {
-      // Surface the classified response (gated / not-found / upstream
-      // unavailable) so ErrorState renders the right copy instead of
-      // a bare "File not found" string.
-      errorClassification.value = await classifyResponse(response);
-      return;
-    }
-
+    const response = await hubFetch(fileUrl.value);
     const content = await response.text();
     fileContent.value = content;
     originalContent.value = content;
   } catch (err) {
-    errorClassification.value = classifyError(err);
+    const decoded = decodeError(err);
+    if (decoded.kind !== KIND.CANCELLED) loadError.value = decoded;
     console.error("Failed to load file:", err);
   } finally {
     loading.value = false;
@@ -244,7 +229,7 @@ function handleSave(content, onSuccess, onError) {
   // successfully — otherwise the user could overwrite a gated / not-
   // found file with empty content and silently nuke whatever the
   // upstream actually has.
-  if (errorClassification.value) {
+  if (loadError.value) {
     ElMessage.error(
       "This file did not load successfully; fix the error above before committing changes.",
     );
@@ -292,8 +277,7 @@ async function submitCommit() {
       router.push(blobUrl.value);
     }, 500);
   } catch (err) {
-    const errorMsg = err.response?.data?.detail || "Failed to commit changes";
-    ElMessage.error(errorMsg);
+    notifyError(err, { fallback: "Failed to commit changes" });
     console.error("Commit error:", err);
   } finally {
     committing.value = false;

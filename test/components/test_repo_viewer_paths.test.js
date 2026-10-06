@@ -409,7 +409,10 @@ describe("RepoViewer path handling", () => {
     await flushPromises();
     await flushPromises();
 
-    expect(failedWrapper.findAll('[class*="cursor-pointer"]')).toHaveLength(0);
+    expect(failedWrapper.findAll("a[href*='/blob/']")).toHaveLength(0);
+    expect(failedWrapper.get('[data-testid="error-title"]').text()).toBe(
+      "Something went wrong on the server",
+    );
     expect(requests.pathsInfo).toEqual([]);
   });
 
@@ -606,7 +609,7 @@ describe("RepoViewer path handling", () => {
     await flushPromises();
 
     // Shared ErrorState's default copy for `gated`.
-    expect(wrapper.text()).toContain("Authentication required");
+    expect(wrapper.text()).toContain("Access needs a token");
     // Diagnostic disclosure from the sources[] body. The per-row
     // cell content lives inside the ElTable stub's scoped-slot
     // rendering, which isn't exercised at this mount's stubs; the
@@ -1443,7 +1446,7 @@ describe("RepoViewer path handling", () => {
     await flushPromises();
 
     const text = wrapper.text();
-    expect(text).toContain("Authentication required");
+    expect(text).toContain("Access needs a token");
     expect(text).not.toContain("No README.md found");
 
     wrapper.unmount();

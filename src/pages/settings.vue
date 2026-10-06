@@ -20,7 +20,14 @@
             />
           </div>
 
-          <div class="card">
+          <ErrorState
+            v-if="profileError"
+            :error="profileError"
+            :context="errorContext('profile')"
+            mode="inline-panel"
+            :retry="loadUserProfile"
+          />
+          <div v-else class="card">
             <h2 class="text-xl font-semibold mb-4">Profile Information</h2>
             <el-form label-position="top">
               <el-form-item label="Username">
@@ -300,6 +307,7 @@
 </template>
 
 <script setup>
+import { notifyError } from "@/errors";
 import { storeToRefs } from "pinia";
 import { useAuthStore } from "@/stores/auth";
 import { useRouter } from "vue-router";
@@ -313,12 +321,20 @@ import {
 import { ElMessage, ElMessageBox } from "element-plus";
 import dayjs from "dayjs";
 import AvatarUpload from "@/components/profile/AvatarUpload.vue";
+import ErrorState from "@/components/common/ErrorState.vue";
+import { KIND, decodeError } from "@/errors";
+import { useErrorContext } from "@/composables/useErrorContext";
 
 const router = useRouter();
 const authStore = useAuthStore();
 const { user } = storeToRefs(authStore);
 
 const activeTab = ref("profile");
+// Why the profile did not load (AppError). The form is replaced by it and
+// saving is refused: a form of blanks would wipe the real profile.
+const errorContext = useErrorContext();
+const profileError = ref(null);
+const profileReady = ref(false);
 const newTokenName = ref("");
 const newToken = ref("");
 const tokens = ref([]);
@@ -363,6 +379,7 @@ async function loadTokens() {
     tokens.value = data.tokens;
   } catch (err) {
     console.error("Failed to load tokens:", err);
+    notifyError(err, { fallback: "Failed to load tokens" });
   }
 }
 
@@ -372,10 +389,17 @@ async function loadUserOrgs() {
     userOrgs.value = data.orgs || [];
   } catch (err) {
     console.error("Failed to load organizations:", err);
+    notifyError(err, { fallback: "Failed to load organizations" });
   }
 }
 
 async function updateProfile() {
+  if (!profileReady.value) {
+    ElMessage.warning(
+      "Your profile has not loaded; saving now would overwrite it.",
+    );
+    return;
+  }
   try {
     await settingsAPI.updateUserSettings(user.value.username, {
       email: profileForm.value.email,
@@ -391,13 +415,14 @@ async function updateProfile() {
     loadUserProfile();
   } catch (err) {
     console.error("Failed to update profile:", err);
-    ElMessage.error(err.response?.data?.detail || "Failed to update profile");
+    notifyError(err, { fallback: "Failed to update profile" });
   }
 }
 
 async function loadUserProfile() {
   if (!user.value) return;
 
+  profileError.value = null;
   try {
     const { data } = await settingsAPI.getUserProfile(user.value.username);
     profileForm.value.email = user.value.email;
@@ -412,7 +437,11 @@ async function loadUserProfile() {
     };
   } catch (err) {
     console.error("Failed to load user profile:", err);
+    const decoded = decodeError(err);
+    if (decoded.kind !== KIND.CANCELLED) profileError.value = decoded;
+    return;
   }
+  profileReady.value = true;
 }
 
 function goToOrganization(orgName) {
@@ -470,6 +499,7 @@ async function loadAvailableSources() {
     availableSources.value = data || [];
   } catch (err) {
     console.error("Failed to load available sources:", err);
+    notifyError(err, { fallback: "Failed to load available sources" });
   }
 }
 
@@ -517,7 +547,7 @@ async function startAddToken(source) {
       ElMessage.success(`Token added for ${source.name}`);
     } catch (err) {
       console.error("Failed to add external token:", err);
-      ElMessage.error("Failed to add token");
+      notifyError(err, { fallback: "Failed to add token" });
     }
   }
 }
@@ -551,7 +581,7 @@ async function startEditToken(source) {
       ElMessage.success("Token updated");
     } catch (err) {
       console.error("Failed to update external token:", err);
-      ElMessage.error("Failed to update token");
+      notifyError(err, { fallback: "Failed to update token" });
     }
   }
 }

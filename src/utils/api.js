@@ -1,7 +1,7 @@
 // src/kohaku-hub-ui/src/utils/api.js
 import axios from "axios";
 import { formatAuthHeader, getExternalTokens } from "./externalTokens";
-import { classifyError } from "./http-errors";
+import { KIND, decodeError, decodeResponse, emitAuthRequired } from "@/errors";
 
 const api = axios.create({
   timeout: 30000,
@@ -28,27 +28,47 @@ api.interceptors.request.use(
   },
 );
 
-// Response interceptor
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    // Don't auto-redirect on 401, let components handle it
-    // This allows visitors to browse public content without login.
-    //
-    // Attach an HF-aligned classification (gated / forbidden /
-    // not-found / upstream-unavailable / cors / generic) onto the
-    // error so callers can `catch (err) { render(err.classification) }`
-    // without re-reading X-Error-Code + body every time. See
-    // `utils/http-errors.js` for the truth table.
-    try {
-      error.classification = classifyError(error);
-    } catch {
-      // Never let the interceptor itself throw — falling back to
-      // the raw error is always safer than masking the original.
-    }
-    return Promise.reject(error);
-  },
-);
+// Response interceptor, on the shared client and on bare axios (the user and
+// organization pages use that one).
+//
+// Every failure leaves with `error.appError`, decoded (see src/errors). A
+// refusal for want of a sign-in is reported to the session hook, which decides
+// whether the session has ended. A 200 that is an HTML page is not the API
+// answering (a proxy, a maintenance page): it is turned into an error rather
+// than handed to the page as data.
+//
+// There is no redirect on 401: this lets visitors browse public content
+// without logging in.
+function onResponse(response) {
+  const contentType = response?.headers?.["content-type"];
+  if (contentType && /text\/html/i.test(contentType)) {
+    const appError = decodeResponse(
+      { status: response.status, headers: response.headers, body: "<html>" },
+      response,
+    );
+    return Promise.reject(
+      Object.assign(new Error(appError.message), {
+        appError,
+        config: response.config,
+      }),
+    );
+  }
+  return response;
+}
+
+function onFailure(error) {
+  // decoded already: the same axios met this interceptor twice (hot reload)
+  if (error?.appError) return Promise.reject(error);
+  const appError = decodeError(error);
+  if (error && typeof error === "object") error.appError = appError;
+  if (appError.kind === KIND.AUTH_REQUIRED) emitAuthRequired(appError);
+  return Promise.reject(error);
+}
+
+api.interceptors.response.use(onResponse, onFailure);
+axios.interceptors.response.use(onResponse, onFailure);
+// bare axios waits forever by default
+axios.defaults.timeout = 30000;
 
 export const socialAPI = {
   getFollowState: (username) =>

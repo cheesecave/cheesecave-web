@@ -69,6 +69,7 @@
 </template>
 
 <script setup>
+import { notifyError, safeReturn } from "@/errors";
 import { useAuthStore } from "@/stores/auth";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
@@ -101,6 +102,7 @@ async function loadSiteConfig() {
     siteConfig.value = data;
   } catch (err) {
     console.error("Failed to load site config:", err);
+    notifyError(err, { fallback: "Failed to load site settings" });
   }
 }
 
@@ -116,14 +118,9 @@ async function handleSubmit() {
       ElMessage.success("Login successful");
 
       // Check for return URL query parameter
-      const returnUrl = route.query.return;
-      if (returnUrl) {
-        router.push(decodeURIComponent(returnUrl));
-      } else {
-        router.push("/");
-      }
+      router.push(safeReturn(route.query.return));
     } catch (err) {
-      ElMessage.error(err.response?.data?.detail || "Login failed");
+      notifyError(err, { fallback: "Login failed" });
     } finally {
       loading.value = false;
     }

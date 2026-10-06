@@ -45,26 +45,12 @@
     </div>
 
     <ErrorState
-      v-else-if="errorClassification"
-      :classification="errorClassification"
+      v-else-if="loadError"
+      :error="loadError"
+      :context="errorContext('file')"
       mode="full-page"
       :retry="loadFile"
-    >
-      <template #actions>
-        <div class="flex items-center gap-2 mt-4">
-          <el-button type="primary" plain @click="loadFile">Retry</el-button>
-          <el-button
-            v-if="errorClassification.kind === 'gated'"
-            type="primary"
-            @click="$router.push('/settings')"
-          >
-            <div class="i-carbon-settings inline-block mr-1" />
-            Open account settings
-          </el-button>
-          <el-button v-else @click="$router.back()">Go Back</el-button>
-        </div>
-      </template>
-    </ErrorState>
+    />
 
     <div v-else>
       <!-- File Header -->
@@ -332,6 +318,7 @@
 </template>
 
 <script setup>
+import { notifyError } from "@/errors";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import CodeViewer from "@/components/common/CodeViewer.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
@@ -349,11 +336,13 @@ import { mediaKind } from "@/utils/media-types";
 import { copyToClipboard } from "@/utils/clipboard";
 import { normalizeCatchAllParam } from "@/utils/repo-paths";
 import {
-  classifyError,
-  classifyResponse,
-  downloadToastFor,
-  probeUrlAndClassify,
-} from "@/utils/http-errors";
+  KIND,
+  decodeError,
+  downloadMessage,
+  hubFetch,
+  probeUrl,
+} from "@/errors";
+import { useErrorContext } from "@/composables/useErrorContext";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { useAuthStore } from "@/stores/auth";
 import { repoAPI } from "@/utils/api";
@@ -385,10 +374,10 @@ const maxPreviewSize = 100 * 1000; // 100KB
 
 // State
 const loading = ref(true);
-// Classification payload from utils/http-errors.js shared across the
-// SPA. Replaces the pre-#28 "error string → generic 404 page" path
-// so a gated upstream no longer surfaces as "File Not Found".
-const errorClassification = ref(null);
+// Why the file did not load (an AppError, see src/errors): a gated upstream,
+// a missing file and an unreachable server each read differently.
+const loadError = ref(null);
+const errorContext = useErrorContext();
 const fileContent = ref("");
 const fileSize = ref(0);
 const fileHeaders = ref({});
@@ -655,7 +644,7 @@ async function loadFile() {
 
 async function loadFileInfo() {
   loading.value = true;
-  errorClassification.value = null;
+  loadError.value = null;
   imageFailed.value = false;
   isIndexedTar.value = false;
   indexedTarTreeEntry.value = null;
@@ -682,53 +671,32 @@ async function loadFileInfo() {
     if (canPreviewText.value || isMarkdown.value) {
       let retries = 0;
       const maxRetries = 10;
-      let lastResponse = null;
 
-      while (retries < maxRetries) {
-        const response = await fetch(fileUrl.value);
-        lastResponse = response;
-
-        if (response.ok) {
+      while (true) {
+        try {
+          const response = await hubFetch(fileUrl.value);
           fileSize.value = parseInt(
             response.headers.get("content-length") || "0",
           );
           fileHeaders.value = Object.fromEntries(response.headers.entries());
           fileContent.value = await response.text();
           return;
+        } catch (err) {
+          // A 404 with no error code may just be a commit still being
+          // processed: retry a few times before surfacing. One that
+          // carries a code (EntryNotFound / RepoNotFound) is already the
+          // backend's final answer, so stop waiting.
+          const { status, code } = decodeError(err);
+          if (status === 404 && !code && retries < maxRetries - 1) {
+            console.log(
+              `File not ready yet (attempt ${retries + 1}/${maxRetries}), retrying...`,
+            );
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            retries++;
+            continue;
+          }
+          throw err;
         }
-
-        // If 404 and no specific HF error code, commit might still be
-        // processing — retry a few times before surfacing. A 404 with
-        // an EntryNotFound / RepoNotFound code is already a terminal
-        // answer from the backend, so short-circuit out of the retry
-        // loop to avoid wasting the user's time.
-        const specificErrorCode =
-          response.headers.get("x-error-code") ||
-          response.headers.get("X-Error-Code");
-        if (
-          response.status === 404 &&
-          !specificErrorCode &&
-          retries < maxRetries - 1
-        ) {
-          console.log(
-            `File not ready yet (attempt ${retries + 1}/${maxRetries}), retrying...`,
-          );
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          retries++;
-          continue;
-        }
-
-        // Terminal non-2xx: surface the classified error instead of a
-        // bare "File not found" string.
-        errorClassification.value = await classifyResponse(response);
-        return;
-      }
-
-      // Exhausted retries without ever getting a 2xx — still classify
-      // the last response so the user sees why (almost certainly 404
-      // without an error code at this point).
-      if (lastResponse) {
-        errorClassification.value = await classifyResponse(lastResponse);
       }
     } else {
       // For media/binary files, we don't need size upfront
@@ -738,9 +706,9 @@ async function loadFileInfo() {
       fileHeaders.value = {};
     }
   } catch (err) {
-    // Transport-level failure (CORS, network, abort). Classification
-    // downgrades to `cors` / `generic` with a usable hint.
-    errorClassification.value = classifyError(err);
+    // A refusal, or a transport failure (CORS, network, timeout)
+    const decoded = decodeError(err);
+    if (decoded.kind !== KIND.CANCELLED) loadError.value = decoded;
     console.error("Failed to load file:", err);
   } finally {
     loading.value = false;
@@ -793,7 +761,7 @@ async function detectIndexedTar() {
 }
 
 async function downloadFile() {
-  // Pre-flight probe via probeUrlAndClassify — issues a Range: 0-0 GET
+  // Pre-flight probe via probeUrl — issues a Range: 0-0 GET
   // against the resolve endpoint so we can tell a gated/404/etc.
   // failure apart from a successful stream. The happy path still
   // goes through `window.open` so the browser owns the real download
@@ -801,14 +769,14 @@ async function downloadFile() {
   // classified failure we surface a toast with kind-specific copy
   // instead of letting the browser render the aggregated JSON body
   // as raw text in a new tab.
-  const { ok, classification } = await probeUrlAndClassify(fileUrl.value);
+  const { ok, error } = await probeUrl(fileUrl.value);
   if (ok) {
     window.open(fileUrl.value, "_blank");
     return;
   }
   ElMessage({
     type: "error",
-    message: downloadToastFor(classification),
+    message: downloadMessage(error),
     duration: 6000,
   });
 }
@@ -898,9 +866,7 @@ async function deleteFile() {
     }
   } catch (err) {
     console.error("Failed to delete file:", err);
-    const errorMsg =
-      err.response?.data?.detail?.error || "Failed to delete file";
-    ElMessage.error(errorMsg);
+    notifyError(err, { fallback: "Failed to delete file" });
   } finally {
     deleting.value = false;
   }

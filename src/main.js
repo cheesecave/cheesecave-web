@@ -4,6 +4,7 @@ import { createPinia } from "pinia";
 import { createRouter, createWebHistory } from "vue-router";
 import { routes } from "vue-router/auto-routes";
 import App from "./App.vue";
+import { installErrorHandling } from "./errors/install";
 import { initializeBrowserTimezone } from "./utils/datetime";
 import { createPageScrollBehavior } from "./utils/page-scroll";
 import { createRepoViewRoutes } from "./utils/repo-view-routes";
@@ -56,6 +57,10 @@ if (import.meta.hot) import.meta.hot.dispose(disposeAppearance);
 // Initialize auth before mounting
 import { useAuthStore } from "./stores/auth";
 const authStore = useAuthStore();
+
+const disposeErrorHandling = installErrorHandling(app, authStore);
+app.onUnmount(disposeErrorHandling);
+if (import.meta.hot) import.meta.hot.dispose(disposeErrorHandling);
 
 // Restore auth state, then mount app. Branding refresh remains independent.
 authStore.init().finally(() => {

@@ -2,6 +2,18 @@
 import { defineStore, acceptHMRUpdate } from "pinia";
 import { authAPI, settingsAPI } from "@/utils/api";
 import { clearRepoSortPreference } from "@/utils/repoSortPreference";
+import { KIND, decodeError } from "@/errors";
+
+// One check of the session is enough for a burst of refused requests
+const SESSION_CHECK_WINDOW_MS = 30_000;
+const INCONCLUSIVE_RECHECK_MS = 5_000;
+
+// 401 is the only answer that means "you are not signed in"; a server that
+// is down or slow says nothing about it
+const signedOut = (err) => {
+  const { kind } = decodeError(err);
+  return kind === KIND.AUTH_REQUIRED || kind === KIND.INVALID_CREDENTIALS;
+};
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
@@ -11,6 +23,12 @@ export const useAuthStore = defineStore("auth", {
     externalTokens: [], // Array of {url, token} for external fallback sources
     loading: false,
     initialized: false,
+    // The session ended while the page was open (signed in, then refused)
+    sessionExpired: false,
+    // The server could not say who we are (down, slow): the sign-in is kept
+    verifyError: null,
+    checkingSession: false,
+    lastSessionCheck: 0,
   }),
 
   getters: {
@@ -19,6 +37,13 @@ export const useAuthStore = defineStore("auth", {
     organizations: (state) => state.userOrganizations,
     organizationNames: (state) =>
       state.userOrganizations.map((org) => org.name),
+    // What the banner at the top of the page should say, if anything
+    sessionNotice: (state) =>
+      state.sessionExpired
+        ? "expired"
+        : state.verifyError
+          ? "unverified"
+          : null,
   },
 
   actions: {
@@ -32,6 +57,8 @@ export const useAuthStore = defineStore("auth", {
         const { data } = await authAPI.login(credentials);
         // Session cookie is set automatically
         clearRepoSortPreference();
+        this.sessionExpired = false;
+        this.verifyError = null;
         await this.fetchUserInfo();
         return data;
       } finally {
@@ -62,6 +89,7 @@ export const useAuthStore = defineStore("auth", {
       } finally {
         this.user = null;
         this.token = null;
+        this.sessionExpired = false;
         localStorage.removeItem("hf_token");
         clearRepoSortPreference();
       }
@@ -98,9 +126,11 @@ export const useAuthStore = defineStore("auth", {
         this.userOrganizations = data.orgs || [];
         return data;
       } catch (err) {
-        this.user = null;
-        this.userOrganizations = [];
-        clearRepoSortPreference();
+        if (signedOut(err)) {
+          this.user = null;
+          this.userOrganizations = [];
+          clearRepoSortPreference();
+        }
         throw err;
       }
     },
@@ -149,14 +179,62 @@ export const useAuthStore = defineStore("auth", {
         await this.fetchUserInfo();
         await this.loadExternalTokens();
       } catch (err) {
-        // Session expired or invalid, clear state
-        this.user = null;
-        this.userOrganizations = [];
-        this.token = null;
-        this.externalTokens = [];
-        localStorage.removeItem("hf_token");
-        clearRepoSortPreference();
+        if (signedOut(err)) {
+          // Session expired or invalid, clear state
+          this.user = null;
+          this.userOrganizations = [];
+          this.token = null;
+          this.externalTokens = [];
+          localStorage.removeItem("hf_token");
+          clearRepoSortPreference();
+        } else {
+          // The server did not answer: keep the token, and say we could not tell
+          this.verifyError = decodeError(err);
+        }
       }
+    },
+
+    /** Ask again after "could not verify" (the banner's Retry). */
+    async retryVerify() {
+      this.verifyError = null;
+      this.initialized = false;
+      await this.init();
+    },
+
+    /**
+     * A request was refused for want of a sign-in. If we thought we were signed
+     * in, find out whether the session ended: once, however many requests
+     * were refused together.
+     */
+    async handleAuthRequired() {
+      if (!this.isAuthenticated || this.checkingSession) return;
+      const now = Date.now();
+      if (now - this.lastSessionCheck < SESSION_CHECK_WINDOW_MS) return;
+      this.checkingSession = true;
+      this.lastSessionCheck = now;
+      try {
+        await settingsAPI.whoamiV2();
+      } catch (err) {
+        if (signedOut(err)) this.expireSession();
+        // could not tell (network, 5xx): look again soon, not in 30 s, or a
+        // session that really ended in that window would go unnoticed
+        else
+          this.lastSessionCheck =
+            Date.now() - SESSION_CHECK_WINDOW_MS + INCONCLUSIVE_RECHECK_MS;
+      } finally {
+        this.checkingSession = false;
+      }
+    },
+
+    /** The session ended under us: forget the sign-in, and remember why. */
+    expireSession() {
+      this.user = null;
+      this.userOrganizations = [];
+      this.token = null;
+      this.externalTokens = [];
+      this.sessionExpired = true;
+      localStorage.removeItem("hf_token");
+      clearRepoSortPreference();
     },
 
     /**

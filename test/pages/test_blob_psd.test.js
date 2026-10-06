@@ -44,17 +44,6 @@ vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock("@/utils/http-errors", () => ({
-  classifyError: (err) => ({ kind: "generic", detail: String(err) }),
-  classifyResponse: (resp) => ({ kind: "not-found", status: resp?.status }),
-  downloadToastFor: (c) => `download-toast:${c?.kind || "?"}`,
-  probeUrlAndClassify: vi.fn().mockResolvedValue({ ok: true }),
-  ERROR_KIND: {
-    NOT_FOUND: "not-found",
-    UPSTREAM_UNAVAILABLE: "upstream-unavailable",
-  },
-}));
-
 // The page's PsdPreview mount is the surface we assert.
 const seen = vi.hoisted(() => ({ sources: [] }));
 vi.mock("@/components/repo/preview/PsdPreview.vue", () => ({

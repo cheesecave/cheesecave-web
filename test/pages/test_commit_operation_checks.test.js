@@ -1,10 +1,12 @@
 import { flushPromises, mount } from "@vue/test-utils";
+import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ElementPlusStubs, RouterLinkStub } from "../helpers/vue";
 import axios from "@/testing/axios";
 
 const mocks = vi.hoisted(() => ({
+  notify: vi.fn(),
   route: {
     params: {
       type: "model",
@@ -26,6 +28,8 @@ vi.mock("vue-router/auto", () => ({
   useRoute: () => mocks.route,
   useRouter: () => mocks.router,
 }));
+
+vi.mock("@/errors/notify", () => ({ notifyError: mocks.notify }));
 
 vi.mock("@/utils/api", () => ({
   settingsAPI: mocks.settingsAPI,
@@ -81,6 +85,7 @@ function checks(revert, reset) {
 
 describe("commit page operation checks", () => {
   beforeEach(() => {
+    setActivePinia(createPinia());
     vi.clearAllMocks();
     vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.spyOn(axios, "get").mockImplementation((url) =>
@@ -352,6 +357,7 @@ describe("commit page operation checks", () => {
 
 describe("commit page media diff", () => {
   beforeEach(() => {
+    setActivePinia(createPinia());
     vi.clearAllMocks();
     vi.spyOn(console, "warn").mockImplementation(() => {});
     mocks.repoAPI.getCommitUnavailableFiles.mockResolvedValue({ data: { files: [] } });
@@ -386,5 +392,93 @@ describe("commit page media diff", () => {
     expect(wrapper.find('img[src*="art/scan.tiff"]').exists()).toBe(false);
     // The TIFF and the video (despite its diff text) are binary files
     expect(wrapper.text().match(/Binary File/g)).toHaveLength(2);
+  });
+});
+
+describe("commit page failures", () => {
+  const httpFailure = (status, data = {}) =>
+    Object.assign(new Error("x"), {
+      isAxiosError: true,
+      response: { status, headers: {}, data },
+    });
+  const operations = { revert: true, reset: true, squash: false };
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.repoAPI.getCommitUnavailableFiles.mockResolvedValue({ data: { files: [] } });
+    mocks.repoAPI.getCommitOperations.mockResolvedValue(
+      checks({ available: true, files: 1 }, { available: true, files: 1 }),
+    );
+    mocks.settingsAPI.getSiteConfig.mockResolvedValue({
+      data: { capabilities: { repository_operations: operations } },
+    });
+  });
+
+  const loaded = async () => {
+    vi.spyOn(axios, "get").mockImplementation((url) =>
+      Promise.resolve({
+        data: url.endsWith("/diff")
+          ? { files: [] }
+          : { commit_id: "commit-1", message: "A commit", author: "owner", date: 1 },
+      }),
+    );
+    const wrapper = mountPage();
+    await flushPromises();
+    return wrapper;
+  };
+
+  it("says a missing commit is missing", async () => {
+    vi.spyOn(axios, "get").mockRejectedValueOnce(httpFailure(404));
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(wrapper.get('[data-testid="error-title"]').text()).toBe("Commit not found");
+  });
+
+  it("loads the commit on retry after the service was unavailable", async () => {
+    const get = vi.spyOn(axios, "get").mockRejectedValueOnce(httpFailure(503));
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(wrapper.get('[data-testid="error-title"]').text()).toBe("Service unavailable");
+    get.mockImplementation((url) =>
+      Promise.resolve({
+        data: url.endsWith("/diff")
+          ? { files: [] }
+          : { commit_id: "commit-1", message: "A commit", author: "owner", date: 1 },
+      }),
+    );
+    await wrapper.get('[data-testid="error-action-retry"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-testid="error-state"]').exists()).toBe(false);
+  });
+
+  it("shows nothing for a load that was cancelled", async () => {
+    vi.spyOn(axios, "get").mockRejectedValueOnce(new DOMException("a", "AbortError"));
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(wrapper.find('[data-testid="error-state"]').exists()).toBe(false);
+  });
+
+  it.each([
+    [409, "Revert conflict"],
+    [500, "Failed to revert commit"],
+  ])("reports a revert that fails with %i", async (status, fallback) => {
+    mocks.settingsAPI.revertBranch.mockRejectedValueOnce(httpFailure(status));
+    const wrapper = await loaded();
+    await wrapper.vm.doRevert();
+    expect(mocks.notify).toHaveBeenCalledWith(expect.anything(), { fallback });
+  });
+
+  it.each([
+    [400, { detail: { error: "LFS files are missing" } }, "LFS files missing"],
+    [400, { detail: { error: "Branch is protected" } }, "Failed to reset branch"],
+    [500, {}, "Failed to reset branch"],
+  ])("reports a reset that fails with %i %j", async (status, data, fallback) => {
+    mocks.settingsAPI.resetBranch.mockRejectedValueOnce(httpFailure(status, data));
+    const wrapper = await loaded();
+    await wrapper.vm.doReset();
+    expect(mocks.notify).toHaveBeenCalledWith(expect.anything(), { fallback });
   });
 });

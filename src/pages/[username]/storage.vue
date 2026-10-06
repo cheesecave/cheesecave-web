@@ -42,15 +42,12 @@
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="text-center py-20">
-      <div class="i-carbon-warning text-6xl text-red-500 mb-4" />
-      <h2 class="text-2xl font-bold mb-2">Error</h2>
-      <p class="text-gray-600 mb-4">{{ error }}</p>
-      <el-button @click="$router.push(`/${username}`)">
-        <div class="i-carbon-arrow-left inline-block mr-1" />
-        Back to Profile
-      </el-button>
-    </div>
+    <ErrorState
+      v-else-if="error"
+      :error="error"
+      :context="errorContext('user')"
+      :retry="loadStorageData"
+    />
 
     <!-- Content -->
     <div v-else>
@@ -215,6 +212,9 @@
 import { quotaAPI } from "@/utils/api";
 import { formatRelativeTime } from "@/utils/datetime";
 import { ElMessage } from "element-plus";
+import ErrorState from "@/components/common/ErrorState.vue";
+import { KIND, decodeError } from "@/errors";
+import { useErrorContext } from "@/composables/useErrorContext";
 
 const route = useRoute();
 const router = useRouter();
@@ -222,6 +222,7 @@ const username = computed(() => route.params.username);
 
 const loading = ref(true);
 const error = ref(null);
+const errorContext = useErrorContext();
 const storageData = ref(null);
 const searchQuery = ref("");
 
@@ -298,14 +299,8 @@ async function loadStorageData() {
     storageData.value = data;
   } catch (err) {
     console.error("Failed to load storage data:", err);
-    if (err.response?.status === 403) {
-      error.value = "You don't have permission to view this storage breakdown";
-    } else if (err.response?.status === 404) {
-      error.value = "User not found";
-    } else {
-      error.value =
-        err.response?.data?.detail?.error || "Failed to load storage data";
-    }
+    const decoded = decodeError(err);
+    if (decoded.kind !== KIND.CANCELLED) error.value = decoded;
   } finally {
     loading.value = false;
   }

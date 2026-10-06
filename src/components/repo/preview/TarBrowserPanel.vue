@@ -29,7 +29,7 @@ import {
   guessMimeType,
   downloadBytesAs,
 } from "@/utils/indexed-tar";
-import { classifyError } from "@/utils/http-errors";
+import { decodeError, notifyError } from "@/errors";
 import { useThumbnailToggle, isThumbnailMember } from "@/utils/tar-thumbnail";
 import {
   readViewMode,
@@ -45,7 +45,6 @@ import FilePreviewDialog from "@/components/repo/preview/FilePreviewDialog.vue";
 import TarMemberThumbnail from "@/components/repo/preview/TarMemberThumbnail.vue";
 import PsdPreview from "@/components/repo/preview/PsdPreview.vue";
 import { createBytesSource } from "@/utils/psd-preview";
-import { ElMessage } from "element-plus";
 
 const props = defineProps({
   tarUrl: { type: String, default: "" },
@@ -204,7 +203,7 @@ async function startLoad() {
   } catch (err) {
     if (requestId !== currentRequestId) return;
     if (err?.name === "AbortError") return;
-    errorClassification.value = classifyError(err);
+    errorClassification.value = describeFailure(err);
     state.value = "error";
   } finally {
     if (requestId === currentRequestId) currentController = null;
@@ -213,11 +212,11 @@ async function startLoad() {
 
 // A zip that does not parse is not a failed request: retrying the same
 // bytes will not help, so say what is wrong instead.
-function classifyZipError(err) {
-  const classification = classifyError(err);
-  if (err?.kind !== "format") return classification;
+function describeFailure(err) {
+  const error = decodeError(err);
+  if (err?.kind !== "format") return { error, title: null, hint: null };
   return {
-    ...classification,
+    error,
     title: "Cannot read this zip",
     hint: "The archive is damaged or incomplete.",
   };
@@ -249,7 +248,7 @@ async function loadZip(requestId) {
     state.value = "ready";
   } catch (err) {
     if (requestId !== currentRequestId) return;
-    errorClassification.value = classifyZipError(err);
+    errorClassification.value = describeFailure(err);
     state.value = "error";
   }
 }
@@ -503,7 +502,7 @@ async function openMember(node) {
         // directly. A blob URL would not work — hyparquet's
         // asyncBufferFromUrl issues HEAD + Range requests against
         // the source URL, and HEAD on `blob:` URLs is rejected
-        // (treated as a CORS-style failure by classifyError).
+        // (treated as a network failure by decodeError).
         // Parsing the in-memory ArrayBuffer skips that dependency.
         innerPreviewProps.value = {
           kind: cls,
@@ -527,7 +526,7 @@ function failMember(err) {
     return;
   }
   memberView.value.state = "error";
-  memberView.value.error = classifyZipError(err);
+  memberView.value.error = describeFailure(err);
 }
 
 async function downloadMember(node) {
@@ -547,7 +546,7 @@ async function downloadMember(node) {
       memberView.value.state = "password";
       return;
     }
-    ElMessage.error(`Download failed: ${err.message || err}`);
+    notifyError(err, { fallback: "Download failed" });
   }
 }
 
@@ -615,7 +614,8 @@ watch(innerPreviewProps, (val) => {
 
     <ErrorState
       v-else-if="state === 'error' && errorClassification"
-      :classification="errorClassification"
+      :error="errorClassification.error"
+      :context="{ noun: 'archive', storage: true }"
       :title-override="errorClassification.title"
       :hint-override="errorClassification.hint"
       mode="inline-panel"
@@ -738,7 +738,8 @@ watch(innerPreviewProps, (val) => {
 
         <ErrorState
           v-else-if="memberView.state === 'error'"
-          :classification="memberView.error"
+          :error="memberView.error.error"
+          :context="{ noun: 'file', storage: true }"
           :title-override="memberView.error.title"
           :hint-override="memberView.error.hint"
           mode="inline-panel"

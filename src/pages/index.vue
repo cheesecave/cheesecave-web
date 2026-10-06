@@ -43,6 +43,7 @@
 </template>
 
 <script setup>
+import { notifyError } from "@/errors";
 import HomepageHero from "../shared/components/HomepageHero.vue";
 import WorkspacePanel from "@/components/home/WorkspacePanel.vue";
 import { DEFAULT_HOMEPAGE, fetchHomepage } from "../shared/site-homepage.js";
@@ -116,6 +117,7 @@ async function loadStats() {
     );
   } catch (err) {
     console.error("Failed to load stats:", err);
+    notifyError(err, { fallback: "Failed to load repository previews" });
   }
 }
 

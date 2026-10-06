@@ -662,7 +662,7 @@ describe("RepoListPage", () => {
     await flushPromises();
 
     expect(mocks.elMessage.error).toHaveBeenCalledWith(
-      "Repository alice/fresh-model already exists",
+      expect.objectContaining({ message: expect.stringContaining("Repository alice/fresh-model already exists") }),
     );
     expect(mocks.router.push).not.toHaveBeenCalledWith(
       "/models/alice/fresh-model",
@@ -776,7 +776,9 @@ describe("RepoListPage", () => {
         .find((button) => button.text().includes("Create Model"))
         .trigger("click");
       await flushPromises();
-      expect(mocks.elMessage.error).toHaveBeenCalledWith(message);
+      expect(mocks.elMessage.error).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining(message) }),
+      );
     },
   );
 

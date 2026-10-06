@@ -2,6 +2,9 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/errors/notify", () => ({ notifyError: notify }));
+
 import {
   ElementPlusStubs,
   InvalidElFormStub,
@@ -50,6 +53,47 @@ describe("auth pages", () => {
       },
     });
   }
+
+  it.each([
+    ["login", LoginPage, "/login"],
+    ["register", RegisterPage, "/register"],
+  ])("says so when the %s page cannot load the site settings", async (_, page, path) => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    axios.get.mockRejectedValueOnce(new Error("down"));
+    const router = await createTestRouter(path);
+    mountPage(page, router);
+    await flushPromises();
+    expect(notify).toHaveBeenCalledWith(expect.any(Error), {
+      fallback: "Failed to load site settings",
+    });
+  });
+
+  it.each(["//evil.example/x", "/\\evil.example", "https://evil.example/x"])(
+    "does not follow a return URL to another origin (%s)",
+    async (target) => {
+      const router = await createTestRouter(
+        `/login?return=${encodeURIComponent(target)}`,
+      );
+      const pushSpy = vi.spyOn(router, "push");
+      const authStore = useAuthStore();
+      authStore.login = vi.fn().mockResolvedValue({ ok: true });
+      const wrapper = mountPage(LoginPage, router);
+      await flushPromises();
+      await wrapper
+        .find('input[placeholder="Enter your username"]')
+        .setValue("mai_lin");
+      await wrapper
+        .find('input[placeholder="Enter your password"]')
+        .setValue("KohakuDev123!");
+      await wrapper
+        .findAll("button")
+        .find((button) => button.text().includes("Login"))
+        .trigger("click");
+      await flushPromises();
+      expect(pushSpy).toHaveBeenCalledWith("/");
+      expect(pushSpy).not.toHaveBeenCalledWith(target);
+    },
+  );
 
   it("loads site config and logs in with the return URL", async () => {
     const router = await createTestRouter(

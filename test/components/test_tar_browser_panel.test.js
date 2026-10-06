@@ -797,7 +797,7 @@ describe("TarBrowserPanel · download path", () => {
       await downloadBtn.trigger("click");
       await flushPromises();
       expect(errorSpy).toHaveBeenCalled();
-      expect(errorSpy.mock.calls[0][0]).toMatch(/Download failed/);
+      expect(errorSpy.mock.calls[0][0].message).toMatch(/Download failed/);
     } finally {
       errorSpy.mockRestore();
     }

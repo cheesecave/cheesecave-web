@@ -44,17 +44,6 @@ vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock("@/utils/http-errors", () => ({
-  classifyError: (err) => ({ kind: "generic", detail: String(err) }),
-  classifyResponse: (resp) => ({ kind: "not-found", status: resp?.status }),
-  downloadToastFor: (c) => `download-toast:${c?.kind || "?"}`,
-  probeUrlAndClassify: vi.fn().mockResolvedValue({ ok: true }),
-  ERROR_KIND: {
-    NOT_FOUND: "not-found",
-    UPSTREAM_UNAVAILABLE: "upstream-unavailable",
-  },
-}));
-
 // The page's FileMetadataPanel mount is the surface we assert. Stub it as
 // a presence-detector that surfaces forwarded props as data attributes.
 vi.mock("@/components/repo/preview/FileMetadataPanel.vue", () => ({

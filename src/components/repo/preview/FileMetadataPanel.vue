@@ -30,7 +30,7 @@ import {
   parseParquetMetadataFromBuffer,
   summarizeParquetSchema,
 } from "@/utils/parquet";
-import { classifyError, ERROR_KIND } from "@/utils/http-errors";
+import { KIND, decodeError } from "@/errors";
 import ErrorState from "@/components/common/ErrorState.vue";
 
 const props = defineProps({
@@ -53,11 +53,10 @@ const props = defineProps({
 const state = ref("idle"); // idle | loading | ready | error
 const phase = ref(""); // human-readable current phase
 const payload = ref(null);
-// Classification output from utils/http-errors.js — shared with the
-// blob / edit pages and RepoViewer via the same `<ErrorState>`
-// component, so "authentication required" copy stays identical
-// across every surface where a fallback-sourced resource fails.
-const errorClassification = ref(null);
+// The decoded failure (AppError), shown by the same `<ErrorState>` as the
+// blob / edit pages and RepoViewer, so the copy stays identical across every
+// surface where a resource fails.
+const loadError = ref(null);
 let currentController = null;
 let currentRequestId = 0;
 
@@ -90,7 +89,7 @@ async function startLoad() {
   state.value = "loading";
   phase.value = describePhase(props.kind, "init");
   payload.value = null;
-  errorClassification.value = null;
+  loadError.value = null;
 
   const controller = new AbortController();
   currentController = controller;
@@ -133,7 +132,7 @@ async function startLoad() {
   } catch (err) {
     if (requestId !== currentRequestId) return;
     if (err?.name === "AbortError") return;
-    errorClassification.value = classifyError(err);
+    loadError.value = decodeError(err);
     state.value = "error";
   } finally {
     if (requestId === currentRequestId) currentController = null;
@@ -254,11 +253,11 @@ const parquetColumnRows = computed(() => {
 // failed to read ONE file's metadata — the shared hint for "gated"
 // still applies verbatim, others benefit from a preview-scoped nudge.
 const previewTitle = computed(() => {
-  if (!errorClassification.value) return null;
-  switch (errorClassification.value.kind) {
-    case ERROR_KIND.NOT_FOUND:
+  if (!loadError.value) return null;
+  switch (loadError.value.kind) {
+    case KIND.NOT_FOUND:
       return "File header not found on any source";
-    case ERROR_KIND.UPSTREAM_UNAVAILABLE:
+    case KIND.UNAVAILABLE:
       return "Upstream source unavailable";
     default:
       return null; // fall back to ErrorState's default
@@ -283,8 +282,9 @@ const previewTitle = computed(() => {
   </div>
 
   <ErrorState
-    v-else-if="state === 'error' && errorClassification"
-    :classification="errorClassification"
+    v-else-if="state === 'error' && loadError"
+    :error="loadError"
+    :context="{ noun: 'file', storage: true }"
     mode="inline-panel"
     :retry="retry"
     :title-override="previewTitle"

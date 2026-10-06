@@ -179,7 +179,26 @@
 
       <!-- Main Content -->
       <main class="space-y-8">
-        <section>
+        <!-- The organization could not be looked up: say so, and keep the rest -->
+        <ErrorState
+          v-if="orgError"
+          :error="orgError"
+          :context="errorContext('organization')"
+          mode="inline-panel"
+          :retrying="lookupRetrying"
+          :retry="reloadLookup"
+        />
+
+        <!-- The repositories could not be listed: say so, not "no repositories" -->
+        <ErrorState
+          v-if="reposError"
+          :error="reposError"
+          :context="errorContext('repositories')"
+          mode="inline-panel"
+          :retry="loadRepos"
+        />
+
+        <section v-if="!reposError">
           <div
             class="flex items-center justify-between gap-3 flex-wrap mb-4 pb-3 border-b-2"
             :class="borderColor"
@@ -294,6 +313,9 @@
 <script setup>
 import { repoAPI, orgAPI } from "@/utils/api";
 import axios from "axios";
+import ErrorState from "@/components/common/ErrorState.vue";
+import { KIND, decodeError } from "@/errors";
+import { useErrorContext } from "@/composables/useErrorContext";
 import { formatRelativeTime } from "@/utils/datetime";
 import {
   getRepoSortPreference,
@@ -314,6 +336,11 @@ const typeMapping = {
 const currentRepoType = computed(() => typeMapping[currentType.value] || "model");
 
 const loading = ref(true);
+// Why the organization / its repository lists could not be loaded (AppError)
+const errorContext = useErrorContext();
+const orgError = ref(null);
+const lookupRetrying = ref(false);
+const reposError = ref(null);
 const orgNotFound = ref(false);
 const orgInfo = ref(null);
 const members = ref([]);
@@ -461,8 +488,12 @@ async function checkOrgExists() {
       orgNotFound.value = true;
       return false;
     }
+    // Anything else (network, server): say what happened, but do not stop the page
     console.error("Failed to load org info:", err);
-    return true; // Continue on non-404 errors
+    const decoded = decodeError(err);
+    // the page is still worth showing: only this part is missing
+    if (decoded.kind !== KIND.CANCELLED) orgError.value = decoded;
+    return true;
   }
 }
 
@@ -476,6 +507,7 @@ async function loadMembers() {
 }
 
 async function loadRepos() {
+  reposError.value = null;
   try {
     const [models, datasets, spaces] = await Promise.all([
       loadRepoType("model"),
@@ -490,6 +522,8 @@ async function loadRepos() {
     };
   } catch (err) {
     console.error("Failed to load repos:", err);
+    const decoded = decodeError(err);
+    if (decoded.kind !== KIND.CANCELLED) reposError.value = decoded;
   }
 }
 
@@ -533,9 +567,21 @@ watch(currentRepoType, (repoType) => {
   });
 });
 
-onMounted(async () => {
+async function reloadLookup() {
+  lookupRetrying.value = true;
+  orgError.value = null;
+  try {
+    await checkOrgExists();
+  } finally {
+    lookupRetrying.value = false;
+  }
+}
+
+async function load() {
   try {
     loading.value = true;
+    orgError.value = null;
+    orgNotFound.value = false;
 
     // Validate type parameter (must be models, datasets, or spaces)
     if (!["models", "datasets", "spaces"].includes(currentType.value)) {
@@ -557,5 +603,7 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
-});
+}
+
+onMounted(load);
 </script>

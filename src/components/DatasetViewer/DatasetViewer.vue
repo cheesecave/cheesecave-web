@@ -10,6 +10,7 @@ import {
 } from "./api";
 import DataGridEnhanced from "./DataGridEnhanced.vue";
 import TARFileList from "./TARFileList.vue";
+import { KIND, decodeError, describeError } from "@/errors";
 
 const props = defineProps({
   fileUrl: {
@@ -47,6 +48,17 @@ const isTAR = ref(false);
 const tarFiles = ref([]);
 const selectedTARFile = ref(null);
 
+// What to tell the user: our own parse errors speak for themselves, a failed
+// request is described by src/errors (the file is read from storage).
+function messageOf(err) {
+  const decoded = decodeError(err);
+  if (decoded.kind === KIND.BUG) return decoded.serverMessage;
+  const described = describeError(decoded, { storage: true });
+  return described
+    ? `${described.title}. ${described.description}`
+    : "The request was cancelled.";
+}
+
 // Handle row selection from DataGrid - emit to parent
 function handleRowSelected(index) {
   emit("row-selected", index);
@@ -75,7 +87,7 @@ async function loadPreview() {
       await loadFilePreview(props.fileUrl, fileFormat.value);
     }
   } catch (err) {
-    error.value = err.response?.data?.detail || err.message;
+    error.value = messageOf(err);
     emit("error", error.value);
   } finally {
     loading.value = false;
@@ -114,7 +126,7 @@ async function selectTARFile(file) {
     // Cleanup temp URL
     URL.revokeObjectURL(tempUrl);
   } catch (err) {
-    error.value = err.response?.data?.detail || err.message;
+    error.value = messageOf(err);
     selectedTARFile.value = null;
   } finally {
     loading.value = false;

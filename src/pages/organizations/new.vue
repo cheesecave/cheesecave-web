@@ -98,6 +98,7 @@
 </template>
 
 <script setup>
+import { notifyError } from "@/errors";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { orgAPI } from "@/utils/api";
@@ -161,9 +162,7 @@ async function handleSubmit() {
       router.push(`/organizations/${form.value.name}`);
     } catch (err) {
       console.error("Failed to create organization:", err);
-      ElMessage.error(
-        err.response?.data?.detail || "Failed to create organization",
-      );
+      notifyError(err, { fallback: "Failed to create organization" });
     } finally {
       creating.value = false;
     }

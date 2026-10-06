@@ -116,6 +116,7 @@
 </template>
 
 <script setup>
+import { notifyError } from "@/errors";
 import { ref, computed } from "vue";
 import "cropperjs";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -240,7 +241,7 @@ async function handleCrop() {
     emit("uploaded");
   } catch (error) {
     console.error("Failed to upload avatar:", error);
-    ElMessage.error(error.response?.data?.detail || "Failed to upload avatar");
+    notifyError(error, { fallback: "Failed to upload avatar" });
   } finally {
     uploading.value = false;
   }
@@ -266,7 +267,7 @@ async function handleDelete() {
   } catch (error) {
     if (error !== "cancel" && error !== "close") {
       console.error("Failed to delete avatar:", error);
-      ElMessage.error("Failed to delete avatar");
+      notifyError(error, { fallback: "Failed to delete avatar" });
     }
   }
 }
