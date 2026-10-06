@@ -120,17 +120,30 @@ async function mountProfile(mode) {
 const title = () => wrapper.get('[data-testid="error-title"]').text();
 
 describe.each(["user", "org"])("%s profile failures", (mode) => {
-  it("says a failed lookup failed, instead of that the account does not exist", async () => {
+  it("says a failed lookup failed, keeps the rest of the page, and retries only the lookup", async () => {
     infoStatus = 503;
     await mountProfile(mode);
     expect(title()).toBe("Service unavailable");
     expect(wrapper.text()).not.toContain("Not Found");
+    // the repositories were still listed: only the lookup is missing
+    expect(mocks.listRepos).toHaveBeenCalled();
+    const listed = mocks.listRepos.mock.calls.length;
     infoStatus = 200;
     await wrapper.get('[data-testid="error-action-retry"]').trigger("click");
     await flushPromises();
     await vi.waitFor(() =>
       expect(wrapper.find('[data-testid="error-state"]').exists()).toBe(false),
     );
+    expect(mocks.listRepos.mock.calls.length).toBe(listed);
+  });
+
+  it("switches to 'not found' when the retry learns the account does not exist", async () => {
+    infoStatus = 503;
+    await mountProfile(mode);
+    infoStatus = 404;
+    await wrapper.get('[data-testid="error-action-retry"]').trigger("click");
+    await flushPromises();
+    await vi.waitFor(() => expect(wrapper.text()).toContain("Not Found"));
   });
 
   it("carries on when the lookup was cancelled", async () => {

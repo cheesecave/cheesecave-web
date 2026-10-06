@@ -11,13 +11,6 @@
       </p>
     </div>
 
-    <ErrorState
-      v-else-if="profileError"
-      :error="profileError"
-      :context="errorContext('user')"
-      :retry="load"
-    />
-
     <!-- User Not Found -->
     <div v-else-if="userNotFound" class="text-center py-20">
       <div
@@ -180,6 +173,16 @@
 
       <!-- Main Content -->
       <main>
+        <!-- The profile could not be looked up: say so, and keep the rest -->
+        <ErrorState
+          v-if="profileError"
+          :error="profileError"
+          :context="errorContext('user')"
+          mode="inline-panel"
+          :retrying="lookupRetrying"
+          :retry="reloadLookup"
+        />
+
         <!-- The repositories could not be listed: say so, not "no repositories" -->
         <ErrorState
           v-if="reposError"
@@ -535,6 +538,7 @@ const loading = ref(true);
 // Why the profile / the repository lists could not be loaded (AppError)
 const errorContext = useErrorContext();
 const profileError = ref(null);
+const lookupRetrying = ref(false);
 const reposError = ref(null);
 const userNotFound = ref(false);
 const userInfo = ref(null);
@@ -654,12 +658,12 @@ async function checkUserExists() {
       userNotFound.value = true;
       return false;
     }
-    // Anything else (network, server): do not guess, say what happened
+    // Anything else (network, server): say what happened, but do not stop the page
     console.error("Failed to check user existence:", err);
     const decoded = decodeError(err);
-    if (decoded.kind === KIND.CANCELLED) return true;
-    profileError.value = decoded;
-    return false;
+    // the page is still worth showing: only this part is missing
+    if (decoded.kind !== KIND.CANCELLED) profileError.value = decoded;
+    return true;
   }
 }
 
@@ -746,6 +750,16 @@ watch(repoType, (type) => {
     fallback: "recent",
   });
 });
+
+async function reloadLookup() {
+  lookupRetrying.value = true;
+  profileError.value = null;
+  try {
+    await checkUserExists();
+  } finally {
+    lookupRetrying.value = false;
+  }
+}
 
 async function load() {
   try {

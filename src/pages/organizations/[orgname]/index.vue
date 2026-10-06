@@ -11,13 +11,6 @@
       </p>
     </div>
 
-    <ErrorState
-      v-else-if="orgError"
-      :error="orgError"
-      :context="errorContext('organization')"
-      :retry="load"
-    />
-
     <!-- Organization Not Found -->
     <div v-else-if="orgNotFound" class="text-center py-20">
       <div
@@ -447,6 +440,16 @@
             </div>
           </section>
 
+          <!-- The organization could not be looked up: say so, and keep the rest -->
+          <ErrorState
+            v-if="orgError"
+            :error="orgError"
+            :context="errorContext('organization')"
+            mode="inline-panel"
+            :retrying="lookupRetrying"
+            :retry="reloadLookup"
+          />
+
           <!-- The repositories could not be listed: say so, not "no models" -->
           <ErrorState
             v-if="reposError"
@@ -854,6 +857,7 @@ const loading = ref(true);
 // Why the organization / its repository lists could not be loaded (AppError)
 const errorContext = useErrorContext();
 const orgError = ref(null);
+const lookupRetrying = ref(false);
 const reposError = ref(null);
 const orgInfo = ref(null);
 const profileInfo = ref(null);
@@ -1002,12 +1006,12 @@ async function loadOrgInfo() {
       orgNotFound.value = true;
       return false;
     }
-    // Anything else (network, server): do not guess, say what happened
+    // Anything else (network, server): say what happened, but do not stop the page
     console.error("Failed to load org info:", err);
     const decoded = decodeError(err);
-    if (decoded.kind === KIND.CANCELLED) return true;
-    orgError.value = decoded;
-    return false;
+    // the page is still worth showing: only this part is missing
+    if (decoded.kind !== KIND.CANCELLED) orgError.value = decoded;
+    return true;
   }
 }
 
@@ -1153,6 +1157,16 @@ async function reloadRepos() {
     await loadRepos();
   } finally {
     loading.value = false;
+  }
+}
+
+async function reloadLookup() {
+  lookupRetrying.value = true;
+  orgError.value = null;
+  try {
+    await loadOrgInfo();
+  } finally {
+    lookupRetrying.value = false;
   }
 }
 
