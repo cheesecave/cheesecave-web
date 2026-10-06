@@ -566,6 +566,12 @@ describe("hasIndexSiblingWithProbe", () => {
 });
 
 describe("classifyMember + guessMimeType", () => {
+  it("classifies a .psd as its own kind, with an Adobe MIME type", () => {
+    expect(classifyMember("art/Cover.PSD")).toBe("psd");
+    expect(classifyMember("art/cover.psb")).toBe("binary");
+    expect(guessMimeType("cover.psd")).toBe("image/vnd.adobe.photoshop");
+  });
+
   it("routes common extensions to the correct preview category", () => {
     expect(classifyMember("a.png")).toBe("image");
     expect(classifyMember("a.MP4")).toBe("video");

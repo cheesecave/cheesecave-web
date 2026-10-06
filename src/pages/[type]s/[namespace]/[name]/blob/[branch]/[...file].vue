@@ -196,6 +196,16 @@
           :resolve-url="parquetResolveUrl"
           :filename="fileName"
         />
+        <!-- PSD: the flattened image saved in the file, read by Range (the
+             head and the composite, not the layers). -->
+        <PsdPreview v-else-if="isPsd" :source="psdSource" :filename="fileName">
+          <template #error-actions>
+            <el-button type="primary" size="large" @click="downloadFile">
+              <div class="i-carbon-download inline-block mr-1" />
+              Download File
+            </el-button>
+          </template>
+        </PsdPreview>
         <!-- Image Preview -->
         <div v-else-if="isImage" class="text-center">
           <img
@@ -327,6 +337,8 @@ import CodeViewer from "@/components/common/CodeViewer.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import TarBrowserPanel from "@/components/repo/preview/TarBrowserPanel.vue";
 import FileMetadataPanel from "@/components/repo/preview/FileMetadataPanel.vue";
+import PsdPreview from "@/components/repo/preview/PsdPreview.vue";
+import { createHttpRangeSource, isPsdPath } from "@/utils/psd-preview";
 import { hasIndexSibling, tarSidecarPath } from "@/utils/indexed-tar";
 import {
   buildResolveUrl,
@@ -393,6 +405,9 @@ const indexedTarTreeEntry = ref(null);
 const isIndexedTar = ref(false);
 const isZipArchive = computed(() => isZipArchivePath(filePath.value));
 const isParquet = computed(() => getPreviewKind(filePath.value) === "parquet");
+const isPsd = computed(() => isPsdPath(filePath.value));
+// One source per file: it remembers the size and the header it has read
+const psdSource = computed(() => createHttpRangeSource(fileUrl.value));
 // Absolute, like the file-list preview: hyparquet range-reads this URL.
 // Only read while isParquet, so the path is never empty.
 const parquetResolveUrl = computed(() =>

@@ -426,6 +426,7 @@ export function guessMimeType(path) {
     pdf: "application/pdf",
     safetensors: "application/octet-stream",
     parquet: "application/octet-stream",
+    psd: "image/vnd.adobe.photoshop",
     tar: "application/x-tar",
   };
   return mediaMime(path) || map[ext] || "application/octet-stream";
@@ -436,7 +437,7 @@ export function guessMimeType(path) {
  * on the standalone blob page so the dialog can route to the same
  * renderer.
  *
- *   image | video | audio | pdf | markdown | text | safetensors | parquet | binary
+ *   image | video | audio | pdf | markdown | text | safetensors | parquet | psd | binary
  */
 export function classifyMember(path) {
   if (typeof path !== "string") return "binary";
@@ -476,6 +477,7 @@ export function classifyMember(path) {
   if (ext === "md" || ext === "markdown") return "markdown";
   if (ext === "safetensors") return "safetensors";
   if (ext === "parquet") return "parquet";
+  if (ext === "psd") return "psd";
   // The standalone blob page allows a wide list of textual extensions —
   // mirror it to stay consistent. See pages/.../blob/.../[...file].vue
   // `isTextFile` for the source of truth.
