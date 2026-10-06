@@ -30,6 +30,10 @@ const COMPRESSION_RLE = 1;
 const MODE_GRAY = 1;
 const MODE_RGB = 3;
 const MODE_CMYK = 4;
+// A PSD saved without "Maximize Compatibility" keeps a blank placeholder as its
+// flattened image (a 70 MB file with 26 layers had a white one): a composite
+// whose luminance barely varies is not a preview of anything
+const BLANK_STD = 0.5;
 
 export function isPsdPath(path) {
   return typeof path === "string" && /\.psd$/i.test(path);
@@ -52,6 +56,7 @@ const view = (bytes) =>
  *   {kind:"thumbnail", jpeg:Uint8Array, width:number, height:number, docWidth:number, docHeight:number} |
  *   {kind:"composite", rgba:Uint8ClampedArray, width:number, height:number, docWidth:number, docHeight:number} |
  *   {kind:"too-large", bytes:number, docWidth:number, docHeight:number} |
+ *   {kind:"blank", reason:string, docWidth:number, docHeight:number} |
  *   {kind:"unsupported", reason:string, docWidth:number, docHeight:number}>}
  */
 export async function readPsdPreview(
@@ -228,6 +233,25 @@ export async function readPsdPreview(
       }
       rgba[o + 3] = 255;
     }
+  }
+  let sum = 0;
+  let sumOfSquares = 0;
+  for (let i = 0; i < rgba.length; i += 4) {
+    const luminance =
+      0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2];
+    sum += luminance;
+    sumOfSquares += luminance * luminance;
+  }
+  const pixels = width * height;
+  const mean = sum / pixels;
+  if (Math.sqrt(Math.max(0, sumOfSquares / pixels - mean * mean)) < BLANK_STD) {
+    return (
+      thumbnail || {
+        kind: "blank",
+        reason: "the flattened image is a single colour",
+        ...doc,
+      }
+    );
   }
   return { kind: "composite", rgba, width, height, ...doc };
 }

@@ -169,6 +169,16 @@ describe("psd strategy · indexed tar (Range reads)", () => {
     );
   });
 
+  it("gives no thumbnail for a PSD whose flattened image is blank", async () => {
+    const psd = buildPsd({
+      width: 16,
+      height: 16,
+      pixel: () => [255, 255, 255],
+    });
+    serveTar(psd, []);
+    expect(await run(member(psd))).toBeNull();
+  });
+
   it("gives no thumbnail for a PSD it cannot decode", async () => {
     const psd = buildPsd({ width: 16, height: 16, mode: 2 });
     serveTar(psd, []);

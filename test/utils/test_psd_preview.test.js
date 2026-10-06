@@ -73,15 +73,16 @@ describe("readPsdPreview · composite", () => {
   });
 
   it("copes with runs, literals and the PackBits no-op byte", async () => {
-    const flat = () => [10, 20, 30]; // every row is one long run
+    // each row is two long runs
+    const halves = (x) => (x < 100 ? [10, 20, 30] : [200, 20, 30]);
     const out = await readPsdPreview(
       createBytesSource(
-        buildPsd({ width: 200, height: 3, pixel: flat, noop: true }),
+        buildPsd({ width: 200, height: 3, pixel: halves, noop: true }),
       ),
       { maxSide: 400 },
     );
     expect(px(out, 0, 0)).toEqual([10, 20, 30, 255]);
-    expect(px(out, 199, 2)).toEqual([10, 20, 30, 255]);
+    expect(px(out, 199, 2)).toEqual([200, 20, 30, 255]);
   });
 
   it("decodes a raw (uncompressed) composite", async () => {
@@ -114,20 +115,20 @@ describe("readPsdPreview · composite", () => {
           width: 2,
           height: 2,
           mode: 4,
-          pixel: () => [200, 100, 50, 255],
+          pixel: (x) => (x ? [200, 100, 50, 255] : [0, 0, 0, 255]),
         }),
       ),
       { maxSide: 64 },
     );
     // r = c * k / 255 with k = 255: no black ink left in the stored (inverted) value
-    expect(px(cmyk, 0, 0)).toEqual([200, 100, 50, 255]);
+    expect(px(cmyk, 1, 0)).toEqual([200, 100, 50, 255]);
     const dark = await readPsdPreview(
       createBytesSource(
         buildPsd({
           width: 2,
           height: 2,
           mode: 4,
-          pixel: () => [255, 255, 255, 128],
+          pixel: (x) => (x ? [255, 255, 255, 128] : [0, 0, 0, 255]),
         }),
       ),
       { maxSide: 64 },
@@ -140,7 +141,7 @@ describe("readPsdPreview · composite", () => {
           width: 3,
           height: 3,
           depth: 16,
-          pixel: () => [0xabcd, 0x1234, 0xff00],
+          pixel: (x) => (x ? [0xabcd, 0x1234, 0xff00] : [0, 0, 0]),
         }),
       ),
       { maxSide: 64 },
@@ -175,7 +176,7 @@ describe("readPsdPreview · composite", () => {
 
   it("box-filters down to maxSide, sampling a few rows per output row", async () => {
     // columns of 0 and 200: a 2:1 box filter gives 100 everywhere
-    const stripes = (x) => [x % 2 ? 200 : 0, 0, 0];
+    const stripes = (x, y) => [x % 2 ? 200 : 0, y < 8 ? 0 : 90, 0];
     const all = await readPsdPreview(
       createBytesSource(buildPsd({ width: 16, height: 16, pixel: stripes })),
       { maxSide: 8, rowsPerOutput: 0 },
@@ -189,6 +190,41 @@ describe("readPsdPreview · composite", () => {
     expect([sampled.width, sampled.height]).toEqual([3, 8]);
     expect(px(sampled, 1, 4)[0]).toBeGreaterThanOrEqual(80);
     expect(px(sampled, 1, 4)[0]).toBeLessThanOrEqual(120);
+  });
+
+  it("calls a composite of one single colour blank: the picture is in the layers", async () => {
+    // a PSD saved without "Maximize Compatibility" keeps a white placeholder
+    const white = () => [255, 255, 255];
+    const out = await readPsdPreview(
+      createBytesSource(buildPsd({ width: 40, height: 30, pixel: white })),
+      { maxSide: 64 },
+    );
+    expect(out.kind).toBe("blank");
+    expect([out.docWidth, out.docHeight]).toEqual([40, 30]);
+    expect(out.reason).toContain("single colour");
+  });
+
+  it("does not call a nearly white page with a few marks blank", async () => {
+    const mark = (x, y) => (x < 4 && y < 4 ? [0, 0, 0] : [255, 255, 255]);
+    const out = await readPsdPreview(
+      createBytesSource(buildPsd({ width: 40, height: 30, pixel: mark })),
+      { maxSide: 64 },
+    );
+    expect(out.kind).toBe("composite");
+  });
+
+  it("falls back to the thumbnail when the composite is blank", async () => {
+    const bytes = buildPsd({
+      width: 40,
+      height: 30,
+      pixel: () => [255, 255, 255],
+      resources: [thumbnailResource(THUMB)],
+    });
+    const out = await readPsdPreview(createBytesSource(bytes), {
+      maxSide: 64,
+      minThumbSide: 1024,
+    });
+    expect(out.kind).toBe("thumbnail");
   });
 
   it("never upscales", async () => {

@@ -58,7 +58,10 @@ async function load() {
     }
     if (id !== requestId) return;
     if (!blob) {
-      message.value = `This PSD cannot be previewed (${out.reason}).`;
+      message.value =
+        out.kind === "blank"
+          ? "The flattened image saved in this PSD is a single colour, so there is nothing to show. It was probably saved without “Maximize Compatibility”: its picture is only in its layers, which this preview does not read."
+          : `This PSD cannot be previewed (${out.reason}).`;
       state.value = "error";
       return;
     }

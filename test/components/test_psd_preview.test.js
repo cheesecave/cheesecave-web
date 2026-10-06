@@ -114,6 +114,21 @@ describe("PsdPreview", () => {
     wrapper.unmount();
   });
 
+  it("says what a blank flattened image means, instead of showing a white page", async () => {
+    const wrapper = mountPreview(
+      buildPsd({ width: 20, height: 20, pixel: () => [255, 255, 255] }),
+    );
+    await flushPromises();
+    const error = wrapper.get('[data-testid="psd-preview-error"]');
+    expect(error.text()).toContain("single colour");
+    expect(error.text()).toContain("Maximize Compatibility");
+    expect(wrapper.find('[data-testid="psd-preview-image"]').exists()).toBe(
+      false,
+    );
+    expect(urls.created).toHaveLength(0);
+    wrapper.unmount();
+  });
+
   it("reports a file that is not a PSD", async () => {
     const wrapper = mountPreview(new Uint8Array(64));
     await flushPromises();
