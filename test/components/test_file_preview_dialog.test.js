@@ -122,6 +122,17 @@ vi.mock("@/utils/safetensors", () => ({
     safetensorsCtrl.calls.push({ url, opts });
     return safetensorsCtrl.deferred.promise;
   }),
+  parseSafetensorsMetadataFromBuffer: vi.fn(() => ({
+    metadata: null,
+    tensors: {
+      "w.bias": {
+        dtype: "F16",
+        shape: [3],
+        parameters: 3,
+        data_offsets: [0, 6],
+      },
+    },
+  })),
   // Compute totals from the actual header so tests exercising the
   // human-readable toggle see a number large enough to render
   // differently under the two formats ("1.23B" vs "1,234,567,890").
@@ -157,7 +168,8 @@ vi.mock("@/utils/safetensors", () => ({
     for (const [name, entry] of entries) {
       const [head, ...rest] = name.split(".");
       const leafSegment = rest.length > 0 ? rest.join(".") : name;
-      if (!groups.has(head)) groups.set(head, { leaves: [], params: 0, bytes: 0 });
+      if (!groups.has(head))
+        groups.set(head, { leaves: [], params: 0, bytes: 0 });
       const grp = groups.get(head);
       const params = entry.parameters ?? 0;
       const bytes = Array.isArray(entry.data_offsets)
@@ -215,6 +227,12 @@ vi.mock("@/utils/parquet", () => ({
     parquetCtrl.calls.push({ url, opts });
     return parquetCtrl.deferred.promise;
   }),
+  parseParquetMetadataFromBuffer: vi.fn(async () => ({
+    byteLength: 64,
+    numRows: 7,
+    createdBy: null,
+    rowGroups: [{ numRows: 7, totalByteSize: 40 }],
+  })),
   summarizeParquetSchema: vi.fn(() => ({
     columnCount: 1,
     columns: [
@@ -230,6 +248,16 @@ vi.mock("@/utils/parquet", () => ({
 
 // Import *after* vi.mock so the component consumes the stubs.
 import FilePreviewDialog from "@/components/repo/preview/FilePreviewDialog.vue";
+import FileMetadataPanel from "@/components/repo/preview/FileMetadataPanel.vue";
+import {
+  buildTensorTree,
+  summarizeSafetensors,
+  parseSafetensorsMetadataFromBuffer,
+} from "@/utils/safetensors";
+import {
+  summarizeParquetSchema,
+  parseParquetMetadataFromBuffer,
+} from "@/utils/parquet";
 
 function mountDialog(props) {
   return mount(FilePreviewDialog, {
@@ -504,7 +532,9 @@ describe("FilePreviewDialog", () => {
 
     // Clicking Retry kicks off a fresh parser call.
     safetensorsCtrl.deferred = makeDeferred();
-    const retryBtn = wrapper.findAll("button").find((b) => b.text() === "Retry");
+    const retryBtn = wrapper
+      .findAll("button")
+      .find((b) => b.text() === "Retry");
     expect(retryBtn).toBeTruthy();
     await retryBtn.trigger("click");
     await flushPromises();
@@ -688,8 +718,20 @@ describe("FilePreviewDialog", () => {
     notFound.errorCode = "EntryNotFound";
     notFound.detail = "No fallback source serves this file.";
     notFound.sources = [
-      { name: "A", url: "https://a", status: 404, category: "not-found", message: "" },
-      { name: "B", url: "https://b", status: 404, category: "not-found", message: "" },
+      {
+        name: "A",
+        url: "https://a",
+        status: 404,
+        category: "not-found",
+        message: "",
+      },
+      {
+        name: "B",
+        url: "https://b",
+        status: 404,
+        category: "not-found",
+        message: "",
+      },
     ];
     safetensorsCtrl.deferred.reject(notFound);
     await flushPromises();
@@ -709,7 +751,9 @@ describe("FilePreviewDialog", () => {
     });
     await flushPromises();
 
-    const upstream = new Error("All fallback sources failed - upstream unavailable.");
+    const upstream = new Error(
+      "All fallback sources failed - upstream unavailable.",
+    );
     upstream.name = "SafetensorsFetchError";
     upstream.status = 502;
     upstream.errorCode = null;
@@ -737,6 +781,198 @@ describe("FilePreviewDialog", () => {
     await closeBtn.trigger("click");
     expect(wrapper.emitted("update:visible")?.at(-1)).toEqual([false]);
 
+    wrapper.unmount();
+  });
+});
+
+// The panel is what the dialog and the blob page both embed; these mount it
+// directly for what the dialog never exercises: in-memory bytes, a request
+// that a newer one supersedes, and the values the formatters get that a real
+// header rarely produces.
+describe("FilePreviewDialog closed by Element Plus itself", () => {
+  it("reports the close (x button, Esc) through update:visible", async () => {
+    const wrapper = mountDialog({
+      kind: "parquet",
+      resolveUrl: "http://host/ds/resolve/main/train.parquet",
+      filename: "train.parquet",
+    });
+    await flushPromises();
+    wrapper
+      .findComponent({ name: "ElDialog" })
+      .vm.$emit("update:modelValue", false);
+    expect(wrapper.emitted("update:visible")).toEqual([[false]]);
+    wrapper.unmount();
+  });
+});
+
+describe("FileMetadataPanel", () => {
+  const url = "http://host/repo/resolve/main/model.safetensors";
+  const mountPanel = (props) =>
+    mount(FileMetadataPanel, {
+      props: { filename: "f", ...props },
+      global: { stubs: dialogStubs },
+    });
+
+  beforeEach(() => {
+    safetensorsCtrl.deferred = makeDeferred();
+    safetensorsCtrl.calls.length = 0;
+    parquetCtrl.deferred = makeDeferred();
+    parquetCtrl.calls.length = 0;
+    vi.clearAllMocks();
+  });
+
+  it("reads safetensors from in-memory bytes without a request", async () => {
+    const bytes = new Uint8Array(4);
+    const wrapper = mountPanel({ kind: "safetensors", bytes });
+    await flushPromises();
+    expect(parseSafetensorsMetadataFromBuffer).toHaveBeenCalledWith(bytes);
+    expect(safetensorsCtrl.calls).toHaveLength(0);
+    expect(wrapper.text()).toContain("Total parameters");
+    wrapper.unmount();
+  });
+
+  it("reads parquet from in-memory bytes without a request", async () => {
+    const bytes = new Uint8Array(4);
+    const wrapper = mountPanel({ kind: "parquet", bytes });
+    await flushPromises();
+    expect(parseParquetMetadataFromBuffer).toHaveBeenCalledWith(bytes);
+    expect(parquetCtrl.calls).toHaveLength(0);
+    expect(wrapper.text()).toContain("Row groups");
+    expect(wrapper.text()).not.toContain("Created by");
+    wrapper.unmount();
+  });
+
+  it("ignores a result that a newer request superseded", async () => {
+    const first = safetensorsCtrl.deferred;
+    const wrapper = mountPanel({ kind: "safetensors", resolveUrl: url });
+    await flushPromises();
+
+    safetensorsCtrl.deferred = makeDeferred();
+    await wrapper.setProps({ resolveUrl: `${url}?v=2` });
+    await flushPromises();
+    first.resolve({ metadata: null, tensors: {} });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("Preparing Range request");
+    expect(wrapper.text()).not.toContain("Total parameters");
+    wrapper.unmount();
+  });
+
+  it("ignores an error that a newer request superseded", async () => {
+    const first = safetensorsCtrl.deferred;
+    const wrapper = mountPanel({ kind: "safetensors", resolveUrl: url });
+    await flushPromises();
+
+    safetensorsCtrl.deferred = makeDeferred();
+    await wrapper.setProps({ resolveUrl: `${url}?v=2` });
+    await flushPromises();
+    first.reject(new Error("stale failure"));
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain("stale failure");
+    expect(wrapper.text()).toContain("Preparing Range request");
+    wrapper.unmount();
+  });
+
+  it("derives nothing for the other kind's tables", async () => {
+    const wrapper = mountPanel({ kind: "parquet", bytes: new Uint8Array(1) });
+    await flushPromises();
+    expect(wrapper.vm.safetensorsTreeRows).toEqual([]);
+    expect(wrapper.vm.totalParamsDisplay).toBe("-");
+    wrapper.unmount();
+
+    const other = mountPanel({ kind: "safetensors", bytes: new Uint8Array(1) });
+    await flushPromises();
+    expect(other.vm.parquetColumnRows).toEqual([]);
+    other.unmount();
+  });
+
+  it("has no error title before anything failed", () => {
+    const wrapper = mountPanel({ kind: "parquet", resolveUrl: url });
+    expect(wrapper.vm.previewTitle).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("shows placeholders for a header with no dtypes and odd numbers", async () => {
+    summarizeSafetensors.mockReturnValueOnce({
+      parameters: {},
+      total: 0,
+      byte_size: null,
+    });
+    buildTensorTree.mockReturnValueOnce([
+      {
+        path: "a",
+        segment: "a",
+        isLeaf: true,
+        dtypeLabel: "F32",
+        shape: undefined,
+        parameters: "12",
+        byteSize: null,
+        leafCount: 1,
+        percent: Number.NaN,
+      },
+      {
+        path: "b",
+        segment: "b",
+        isLeaf: true,
+        dtypeLabel: "F32",
+        shape: [],
+        parameters: 3,
+        byteSize: 5n,
+        leafCount: 1,
+        percent: 250,
+      },
+      {
+        path: "c",
+        segment: "c",
+        isLeaf: true,
+        dtypeLabel: "F32",
+        shape: [1],
+        parameters: null,
+        byteSize: Number.POSITIVE_INFINITY,
+        leafCount: 1,
+        percent: 50,
+      },
+    ]);
+    const wrapper = mountPanel({
+      kind: "safetensors",
+      bytes: new Uint8Array(1),
+    });
+    await flushPromises();
+
+    const text = wrapper.text();
+    expect(text).toContain("Tensor bytes");
+    expect(text).toContain("5 B");
+    expect(text).toContain("Infinity");
+    // no dtypes -> "-", unknown shape -> "[]", NaN percent -> 0.00%
+    expect(text).toContain("0.00%");
+    expect(text).toContain("250.00%");
+    expect(wrapper.html()).toContain("width: 100%");
+    expect(wrapper.html()).toContain('title="0 bytes"');
+    expect(wrapper.html()).toContain('title="5 bytes"');
+    expect(wrapper.html()).toContain('title="Infinity bytes"');
+
+    // exact mode prints counts as they are (a string stays, null is "-"),
+    // and a second click returns to the compact form
+    const pill = wrapper.find('[title^="Click to show"]');
+    await pill.trigger("click");
+    expect(wrapper.text()).toContain("12");
+    expect(wrapper.vm.totalParamsFormat).toBe("exact");
+    await pill.trigger("click");
+    expect(wrapper.vm.totalParamsFormat).toBe("human");
+    wrapper.unmount();
+  });
+
+  it("renders columns that carry no physical, logical or repetition type", async () => {
+    summarizeParquetSchema.mockReturnValueOnce({
+      columnCount: 1,
+      columns: [{ name: "group" }],
+    });
+    const wrapper = mountPanel({ kind: "parquet", bytes: new Uint8Array(1) });
+    await flushPromises();
+    expect(wrapper.vm.parquetColumnRows).toEqual([
+      { name: "group", physicalType: "", logicalType: "", repetition: "" },
+    ]);
     wrapper.unmount();
   });
 });

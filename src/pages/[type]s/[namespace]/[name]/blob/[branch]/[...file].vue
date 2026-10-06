@@ -393,18 +393,17 @@ const indexedTarTreeEntry = ref(null);
 const isIndexedTar = ref(false);
 const isZipArchive = computed(() => isZipArchivePath(filePath.value));
 const isParquet = computed(() => getPreviewKind(filePath.value) === "parquet");
-// Absolute, like the file-list preview: hyparquet range-reads this URL
+// Absolute, like the file-list preview: hyparquet range-reads this URL.
+// Only read while isParquet, so the path is never empty.
 const parquetResolveUrl = computed(() =>
-  isParquet.value
-    ? buildResolveUrl({
-        baseUrl: window.location.origin,
-        repoType: repoType.value,
-        namespace: namespace.value,
-        name: name.value,
-        branch: branch.value,
-        path: filePath.value,
-      })
-    : "",
+  buildResolveUrl({
+    baseUrl: window.location.origin,
+    repoType: repoType.value,
+    namespace: namespace.value,
+    name: name.value,
+    branch: branch.value,
+    path: filePath.value,
+  }),
 );
 const zipTarget = computed(() => ({
   repoType: repoType.value,
