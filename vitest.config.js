@@ -103,6 +103,7 @@ export default defineConfig({
         "src/components/repo/FileUploader.vue",
         "src/components/repo/RepoList.vue",
         "src/components/repo/RepoViewer.vue",
+        "src/components/repo/preview/FileMetadataPanel.vue",
         "src/components/repo/preview/FilePreviewDialog.vue",
         "src/components/repo/preview/TarBrowserDialog.vue",
         "src/components/repo/preview/TarBrowserPanel.vue",
