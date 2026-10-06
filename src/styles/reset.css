@@ -1,0 +1,6 @@
+/* The reset sits in a cascade layer, so every unlayered rule (Element Plus,
+   UnoCSS utilities, the app's own) beats it whatever order the build links
+   the stylesheets in. Unlayered, its `[type=button]{background-color:
+   transparent}` is as specific as `.el-button` and blanked Element Plus
+   buttons in production, where Element Plus's chunk is linked first. */
+@import "@unocss/reset/tailwind.css" layer(reset);

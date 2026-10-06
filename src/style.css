@@ -151,10 +151,17 @@ html[data-site-theme] :is(a, button)[class*="hover:text-blue-"]:hover {
   color: var(--site-context-link, var(--site-link));
 }
 
+/* A message box's confirm button is always `el-button--primary`; a
+   confirmButtonClass such as `el-button--danger` keeps its own color. */
 html[data-site-theme] .btn-primary,
 html[data-site-theme] :is(a, button):is(.bg-blue-500, .bg-blue-600),
 html[data-site-theme]
-  .el-button--primary:not(.is-plain):not(.is-text):not(.is-link) {
+  .el-button--primary:not(.is-plain):not(.is-text):not(.is-link):not(
+    .el-button--success,
+    .el-button--warning,
+    .el-button--danger,
+    .el-button--info
+  ) {
   background-color: var(--site-primary);
   border-color: var(--site-primary);
   color: var(--site-primary-text);
@@ -163,21 +170,34 @@ html[data-site-theme] .btn-primary:hover,
 html[data-site-theme] :is(a, button):is(.bg-blue-500, .bg-blue-600):hover,
 html[data-site-theme]
   .el-button--primary:not(.is-plain):not(.is-text):not(.is-link):not(
-    .is-disabled
-  ):is(:hover, :focus-visible) {
+    .el-button--success,
+    .el-button--warning,
+    .el-button--danger,
+    .el-button--info
+  ):not(.is-disabled):is(:hover, :focus-visible) {
   background-color: var(--site-primary-hover);
   border-color: var(--site-primary-hover);
   color: var(--site-primary-text);
 }
 html[data-site-theme]
   .el-button--primary:not(.is-plain):not(.is-text):not(.is-link):not(
-    .is-disabled
-  ):active {
+    .el-button--success,
+    .el-button--warning,
+    .el-button--danger,
+    .el-button--info
+  ):not(.is-disabled):active {
   background-color: var(--site-primary-active);
   border-color: var(--site-primary-active);
 }
 html[data-site-theme]
-  .el-button--primary.is-disabled:not(.is-plain):not(.is-text):not(.is-link) {
+  .el-button--primary.is-disabled:not(.is-plain):not(.is-text):not(
+    .is-link
+  ):not(
+    .el-button--success,
+    .el-button--warning,
+    .el-button--danger,
+    .el-button--info
+  ) {
   opacity: 0.5;
 }
 html[data-site-theme] .el-button--primary:is(.is-plain, .is-text, .is-link),

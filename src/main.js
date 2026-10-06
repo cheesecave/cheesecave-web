@@ -12,7 +12,7 @@ import { useSiteAppearanceStore } from "./stores/siteAppearance";
 
 // Import UnoCSS
 import "virtual:uno.css";
-import "@unocss/reset/tailwind.css";
+import "./styles/reset.css";
 
 // Import Element Plus base styles
 import "element-plus/dist/index.css";
