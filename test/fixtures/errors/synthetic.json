@@ -1,0 +1,261 @@
+[
+  {
+    "name": "unhandled-exception-plain-text",
+    "note": "Starlette's answer to an exception nothing caught",
+    "response": {
+      "status": 500,
+      "headers": {
+        "content-type": "text/plain; charset=utf-8",
+        "x-request-id": "req-500"
+      },
+      "body": "Internal Server Error"
+    }
+  },
+  {
+    "name": "proxy-502-html",
+    "note": "nginx in front of a backend that is down",
+    "response": {
+      "status": 502,
+      "headers": {
+        "content-type": "text/html"
+      },
+      "body": "<html><head><title>502 Bad Gateway</title></head><body><center><h1>502 Bad Gateway</h1></center><hr><center>nginx</center></body></html>"
+    }
+  },
+  {
+    "name": "proxy-504-html",
+    "response": {
+      "status": 504,
+      "headers": {
+        "content-type": "text/html"
+      },
+      "body": "<html><body><h1>504 Gateway Time-out</h1></body></html>"
+    }
+  },
+  {
+    "name": "maintenance-page-with-200",
+    "note": "a proxy or CDN answering 200 with its own page instead of the API",
+    "response": {
+      "status": 200,
+      "headers": {
+        "content-type": "text/html"
+      },
+      "body": "<!doctype html><html><body>We'll be right back</body></html>"
+    }
+  },
+  {
+    "name": "authentication-required-as-403",
+    "note": "auth/permissions.py raises 403 for a missing login",
+    "response": {
+      "status": 403,
+      "headers": {
+        "x-request-id": "req-403"
+      },
+      "body": {
+        "detail": {
+          "error": "User authentication required"
+        }
+      }
+    }
+  },
+  {
+    "name": "namespace-missing-as-403",
+    "response": {
+      "status": 403,
+      "headers": {},
+      "body": {
+        "detail": {
+          "error": "Namespace 'x' does not exist or you don't have access"
+        }
+      }
+    }
+  },
+  {
+    "name": "email-already-exists-as-400",
+    "response": {
+      "status": 400,
+      "headers": {},
+      "body": {
+        "detail": "Email already exists"
+      }
+    }
+  },
+  {
+    "name": "image-too-large-as-400",
+    "response": {
+      "status": 400,
+      "headers": {},
+      "body": {
+        "detail": "Image too large. Maximum: 10MB"
+      }
+    }
+  },
+  {
+    "name": "storage-quota-413",
+    "response": {
+      "status": 413,
+      "headers": {},
+      "body": {
+        "detail": {
+          "error": "Storage quota exceeded",
+          "repo_size_bytes": 123
+        }
+      }
+    }
+  },
+  {
+    "name": "rate-limited-with-retry-after",
+    "response": {
+      "status": 429,
+      "headers": {
+        "retry-after": "7"
+      },
+      "body": {
+        "detail": "Too many requests"
+      }
+    }
+  },
+  {
+    "name": "service-unavailable-503",
+    "response": {
+      "status": 503,
+      "headers": {},
+      "body": {
+        "detail": "Service Unavailable"
+      }
+    }
+  },
+  {
+    "name": "not-implemented-501",
+    "response": {
+      "status": 501,
+      "headers": {
+        "x-error-code": "NotImplemented",
+        "x-error-message": "Not supported"
+      },
+      "body": null
+    }
+  },
+  {
+    "name": "gated-repo-aggregate",
+    "response": {
+      "status": 401,
+      "headers": {
+        "x-error-code": "GatedRepo",
+        "x-error-message": "gated"
+      },
+      "body": {
+        "error": "GatedRepo",
+        "detail": "Upstream source requires authentication - likely a gated repository.",
+        "sources": [
+          {
+            "name": "HuggingFace",
+            "url": "https://huggingface.co",
+            "status": 401,
+            "category": "auth",
+            "message": "gated"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "upstream-failure-aggregate",
+    "response": {
+      "status": 502,
+      "headers": {
+        "x-error-message": "All fallback sources failed - upstream unavailable."
+      },
+      "body": {
+        "error": "UpstreamFailure",
+        "detail": "All fallback sources failed - upstream unavailable.",
+        "sources": [
+          {
+            "name": "HuggingFace",
+            "status": 503,
+            "category": "server",
+            "message": "x"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "repo-name-recycling-409",
+    "response": {
+      "status": 409,
+      "headers": {
+        "x-error-code": "RepoNameRecycling",
+        "x-error-message": "being deleted"
+      },
+      "body": {
+        "error": "being deleted, retry"
+      }
+    }
+  },
+  {
+    "name": "range-not-satisfiable-416",
+    "response": {
+      "status": 416,
+      "headers": {
+        "x-error-code": "RangeNotSatisfiable"
+      },
+      "body": null
+    }
+  },
+  {
+    "name": "hf-invalid-repo-id-400",
+    "response": {
+      "status": 400,
+      "headers": {
+        "x-error-code": "InvalidRepoId",
+        "x-error-message": "bad id"
+      },
+      "body": null
+    }
+  },
+  {
+    "name": "unknown-code-header",
+    "response": {
+      "status": 418,
+      "headers": {
+        "x-error-code": "Teapot",
+        "x-error-message": "short and stout"
+      },
+      "body": null
+    }
+  },
+  {
+    "name": "detail-is-an-object-without-text",
+    "response": {
+      "status": 409,
+      "headers": {},
+      "body": {
+        "detail": {
+          "code": 42,
+          "nested": {
+            "a": 1
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "request-timeout-408",
+    "response": {
+      "status": 408,
+      "headers": {},
+      "body": null
+    }
+  },
+  {
+    "name": "hostile-message",
+    "response": {
+      "status": 400,
+      "headers": {},
+      "body": {
+        "detail": "<img src=x onerror=alert(1)>\u0000\u0007   spaced   out xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+    }
+  }
+]

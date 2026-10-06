@@ -1,0 +1,438 @@
+[
+  {
+    "name": "token-missing",
+    "request": {
+      "method": "DELETE",
+      "path": "/api/auth/tokens/0"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "x-request-id": "57cdc48c82414f6094aa48adaf15fc5b",
+        "content-type": "application/json"
+      },
+      "body": {
+        "detail": "Token not found"
+      }
+    }
+  },
+  {
+    "name": "preupload-anonymous",
+    "request": {
+      "method": "POST",
+      "path": "/api/datasets/nobody-ns/nothing/preupload/main"
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "x-request-id": "6d75772d7f1b4d599948013b158abc20",
+        "content-type": "application/json"
+      },
+      "body": {
+        "detail": "Not authenticated"
+      }
+    }
+  },
+  {
+    "name": "commits-private-repo-anonymous",
+    "request": {
+      "method": "GET",
+      "path": "/api/datasets/mai_lin/zip-preview-private/commits/main"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "x-error-code": "RepoNotFound",
+        "x-error-message": "Repository 'mai_lin/zip-preview-private' (dataset) not found",
+        "x-request-id": "8c2f702d5d184c8a8388e4e3addff151"
+      },
+      "body": null
+    }
+  },
+  {
+    "name": "repo-info-no-fallback-source",
+    "request": {
+      "method": "GET",
+      "path": "/api/datasets/nobody-ns/nothing"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "x-error-code": "RepoNotFound",
+        "x-error-message": "No fallback source serves this repository.",
+        "x-request-id": "2d280ab67b134b5daa278f828e73f8d9",
+        "content-type": "application/json"
+      },
+      "body": {
+        "error": "RepoNotFound",
+        "detail": "No fallback source serves this repository.",
+        "sources": [
+          {
+            "name": "HuggingFace",
+            "url": "https://huggingface.co",
+            "status": 401,
+            "category": "not-found",
+            "error_code": null,
+            "message": "Invalid username or password."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "tree-missing-branch",
+    "request": {
+      "method": "GET",
+      "path": "/api/datasets/mai_lin/zip-preview-private/tree/nope-branch"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "x-error-code": "RevisionNotFound",
+        "x-error-message": "Revision 'nope-branch' not found in repository 'mai_lin/zip-preview-private'",
+        "x-request-id": "df818bb1f578466396df52ccbbeb3be0"
+      },
+      "body": null
+    }
+  },
+  {
+    "name": "resolve-missing-file",
+    "request": {
+      "method": "HEAD",
+      "path": "/datasets/mai_lin/zip-preview-private/resolve/main/nope.txt"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "x-error-code": "EntryNotFound",
+        "x-error-message": "Entry 'nope.txt' not found in repository 'mai_lin/zip-preview-private' at revision 'main'",
+        "x-request-id": "b1185572feba4f21baf4c3e21c6153b1",
+        "content-type": "application/json"
+      },
+      "body": null
+    }
+  },
+  {
+    "name": "org-missing",
+    "request": {
+      "method": "GET",
+      "path": "/org/no-such-org"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "x-request-id": "4da2d7f6aea248d3bdff3c807095e2be",
+        "content-type": "application/json"
+      },
+      "body": {
+        "detail": "Organization not found"
+      }
+    }
+  },
+  {
+    "name": "unknown-api-route",
+    "request": {
+      "method": "GET",
+      "path": "/api/no-such-thing"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "x-request-id": "966b6af07b7e472292e6bade50a2f488",
+        "content-type": "application/json"
+      },
+      "body": {
+        "detail": "Not Found"
+      }
+    }
+  },
+  {
+    "name": "method-not-allowed",
+    "request": {
+      "method": "PATCH",
+      "path": "/api/auth/login"
+    },
+    "response": {
+      "status": 405,
+      "headers": {
+        "x-request-id": "342fd3bd4ffc47d68403b494fba4186f",
+        "content-type": "application/json"
+      },
+      "body": {
+        "detail": "Method Not Allowed"
+      }
+    }
+  },
+  {
+    "name": "auth-me-anonymous",
+    "request": {
+      "method": "GET",
+      "path": "/api/auth/me"
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "x-request-id": "db141e6fae224b9cb408aa2916e0310c",
+        "content-type": "application/json"
+      },
+      "body": {
+        "detail": "Not authenticated"
+      }
+    }
+  },
+  {
+    "name": "login-wrong-password",
+    "request": {
+      "method": "POST",
+      "path": "/api/auth/login"
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "x-request-id": "2b688720663a4c47bc98d2e539c9d506",
+        "content-type": "application/json"
+      },
+      "body": {
+        "detail": "Invalid username or password"
+      }
+    }
+  },
+  {
+    "name": "admin-without-token",
+    "request": {
+      "method": "GET",
+      "path": "/admin/api/users"
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "x-request-id": "099c9138506d47618ff1af42c8147eea",
+        "content-type": "application/json"
+      },
+      "body": {
+        "detail": {
+          "error": "Admin token required in X-Admin-Token header"
+        }
+      }
+    }
+  },
+  {
+    "name": "quota-recalculate-anonymous",
+    "request": {
+      "method": "POST",
+      "path": "/api/quota/nobody-ns/recalculate"
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "x-request-id": "a2fb1bba6f8841ceaf770137689084c1",
+        "content-type": "application/json"
+      },
+      "body": {
+        "detail": "Not authenticated"
+      }
+    }
+  },
+  {
+    "name": "external-tokens-anonymous",
+    "request": {
+      "method": "GET",
+      "path": "/api/users/mai_lin/external-tokens"
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "x-request-id": "b7fad6e836574701a451a8badd094047",
+        "content-type": "application/json"
+      },
+      "body": {
+        "detail": "Not authenticated"
+      }
+    }
+  },
+  {
+    "name": "other-users-settings",
+    "request": {
+      "method": "PUT",
+      "path": "/api/users/someone-else/settings"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "x-request-id": "b45a33bb317743f59efbdfaa30ba34fc",
+        "content-type": "application/json"
+      },
+      "body": {
+        "detail": "Not authorized to update this user's settings"
+      }
+    }
+  },
+  {
+    "name": "register-existing-username",
+    "request": {
+      "method": "POST",
+      "path": "/api/auth/register"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "x-request-id": "7fa59647e3b4437283b20843c4e714c0",
+        "content-type": "application/json"
+      },
+      "body": {
+        "detail": "Username already exists"
+      }
+    }
+  },
+  {
+    "name": "org-exists",
+    "request": {
+      "method": "POST",
+      "path": "/org/create"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "x-request-id": "9d131de2a3444f66af1dc527f797d74b",
+        "content-type": "application/json"
+      },
+      "body": {
+        "detail": "Organization name already exists"
+      }
+    }
+  },
+  {
+    "name": "repo-exists",
+    "request": {
+      "method": "POST",
+      "path": "/api/repos/create"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "x-error-code": "RepoExists",
+        "x-error-message": "Repository mai_lin/zip-preview-private already exists",
+        "x-request-id": "8e273fcd9b6a4105bafbb94341f14238",
+        "content-type": "application/json"
+      },
+      "body": {
+        "url": "http://127.0.0.1:5173/datasets/mai_lin/zip-preview-private",
+        "repo_id": "mai_lin/zip-preview-private",
+        "error": "Repository mai_lin/zip-preview-private already exists"
+      }
+    }
+  },
+  {
+    "name": "repo-create-missing-fields",
+    "request": {
+      "method": "POST",
+      "path": "/api/repos/create"
+    },
+    "response": {
+      "status": 422,
+      "headers": {
+        "x-request-id": "31c1b21e96a64b4eb435c64a84238d77",
+        "content-type": "application/json"
+      },
+      "body": {
+        "detail": [
+          {
+            "type": "missing",
+            "loc": [
+              "body",
+              "name"
+            ],
+            "msg": "Field required",
+            "input": {}
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "repo-create-bad-enum",
+    "request": {
+      "method": "POST",
+      "path": "/api/repos/create"
+    },
+    "response": {
+      "status": 422,
+      "headers": {
+        "x-request-id": "712f586d8236484ea554a9af95e23ee7",
+        "content-type": "application/json"
+      },
+      "body": {
+        "detail": [
+          {
+            "type": "literal_error",
+            "loc": [
+              "body",
+              "type"
+            ],
+            "msg": "Input should be 'model', 'dataset' or 'space'",
+            "input": "banana",
+            "ctx": {
+              "expected": "'model', 'dataset' or 'space'"
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "lfs-batch-bad-request",
+    "request": {
+      "method": "POST",
+      "path": "/nobody-ns/nothing.git/info/lfs/objects/batch"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "x-request-id": "33fa1aa38e62438c861a7780eb7a352d",
+        "content-type": "application/json"
+      },
+      "body": {
+        "detail": {
+          "error": "Invalid LFS batch request: 2 validation errors for LFSBatchRequest\noperation\n  Field required [type=missing, input_value={}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nobjects\n  Field required [type=missing, input_value={}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing"
+        }
+      }
+    }
+  },
+  {
+    "name": "viewer-rate-limited",
+    "request": {
+      "method": "POST",
+      "path": "/api/dataset-viewer/tar/list"
+    },
+    "response": {
+      "status": 429,
+      "headers": {
+        "x-request-id": "28c99eaf67b74610a727aa6eda00ae0f",
+        "content-type": "application/json"
+      },
+      "body": {
+        "detail": {
+          "error": "Too many concurrent requests",
+          "limit": 3,
+          "current": 3
+        }
+      }
+    }
+  },
+  {
+    "name": "repo-create-name-too-long",
+    "request": {
+      "method": "POST",
+      "path": "/api/repos/create"
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "x-error-code": "ServerError",
+        "x-error-message": "Failed to record repository: value too long for type character varying(255)",
+        "x-request-id": "6e5cd34cfc844995addab748777a4e82"
+      },
+      "body": null
+    }
+  }
+]
