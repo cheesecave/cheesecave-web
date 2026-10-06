@@ -51,7 +51,14 @@
     <el-tabs v-model="activeTab">
       <!-- General Settings -->
       <el-tab-pane label="General" name="general">
-        <div class="max-w-2xl space-y-6">
+        <ErrorState
+          v-if="infoError"
+          :error="infoError"
+          :context="errorContext('repository')"
+          mode="inline-panel"
+          :retry="loadRepoInfo"
+        />
+        <div v-else class="max-w-2xl space-y-6">
           <!-- Visibility -->
           <div class="card">
             <h2 class="text-xl font-semibold mb-4">Visibility</h2>
@@ -274,7 +281,14 @@
 
       <!-- LFS Settings -->
       <el-tab-pane label="LFS Settings" name="lfs">
-        <div class="max-w-2xl space-y-6">
+        <ErrorState
+          v-if="lfsError"
+          :error="lfsError"
+          :context="errorContext('LFS settings')"
+          mode="inline-panel"
+          :retry="loadLfsSettings"
+        />
+        <div v-else class="max-w-2xl space-y-6">
           <!-- LFS Threshold -->
           <div class="card">
             <h2 class="text-xl font-semibold mb-4">LFS Threshold</h2>
@@ -465,7 +479,14 @@
 
       <!-- Storage & Quota -->
       <el-tab-pane label="Storage & Quota" name="quota">
-        <div class="max-w-2xl space-y-6">
+        <ErrorState
+          v-if="quotaError"
+          :error="quotaError"
+          :context="errorContext('quota information')"
+          mode="inline-panel"
+          :retry="loadQuotaInfo"
+        />
+        <div v-else class="max-w-2xl space-y-6">
           <!-- Storage Usage Card -->
           <div class="card">
             <h2 class="text-xl font-semibold mb-4">Storage Usage</h2>
@@ -594,6 +615,9 @@ import { useRoute, useRouter } from "vue-router";
 import { repoAPI, settingsAPI, validationAPI, quotaAPI } from "@/utils/api";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { useAuthStore } from "@/stores/auth";
+import ErrorState from "@/components/common/ErrorState.vue";
+import { KIND, decodeError, notifyError } from "@/errors";
+import { useErrorContext } from "@/composables/useErrorContext";
 import { getRepositoryOperationCapabilities } from "@/utils/repositoryOperationCapabilities";
 
 const route = useRoute();
@@ -629,6 +653,19 @@ const savingQuota = ref(false);
 const lfsSettings = ref(null);
 const savingLfs = ref(false);
 const squashEnabled = ref(false);
+// Why a tab's data did not load (AppError). The tab shows it instead of a
+// form, and saving is refused: a form filled with defaults would overwrite
+// the real settings (a failed load must never turn a private repo public).
+const errorContext = useErrorContext();
+const infoError = ref(null);
+const infoReady = ref(false);
+const quotaError = ref(null);
+const lfsError = ref(null);
+
+function failure(err) {
+  const decoded = decodeError(err);
+  return decoded.kind === KIND.CANCELLED ? null : decoded;
+}
 
 const repoId = computed(() => `${route.params.namespace}/${route.params.name}`);
 const repoType = computed(() => route.params.type);
@@ -652,6 +689,7 @@ const maxQuotaGB = computed(() => {
 });
 
 async function loadRepoInfo() {
+  infoError.value = null;
   try {
     const { data } = await repoAPI.getInfo(
       repoType.value,
@@ -661,9 +699,10 @@ async function loadRepoInfo() {
     );
     settings.value.private = data.private || false;
     moveToRepo.value = repoId.value;
+    infoReady.value = true;
   } catch (err) {
     console.error("Failed to load repo info:", err);
-    ElMessage.error("Failed to load repository information");
+    infoError.value = failure(err);
   }
 }
 
@@ -678,6 +717,12 @@ async function loadOperationCapabilities() {
 }
 
 async function saveGeneralSettings() {
+  if (!infoReady.value) {
+    ElMessage.warning(
+      "Settings are still loading; saving now would overwrite them.",
+    );
+    return;
+  }
   try {
     await settingsAPI.updateRepoSettings(
       repoType.value,
@@ -690,7 +735,7 @@ async function saveGeneralSettings() {
     ElMessage.success("Settings updated successfully");
   } catch (err) {
     console.error("Failed to update settings:", err);
-    ElMessage.error("Failed to update settings");
+    notifyError(err, { fallback: "Failed to update settings" });
   }
 }
 
@@ -805,9 +850,7 @@ async function handleMoveRepo() {
   } catch (err) {
     if (err !== "cancel") {
       console.error("Failed to move repository:", err);
-      const errorMsg =
-        err.response?.data?.detail?.error || "Failed to move repository";
-      ElMessage.error(errorMsg);
+      notifyError(err, { fallback: "Failed to move repository" });
     }
   }
 }
@@ -863,9 +906,7 @@ async function handleSquashRepo() {
   } catch (err) {
     if (err !== "cancel" && err !== "close") {
       console.error("Failed to squash repository:", err);
-      const errorMsg =
-        err.response?.data?.detail?.error || "Failed to squash repository";
-      ElMessage.error(errorMsg);
+      notifyError(err, { fallback: "Failed to squash repository" });
     }
   }
 }
@@ -906,7 +947,7 @@ async function handleDeleteRepo() {
   } catch (err) {
     if (err !== "cancel" && err !== "close") {
       console.error("Failed to delete repository:", err);
-      ElMessage.error("Failed to delete repository");
+      notifyError(err, { fallback: "Failed to delete repository" });
     }
   }
 }
@@ -932,7 +973,7 @@ async function handleCreateBranch() {
     newBranch.value = { name: "", revision: "" };
   } catch (err) {
     console.error("Failed to create branch:", err);
-    ElMessage.error("Failed to create branch");
+    notifyError(err, { fallback: "Failed to create branch" });
   }
 }
 
@@ -958,11 +999,12 @@ async function handleCreateTag() {
     newTag.value = { name: "", revision: "", message: "" };
   } catch (err) {
     console.error("Failed to create tag:", err);
-    ElMessage.error("Failed to create tag");
+    notifyError(err, { fallback: "Failed to create tag" });
   }
 }
 
 async function loadQuotaInfo() {
+  quotaError.value = null;
   try {
     const { data } = await quotaAPI.getRepoQuota(
       repoType.value,
@@ -982,7 +1024,7 @@ async function loadQuotaInfo() {
     }
   } catch (err) {
     console.error("Failed to load quota info:", err);
-    ElMessage.error("Failed to load quota information");
+    quotaError.value = failure(err);
   }
 }
 
@@ -998,15 +1040,14 @@ async function handleRecalculateStorage() {
     ElMessage.success("Storage recalculated successfully");
   } catch (err) {
     console.error("Failed to recalculate storage:", err);
-    const errorMsg =
-      err.response?.data?.detail?.error || "Failed to recalculate storage";
-    ElMessage.error(errorMsg);
+    notifyError(err, { fallback: "Failed to recalculate storage" });
   } finally {
     recalculating.value = false;
   }
 }
 
 async function saveQuotaSettings() {
+  if (!quotaInfo.value) return;
   savingQuota.value = true;
   try {
     const quota_bytes =
@@ -1025,9 +1066,7 @@ async function saveQuotaSettings() {
     ElMessage.success("Quota settings saved successfully");
   } catch (err) {
     console.error("Failed to save quota settings:", err);
-    const errorMsg =
-      err.response?.data?.detail?.error || "Failed to save quota settings";
-    ElMessage.error(errorMsg);
+    notifyError(err, { fallback: "Failed to save quota settings" });
   } finally {
     savingQuota.value = false;
   }
@@ -1049,6 +1088,7 @@ function getProgressColor(percentage) {
 }
 
 async function loadLfsSettings() {
+  lfsError.value = null;
   try {
     const { data } = await settingsAPI.getLfsSettings(
       repoType.value,
@@ -1087,11 +1127,12 @@ async function loadLfsSettings() {
     };
   } catch (err) {
     console.error("Failed to load LFS settings:", err);
-    ElMessage.error("Failed to load LFS settings");
+    lfsError.value = failure(err);
   }
 }
 
 async function saveLfsSettings() {
+  if (!lfsSettings.value) return;
   savingLfs.value = true;
   try {
     const payload = {};
@@ -1130,9 +1171,7 @@ async function saveLfsSettings() {
     await loadLfsSettings();
   } catch (err) {
     console.error("Failed to save LFS settings:", err);
-    const errorMsg =
-      err.response?.data?.detail?.error || "Failed to save LFS settings";
-    ElMessage.error(errorMsg);
+    notifyError(err, { fallback: "Failed to save LFS settings" });
   } finally {
     savingLfs.value = false;
   }

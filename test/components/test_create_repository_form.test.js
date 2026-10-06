@@ -107,14 +107,23 @@ describe("shared repository creation form", () => {
 
   it("keeps draft text on failure and permits correcting it before retry", async () => {
     mocks.create.mockRejectedValueOnce({
-      response: { data: { detail: { error: "Quota exceeded" } } },
+      isAxiosError: true,
+      response: {
+        status: 400,
+        headers: {},
+        data: { detail: { error: "Quota exceeded" } },
+      },
     });
     const wrapper = mountForm({ initialType: "space" });
     await flushPromises();
     await wrapper.get('input[placeholder="my-awesome-space"]').setValue("demo");
     await button(wrapper, "Create Space").trigger("click");
     await flushPromises();
-    expect(mocks.error).toHaveBeenCalledWith("Quota exceeded");
+    expect(mocks.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining("Failed to create space: Quota exceeded"),
+      }),
+    );
     expect(
       wrapper.get('input[placeholder="my-awesome-space"]').element.value,
     ).toBe("demo");

@@ -88,6 +88,7 @@
 </template>
 
 <script setup>
+import { notifyError } from "@/errors";
 import { computed, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { ElMessage } from "element-plus";
@@ -126,8 +127,7 @@ function handleUploadSuccess() {
 }
 
 function handleUploadError(error) {
-  const errorMsg = error.response?.data?.detail || "Failed to upload files";
-  ElMessage.error(errorMsg);
+  notifyError(error, { fallback: "Failed to upload files" });
   console.error("Upload error:", error);
 }
 

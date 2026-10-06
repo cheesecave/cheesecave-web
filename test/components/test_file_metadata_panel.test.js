@@ -24,6 +24,7 @@ vi.mock("@/utils/parquet", () => ({
   summarizeParquetSchema: vi.fn(),
 }));
 
+import { parseParquetMetadata } from "@/utils/parquet";
 import FileMetadataPanel from "@/components/repo/preview/FileMetadataPanel.vue";
 
 const URL = "http://host/datasets/o/n/resolve/main/data.parquet";
@@ -85,5 +86,40 @@ describe("FileMetadataPanel", () => {
 
     wrapper.unmount();
     expect(signal.aborted).toBe(true);
+  });
+
+  describe("when the header cannot be read", () => {
+    const failure = (status) =>
+      Object.assign(new Error("x"), {
+        isAxiosError: true,
+        response: { status, headers: {}, data: {} },
+      });
+    const failWith = async (status) => {
+      vi.mocked(parseParquetMetadata).mockRejectedValueOnce(failure(status));
+      const wrapper = mountPanel();
+      await flushPromises();
+      return wrapper;
+    };
+    const title = (w) => w.get('[data-testid="error-title"]').text();
+
+    it("says the header is missing when the file is", async () => {
+      expect(title(await failWith(404))).toBe(
+        "File header not found on any source",
+      );
+    });
+
+    it("names an unavailable source", async () => {
+      expect(title(await failWith(503))).toBe("Upstream source unavailable");
+    });
+
+    it("keeps the generic wording for anything else, and can try again", async () => {
+      const wrapper = await failWith(500);
+      expect(title(wrapper)).toBe("Something went wrong on the server");
+      await wrapper.get('[data-testid="error-action-retry"]').trigger("click");
+      await flushPromises();
+      expect(mocks.calls).toHaveLength(1);
+      expect(wrapper.text()).toContain("Reading only the file header");
+      wrapper.unmount();
+    });
   });
 });

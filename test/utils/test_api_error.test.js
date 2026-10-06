@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { getApiErrorMessage } from "@/utils/api-error";
-import { readErrorMessage } from "../../src/shared/api-error.js";
+import { parseApiError, readErrorMessage } from "../../src/shared/api-error.js";
+
+// What the web UI used before its errors were decoded by src/errors; the
+// admin app still shares this parser.
+const getApiErrorMessage = (error, fallback) =>
+  parseApiError(error, fallback, { preferDetail: false });
 
 describe("UI API error compatibility and shared parsing", () => {
   it("keeps HF top-level errors ahead of details and backend messages ahead of fallbacks", () => {

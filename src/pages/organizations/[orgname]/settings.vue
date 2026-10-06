@@ -117,6 +117,7 @@
 </template>
 
 <script setup>
+import { notifyError } from "@/errors";
 import { useRoute, useRouter } from "vue-router";
 import { orgAPI } from "@/utils/api";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -130,6 +131,8 @@ const activeTab = ref("general");
 const orgSettings = ref({
   description: "",
 });
+// Saving before the real description has loaded would overwrite it with ""
+const orgInfoReady = ref(false);
 const members = ref([]);
 const newMember = ref({
   username: "",
@@ -140,9 +143,10 @@ async function loadOrgInfo() {
   try {
     const { data } = await orgAPI.get(route.params.orgname);
     orgSettings.value.description = data.description || "";
+    orgInfoReady.value = true;
   } catch (err) {
     console.error("Failed to load org info:", err);
-    ElMessage.error("Failed to load organization information");
+    notifyError(err, { fallback: "Failed to load organization information" });
   }
 }
 
@@ -152,11 +156,17 @@ async function loadMembers() {
     members.value = data.members || [];
   } catch (err) {
     console.error("Failed to load members:", err);
-    ElMessage.error("Failed to load members");
+    notifyError(err, { fallback: "Failed to load members" });
   }
 }
 
 async function saveGeneralSettings() {
+  if (!orgInfoReady.value) {
+    ElMessage.warning(
+      "The organization has not loaded; saving now would overwrite it.",
+    );
+    return;
+  }
   try {
     await orgAPI.updateSettings(route.params.orgname, {
       description: orgSettings.value.description,
@@ -164,7 +174,7 @@ async function saveGeneralSettings() {
     ElMessage.success("Settings updated successfully");
   } catch (err) {
     console.error("Failed to update settings:", err);
-    ElMessage.error("Failed to update settings");
+    notifyError(err, { fallback: "Failed to update settings" });
   }
 }
 
@@ -184,7 +194,7 @@ async function handleAddMember() {
     await loadMembers();
   } catch (err) {
     console.error("Failed to add member:", err);
-    ElMessage.error("Failed to add member");
+    notifyError(err, { fallback: "Failed to add member" });
   }
 }
 
@@ -201,7 +211,7 @@ async function handleUpdateRole(member, newRole) {
     await loadMembers();
   } catch (err) {
     console.error("Failed to update role:", err);
-    ElMessage.error("Failed to update role");
+    notifyError(err, { fallback: "Failed to update role" });
   }
 }
 
@@ -223,7 +233,7 @@ async function handleRemoveMember(member) {
   } catch (err) {
     if (err !== "cancel") {
       console.error("Failed to remove member:", err);
-      ElMessage.error("Failed to remove member");
+      notifyError(err, { fallback: "Failed to remove member" });
     }
   }
 }

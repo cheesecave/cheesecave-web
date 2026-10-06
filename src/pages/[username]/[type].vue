@@ -11,6 +11,13 @@
       </p>
     </div>
 
+    <ErrorState
+      v-else-if="profileError"
+      :error="profileError"
+      :context="errorContext('user')"
+      :retry="load"
+    />
+
     <!-- User Not Found -->
     <div v-else-if="userNotFound" class="text-center py-20">
       <div
@@ -173,8 +180,17 @@
 
       <!-- Main Content -->
       <main>
+        <!-- The repositories could not be listed: say so, not "no repositories" -->
+        <ErrorState
+          v-if="reposError"
+          :error="reposError"
+          :context="errorContext('repositories')"
+          mode="inline-panel"
+          :retry="loadRepos"
+        />
+
         <!-- Models Tab -->
-        <div v-if="repoType === 'model'">
+        <div v-if="!reposError && repoType === 'model'">
           <div class="flex items-center justify-between mb-6">
             <div class="flex items-center gap-3">
               <div class="i-carbon-model text-blue-500 text-3xl" />
@@ -288,7 +304,7 @@
         </div>
 
         <!-- Datasets Tab -->
-        <div v-if="repoType === 'dataset'">
+        <div v-if="!reposError && repoType === 'dataset'">
           <div class="flex items-center justify-between mb-6">
             <div class="flex items-center gap-3">
               <div class="i-carbon-data-table text-green-500 text-3xl" />
@@ -391,7 +407,7 @@
         </div>
 
         <!-- Spaces Tab -->
-        <div v-if="repoType === 'space'">
+        <div v-if="!reposError && repoType === 'space'">
           <div class="flex items-center justify-between mb-6">
             <div class="flex items-center gap-3">
               <div class="i-carbon-application text-purple-500 text-3xl" />
@@ -500,6 +516,9 @@
 <script setup>
 import { repoAPI, orgAPI } from "@/utils/api";
 import axios from "axios";
+import ErrorState from "@/components/common/ErrorState.vue";
+import { KIND, decodeError } from "@/errors";
+import { useErrorContext } from "@/composables/useErrorContext";
 import { formatRelativeTime } from "@/utils/datetime";
 import {
   getRepoSortPreference,
@@ -513,6 +532,10 @@ const username = computed(() => route.params.username);
 const currentType = computed(() => route.params.type); // 'models', 'datasets', or 'spaces'
 
 const loading = ref(true);
+// Why the profile / the repository lists could not be loaded (AppError)
+const errorContext = useErrorContext();
+const profileError = ref(null);
+const reposError = ref(null);
 const userNotFound = ref(false);
 const userInfo = ref(null);
 const repos = ref({ model: [], dataset: [], space: [] });
@@ -631,13 +654,17 @@ async function checkUserExists() {
       userNotFound.value = true;
       return false;
     }
-    // Other errors - continue anyway
+    // Anything else (network, server): do not guess, say what happened
     console.error("Failed to check user existence:", err);
-    return true;
+    const decoded = decodeError(err);
+    if (decoded.kind === KIND.CANCELLED) return true;
+    profileError.value = decoded;
+    return false;
   }
 }
 
 async function loadRepos() {
+  reposError.value = null;
   try {
     const [models, datasets, spaces] = await Promise.all([
       repoAPI.listRepos("model", {
@@ -688,6 +715,8 @@ async function loadRepos() {
     };
   } catch (err) {
     console.error("Failed to load repos:", err);
+    const decoded = decodeError(err);
+    if (decoded.kind !== KIND.CANCELLED) reposError.value = decoded;
   }
 }
 
@@ -718,9 +747,11 @@ watch(repoType, (type) => {
   });
 });
 
-onMounted(async () => {
+async function load() {
   try {
     loading.value = true;
+    profileError.value = null;
+    userNotFound.value = false;
 
     // Validate type parameter (must be models, datasets, or spaces)
     if (!["models", "datasets", "spaces"].includes(currentType.value)) {
@@ -745,5 +776,7 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
-});
+}
+
+onMounted(load);
 </script>

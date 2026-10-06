@@ -378,6 +378,7 @@
 </template>
 
 <script setup>
+import { notifyError } from "@/errors";
 import { useRoute, useRouter } from "vue-router";
 import { orgAPI, invitationAPI, settingsAPI } from "@/utils/api";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -478,11 +479,17 @@ async function loadOrgProfile() {
     originalProfile.value = JSON.parse(JSON.stringify(profile));
   } catch (err) {
     console.error("Failed to load organization profile:", err);
-    ElMessage.error("Failed to load organization profile");
+    notifyError(err, { fallback: "Failed to load organization profile" });
   }
 }
 
 async function saveGeneralSettings() {
+  if (!originalProfile.value) {
+    ElMessage.warning(
+      "The organization profile has not loaded; saving now would overwrite it.",
+    );
+    return;
+  }
   saving.value = true;
   try {
     await orgAPI.updateSettings(route.params.org, {
@@ -495,7 +502,7 @@ async function saveGeneralSettings() {
     await loadOrgProfile(); // Reload to sync
   } catch (err) {
     console.error("Failed to save settings:", err);
-    ElMessage.error(err.response?.data?.detail || "Failed to save settings");
+    notifyError(err, { fallback: "Failed to save settings" });
   } finally {
     saving.value = false;
   }
@@ -508,7 +515,7 @@ async function loadMembers() {
     members.value = data.members;
   } catch (err) {
     console.error("Failed to load members:", err);
-    ElMessage.error("Failed to load members");
+    notifyError(err, { fallback: "Failed to load members" });
   } finally {
     loadingMembers.value = false;
   }
@@ -522,7 +529,7 @@ async function updateMemberRole(username, newRole) {
     ElMessage.success(`Updated ${username}'s role to ${newRole}`);
   } catch (err) {
     console.error("Failed to update role:", err);
-    ElMessage.error("Failed to update role");
+    notifyError(err, { fallback: "Failed to update role" });
     // Reload members to revert UI
     await loadMembers();
   }
@@ -542,7 +549,7 @@ async function removeMember(username) {
   } catch (err) {
     if (err !== "cancel") {
       console.error("Failed to remove member:", err);
-      ElMessage.error("Failed to remove member");
+      notifyError(err, { fallback: "Failed to remove member" });
     }
   }
 }
@@ -611,7 +618,7 @@ async function sendInvitation() {
     await loadInvitations();
   } catch (err) {
     console.error("Failed to send invitation:", err);
-    ElMessage.error(err.response?.data?.detail || "Failed to send invitation");
+    notifyError(err, { fallback: "Failed to send invitation" });
   } finally {
     inviting.value = false;
   }
@@ -624,7 +631,7 @@ async function loadInvitations() {
     invitations.value = data.invitations;
   } catch (err) {
     console.error("Failed to load invitations:", err);
-    ElMessage.error("Failed to load invitations");
+    notifyError(err, { fallback: "Failed to load invitations" });
   } finally {
     loadingInvitations.value = false;
   }
@@ -652,7 +659,7 @@ async function deleteInvitation(token) {
   } catch (err) {
     if (err !== "cancel") {
       console.error("Failed to delete invitation:", err);
-      ElMessage.error("Failed to delete invitation");
+      notifyError(err, { fallback: "Failed to delete invitation" });
     }
   }
 }

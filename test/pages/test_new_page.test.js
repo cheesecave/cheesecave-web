@@ -224,7 +224,7 @@ describe("new repository page", () => {
     await flushPromises();
 
     expect(mocks.elMessage.error).toHaveBeenCalledWith(
-      "Repository mai_lin/fresh-model already exists",
+      expect.objectContaining({ message: expect.stringContaining("Repository mai_lin/fresh-model already exists") }),
     );
     expect(pushSpy).not.toHaveBeenCalled();
   });
@@ -256,7 +256,7 @@ describe("new repository page", () => {
     await flushPromises();
 
     expect(mocks.elMessage.error).toHaveBeenCalledWith(
-      "Invalid repository name",
+      expect.objectContaining({ message: expect.stringContaining("Invalid repository name") }),
     );
   });
 
@@ -375,7 +375,11 @@ describe("new repository page", () => {
           .find((button) => button.text().includes("Create Model"))
           .trigger("click");
         await flushPromises();
-        expect(mocks.elMessage.error).toHaveBeenCalledWith(message);
+        expect(mocks.elMessage.error).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: expect.stringContaining(message),
+          }),
+        );
       } finally {
         wrapper.unmount();
       }

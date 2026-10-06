@@ -354,7 +354,7 @@ describe("FilePreviewDialog", () => {
     // dialog already renders the "Preview failed" view because the
     // component rejects unsupported kinds, so this assertion just
     // confirms the fallthrough did not crash.
-    expect(wrapper.text()).toContain("Request failed");
+    expect(wrapper.text()).toContain("Something went wrong in the app");
     wrapper.unmount();
   });
 
@@ -527,7 +527,7 @@ describe("FilePreviewDialog", () => {
     safetensorsCtrl.deferred.reject(new Error("internal explosion"));
     await flushPromises();
 
-    expect(wrapper.text()).toContain("Request failed");
+    expect(wrapper.text()).toContain("Something went wrong in the app");
     expect(wrapper.text()).toContain("internal explosion");
 
     // Clicking Retry kicks off a fresh parser call.
@@ -559,6 +559,7 @@ describe("FilePreviewDialog", () => {
     safetensorsCtrl.deferred.reject(new TypeError("Failed to fetch"));
     await flushPromises();
 
+    expect(wrapper.text()).toContain("Browser blocked the request");
     expect(wrapper.text()).toContain("looks like a CORS failure");
     expect(wrapper.text()).toMatch(/Access-Control-Allow-Origin/);
     expect(wrapper.text()).toMatch(/MinIO CORS/);
@@ -577,7 +578,7 @@ describe("FilePreviewDialog", () => {
     safetensorsCtrl.deferred.reject(new Error("404 not found"));
     await flushPromises();
 
-    expect(wrapper.text()).toContain("Request failed");
+    expect(wrapper.text()).toContain("Something went wrong in the app");
     expect(wrapper.text()).not.toContain("looks like a CORS failure");
 
     wrapper.unmount();
@@ -596,7 +597,7 @@ describe("FilePreviewDialog", () => {
     safetensorsCtrl.deferred.reject(abortErr);
     await flushPromises();
 
-    expect(wrapper.text()).not.toContain("Request failed");
+    expect(wrapper.text()).not.toContain("Something went wrong");
     wrapper.unmount();
   });
 
@@ -648,7 +649,7 @@ describe("FilePreviewDialog", () => {
     });
     await flushPromises();
 
-    expect(wrapper.text()).toContain("Request failed");
+    expect(wrapper.text()).toContain("Something went wrong in the app");
     expect(wrapper.text()).toContain("Unsupported preview kind: gguf");
 
     wrapper.unmount();
@@ -690,9 +691,9 @@ describe("FilePreviewDialog", () => {
     await flushPromises();
 
     const text = wrapper.text();
-    expect(text).toContain("Authentication required");
+    expect(text).toContain("Access needs a token");
     // The copy guides the user toward the concrete next step.
-    expect(text).toContain("attach a Hugging Face token");
+    expect(text).toContain("Add an access token");
     // Raw upstream message surfaces in the sources details.
     expect(text).toContain("Access to model owner/demo is restricted");
     expect(text).toContain("Mirror");
@@ -738,7 +739,7 @@ describe("FilePreviewDialog", () => {
 
     const text = wrapper.text();
     expect(text).toContain("File header not found on any source");
-    expect(text).toContain("Every configured source returned 404");
+    expect(text).toContain("No fallback source serves this file.");
 
     wrapper.unmount();
   });

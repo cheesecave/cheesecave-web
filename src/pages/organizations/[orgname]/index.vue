@@ -11,6 +11,13 @@
       </p>
     </div>
 
+    <ErrorState
+      v-else-if="orgError"
+      :error="orgError"
+      :context="errorContext('organization')"
+      :retry="load"
+    />
+
     <!-- Organization Not Found -->
     <div v-else-if="orgNotFound" class="text-center py-20">
       <div
@@ -440,8 +447,17 @@
             </div>
           </section>
 
+          <!-- The repositories could not be listed: say so, not "no models" -->
+          <ErrorState
+            v-if="reposError"
+            :error="reposError"
+            :context="errorContext('repositories')"
+            mode="inline-panel"
+            :retry="reloadRepos"
+          />
+
           <!-- Models Section -->
-          <section id="repositories" class="mb-8">
+          <section v-if="!reposError" id="repositories" class="mb-8">
             <div
               class="flex items-center justify-between gap-3 flex-wrap mb-4 pb-3 border-b-2 border-blue-500"
             >
@@ -564,7 +580,7 @@
           </section>
 
           <!-- Datasets Section -->
-          <section class="mb-8">
+          <section v-if="!reposError" class="mb-8">
             <div
               class="flex items-center justify-between gap-3 flex-wrap mb-4 pb-3 border-b-2 border-green-500"
             >
@@ -687,7 +703,7 @@
           </section>
 
           <!-- Spaces Section -->
-          <section>
+          <section v-if="!reposError">
             <div
               class="flex items-center justify-between gap-3 flex-wrap mb-4 pb-3 border-b-2 border-purple-500"
             >
@@ -826,12 +842,19 @@ import {
   setRepoSortPreference,
 } from "@/utils/repoSortPreference";
 import axios from "axios";
+import ErrorState from "@/components/common/ErrorState.vue";
+import { KIND, decodeError } from "@/errors";
+import { useErrorContext } from "@/composables/useErrorContext";
 
 const route = useRoute();
 const router = useRouter();
 const orgname = computed(() => route.params.orgname);
 
 const loading = ref(true);
+// Why the organization / its repository lists could not be loaded (AppError)
+const errorContext = useErrorContext();
+const orgError = ref(null);
+const reposError = ref(null);
 const orgInfo = ref(null);
 const profileInfo = ref(null);
 const members = ref([]);
@@ -979,8 +1002,12 @@ async function loadOrgInfo() {
       orgNotFound.value = true;
       return false;
     }
+    // Anything else (network, server): do not guess, say what happened
     console.error("Failed to load org info:", err);
-    return true; // Continue on non-404 errors
+    const decoded = decodeError(err);
+    if (decoded.kind === KIND.CANCELLED) return true;
+    orgError.value = decoded;
+    return false;
   }
 }
 
@@ -994,6 +1021,7 @@ async function loadMembers() {
 }
 
 async function loadRepos() {
+  reposError.value = null;
   try {
     const [models, datasets, spaces] = await Promise.all([
       loadRepoType("model"),
@@ -1011,7 +1039,10 @@ async function loadRepos() {
   } catch (err) {
     console.error("Failed to load repos:", err);
     repos.value = { model: [], dataset: [], space: [] };
-    return true; // Continue on error
+    // The organization exists, so the lists are not "empty": show why
+    const decoded = decodeError(err);
+    if (decoded.kind !== KIND.CANCELLED) reposError.value = decoded;
+    return true;
   }
 }
 
@@ -1116,9 +1147,20 @@ async function checkUserRole() {
   }
 }
 
-onMounted(async () => {
+async function reloadRepos() {
+  loading.value = true;
+  try {
+    await loadRepos();
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function load() {
   try {
     loading.value = true;
+    orgError.value = null;
+    orgNotFound.value = false;
 
     // Load org info first to check if it exists (with fallback)
     const orgExists = await loadOrgInfo();
@@ -1139,5 +1181,7 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
-});
+}
+
+onMounted(load);
 </script>

@@ -148,6 +148,7 @@
 </template>
 
 <script setup>
+import { notifyError } from "@/errors";
 import { ref, computed } from "vue";
 import { ElMessage } from "element-plus";
 import { repoAPI } from "@/utils/api";
@@ -271,8 +272,7 @@ async function handleUpload() {
     }, 1000);
   } catch (err) {
     uploadStatus.value = "exception";
-    const errorMsg = err.response?.data?.detail || "Failed to upload files";
-    ElMessage.error(errorMsg);
+    notifyError(err, { fallback: "Failed to upload files" });
     emit("upload-error", err);
     console.error("Upload error:", err);
   } finally {

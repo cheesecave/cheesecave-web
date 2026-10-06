@@ -112,6 +112,7 @@
 </template>
 
 <script setup>
+import { notifyError } from "@/errors";
 import EntityAvatar from "@/components/common/EntityAvatar.vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
@@ -208,7 +209,7 @@ async function loadOrganizations() {
     }
   } catch (err) {
     console.error("Failed to load organizations:", err);
-    ElMessage.error("Failed to load organizations");
+    notifyError(err, { fallback: "Failed to load organizations" });
   } finally {
     loading.value = false;
   }

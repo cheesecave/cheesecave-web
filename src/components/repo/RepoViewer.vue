@@ -47,12 +47,15 @@
       </el-icon>
     </div>
 
-    <div v-else-if="error" class="text-center py-20">
-      <div class="i-carbon-warning text-6xl text-red-500 mb-4" />
-      <h2 class="text-2xl font-bold mb-2">Repository Not Found</h2>
-      <p class="text-gray-600 mb-4">{{ error }}</p>
-      <el-button @click="$router.back()">Go Back</el-button>
-    </div>
+    <ErrorState
+      v-else-if="error"
+      :error="error"
+      :context="errorContext('repository')"
+      :retry="loadRepoInfo"
+      :retrying="repoInfoResource.retrying.value"
+      :auto-retry-in="repoInfoResource.autoRetryIn.value"
+      @cancel-auto-retry="repoInfoResource.cancelAutoRetry"
+    />
 
     <div
       v-else
@@ -315,8 +318,9 @@
               we just couldn't read it.
             -->
             <ErrorState
-              v-else-if="readmeErrorClassification"
-              :classification="readmeErrorClassification"
+              v-else-if="readmeError"
+              :error="readmeError"
+              :context="errorContext('README')"
               mode="inline-panel"
               :retry="loadReadme"
             />
@@ -376,8 +380,9 @@
             <el-skeleton :rows="6" animated />
           </div>
           <ErrorState
-            v-else-if="treeErrorClassification"
-            :classification="treeErrorClassification"
+            v-else-if="treeError"
+            :error="treeError"
+            :context="errorContext('file list')"
             mode="inline-panel"
             :retry="loadFileTree"
           />
@@ -493,15 +498,15 @@
               </p>
             </div>
             <!--
-              Root-tree fetch failed (classified by the axios
-              interceptor → err.classification). Render the shared
+              Root-tree fetch failed (decoded by src/errors). Render the shared
               ErrorState instead of silently showing an empty file
               list — that was the preview-of-gated-repo symptom in
               the linked tracking issue.
             -->
             <ErrorState
-              v-else-if="treeErrorClassification"
-              :classification="treeErrorClassification"
+              v-else-if="treeError"
+              :error="treeError"
+              :context="errorContext('file list')"
               mode="inline-panel"
               :retry="loadFileTree"
             />
@@ -689,6 +694,13 @@
               </p>
             </div>
 
+            <ErrorState
+              v-else-if="commitsError"
+              :error="commitsError"
+              :context="errorContext('commit history')"
+              mode="inline-panel"
+              :retry="loadCommits"
+            />
             <div v-else-if="commits.length > 0" class="space-y-3">
               <div
                 v-for="commit in commits"
@@ -1009,7 +1021,9 @@ import { parseYAMLFrontmatter, normalizeMetadata } from "@/utils/yaml-parser";
 import { parseTags } from "@/utils/tag-parser";
 import { likesAPI, repoAPI, settingsAPI } from "@/utils/api";
 import { getRepositoryOperationCapabilities } from "@/utils/repositoryOperationCapabilities";
-import { classifyError, classifyResponse } from "@/utils/http-errors";
+import { decodeError, hubFetch, notifyError, KIND } from "@/errors";
+import { useErrorContext } from "@/composables/useErrorContext";
+import { useAsyncResource } from "@/composables/useAsyncResource";
 import { resolveRepoTreeEntryPath } from "@/utils/repo-paths";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import MetadataHeader from "@/components/repo/metadata/MetadataHeader.vue";
@@ -1058,8 +1072,6 @@ const router = useRouter();
 const authStore = useAuthStore();
 
 // State
-const loading = ref(true);
-const error = ref(null);
 const repoInfo = ref(null);
 const currentBranch = ref(props.branch);
 const fileTree = ref([]);
@@ -1075,11 +1087,13 @@ const commitUnavailableFiles = ref({});
 const SHOWN_FILES = 20;
 const commitsNextCursor = ref(null);
 const filesLoading = ref(true);
-// Classified tree / readme errors (utils/http-errors.js shape). A
-// 4xx/5xx fallback failure used to silently render an empty file list
-// or "No README.md found" — now drives the shared <ErrorState> panel.
-const treeErrorClassification = ref(null);
-const readmeErrorClassification = ref(null);
+// Decoded tree / readme / commits errors (AppError). A failure used to
+// render as an empty file list or "No README.md found"; it now drives the
+// shared <ErrorState> panel.
+const errorContext = useErrorContext();
+const treeError = ref(null);
+const readmeError = ref(null);
+const commitsError = ref(null);
 const readmeContent = ref("");
 const readmeLoading = ref(true);
 const readmeMetadata = ref({});
@@ -1480,43 +1494,48 @@ const REPO_PAGE_FIELDS = [
   "storage",
 ];
 
-async function loadRepoInfo() {
-  loading.value = true;
-  error.value = null;
+async function fetchRepoInfo() {
+  const { data } = await repoAPI.getInfo(
+    props.repoType,
+    props.namespace,
+    props.name,
+    REPO_PAGE_FIELDS,
+  );
+  repoInfo.value = data;
+  likesCount.value = data.likes || 0;
 
-  try {
-    const { data } = await repoAPI.getInfo(
-      props.repoType,
-      props.namespace,
-      props.name,
-      REPO_PAGE_FIELDS,
-    );
-    repoInfo.value = data;
-    likesCount.value = data.likes || 0;
+  // Check if namespace is an org (for correct linking)
+  checkIfNamespaceIsOrg();
 
-    // Check if namespace is an org (for correct linking)
-    checkIfNamespaceIsOrg();
-
-    // Check if current user has liked (only if authenticated)
-    if (authStore.isAuthenticated) {
-      try {
-        const { data: likeData } = await likesAPI.checkLiked(
-          props.repoType,
-          props.namespace,
-          props.name,
-        );
-        isLiked.value = likeData.liked;
-      } catch (err) {
-        console.error("Failed to check liked status:", err);
-      }
+  // Check if current user has liked (only if authenticated)
+  if (authStore.isAuthenticated) {
+    try {
+      const { data: likeData } = await likesAPI.checkLiked(
+        props.repoType,
+        props.namespace,
+        props.name,
+      );
+      isLiked.value = likeData.liked;
+    } catch (err) {
+      console.error("Failed to check liked status:", err);
     }
-  } catch (err) {
-    error.value = err.response?.data?.detail || "Failed to load repository";
-    console.error("Failed to load repo info:", err);
-  } finally {
-    loading.value = false;
   }
+  return data;
 }
+
+// A transient failure (network, 5xx, 429) is retried by itself, with a
+// countdown the user can cancel; anything else waits for the Retry button.
+const repoInfoResource = useAsyncResource(fetchRepoInfo, {
+  immediate: false,
+  autoRetry: { max: 2 },
+});
+const loading = computed(() =>
+  ["idle", "loading"].includes(repoInfoResource.status.value),
+);
+const error = computed(() =>
+  repoInfoResource.failed.value ? repoInfoResource.error.value : null,
+);
+const loadRepoInfo = () => repoInfoResource.reload();
 
 async function toggleLike() {
   if (!authStore.isAuthenticated) {
@@ -1552,9 +1571,7 @@ async function toggleLike() {
     }
   } catch (err) {
     console.error("Failed to toggle like:", err);
-    const errorMsg =
-      err.response?.data?.detail?.error || "Failed to update like status";
-    ElMessage.error(errorMsg);
+    notifyError(err, { fallback: "Failed to update like status" });
   } finally {
     likingInProgress.value = false;
   }
@@ -1642,7 +1659,7 @@ async function fetchFileTree({ resetPagination = true } = {}, context) {
     fileListNextCursor.value = null;
   }
   filesLoading.value = true;
-  treeErrorClassification.value = null;
+  treeError.value = null;
   const requestId = fileTreeRequestId.value + 1;
   fileTreeRequestId.value = requestId;
 
@@ -1681,10 +1698,7 @@ async function fetchFileTree({ resetPagination = true } = {}, context) {
       fileTreeContext = context;
       fileTree.value = [];
       fileListNextCursor.value = null;
-      // Axios interceptor in utils/api.js attaches `.classification`.
-      // Prefer it; fall back to classifying the bare error ourselves
-      // if a future refactor changes the interceptor.
-      treeErrorClassification.value = err?.classification || classifyError(err);
+      treeError.value = decodeError(err);
     }
   } finally {
     if (requestId === fileTreeRequestId.value) {
@@ -1843,7 +1857,7 @@ async function fetchReadme(branch, requestId) {
   const isCurrent = () =>
     requestId === readmeRequestId && branch === currentBranch.value;
   readmeLoading.value = true;
-  readmeErrorClassification.value = null;
+  readmeError.value = null;
   try {
     let readmeFile = fileTree.value.find(
       (f) => f.type === "file" && f.path.toLowerCase().endsWith("readme.md"),
@@ -1866,33 +1880,24 @@ async function fetchReadme(branch, requestId) {
     }
 
     const downloadUrl = `/${props.repoType}s/${props.namespace}/${props.name}/resolve/${branch}/${readmeFile.path}`;
-    const response = await fetch(downloadUrl);
+    // A failure (gated / not found / unavailable) throws a decoded error,
+    // shown by the card tab: "No README.md found" would be wrong, the repo
+    // has one and we just could not read it.
+    const response = await hubFetch(downloadUrl);
+    if (!isCurrent()) return;
+    const rawContent = await response.text();
     if (!isCurrent()) return;
 
-    if (response.ok) {
-      const rawContent = await response.text();
-      if (!isCurrent()) return;
-
-      // Parse YAML frontmatter
-      const { metadata, content } = parseYAMLFrontmatter(rawContent);
-      readmeMetadata.value = normalizeMetadata(metadata);
-      readmeContent.value = content ? content : " "; // Content without frontmatter for display, single space if remainder empty
-    } else {
-      // README fetch failed (gated / not-found / unavailable). Surface
-      // the classification so the card tab shows an actionable
-      // ErrorState instead of the "No README.md found" placeholder,
-      // which would be misleading — the repo has a README, we just
-      // couldn't read it.
-      const classification = await classifyResponse(response);
-      if (!isCurrent()) return;
-      readmeErrorClassification.value = classification;
-      readmeContent.value = "";
-      readmeMetadata.value = {};
-    }
+    // Parse YAML frontmatter
+    const { metadata, content } = parseYAMLFrontmatter(rawContent);
+    readmeMetadata.value = normalizeMetadata(metadata);
+    readmeContent.value = content ? content : " "; // Content without frontmatter for display, single space if remainder empty
   } catch (err) {
     if (!isCurrent()) return;
+    const decoded = decodeError(err);
+    if (decoded.kind === KIND.CANCELLED) return;
     console.error("Failed to load README:", err);
-    readmeErrorClassification.value = err?.classification || classifyError(err);
+    readmeError.value = decoded;
     readmeContent.value = "";
     readmeMetadata.value = {};
   } finally {
@@ -2005,6 +2010,7 @@ async function loadCommits() {
   const branch = currentBranch.value;
   const requestId = ++commitsRequestId;
   commitsLoading.value = true;
+  commitsError.value = null;
   commitOperationVerdicts.value = {};
   try {
     const { data } = await repoAPI.listCommits(
@@ -2027,6 +2033,7 @@ async function loadCommits() {
       return;
     console.error("Failed to load commits:", err);
     commits.value = [];
+    commitsError.value = decodeError(err);
   } finally {
     if (requestId === commitsRequestId && branch === currentBranch.value) {
       commitsBranch = branch;
@@ -2059,6 +2066,7 @@ async function loadMoreCommits() {
     commitsNextCursor.value = data.nextCursor || null;
   } catch (err) {
     console.error("Failed to load more commits:", err);
+    notifyError(err, { fallback: "Failed to load more commits" });
   } finally {
     if (requestId === commitsRequestId && branch === currentBranch.value) {
       commitsLoading.value = false;
@@ -2123,11 +2131,7 @@ async function createReadme() {
     await loadReadme();
   } catch (err) {
     console.error("Failed to create README:", err);
-    console.error("Error response:", err.response);
-    console.error("Error data:", err.response?.data);
-    const errorMsg =
-      err.response?.data?.detail?.error || "Failed to create README.md";
-    ElMessage.error(errorMsg);
+    notifyError(err, { fallback: "Failed to create README.md" });
   }
 }
 
@@ -2217,9 +2221,7 @@ async function deleteFolder() {
     }
   } catch (err) {
     console.error("Failed to delete folder:", err);
-    const errorMsg =
-      err.response?.data?.detail?.error || "Failed to delete folder";
-    ElMessage.error(errorMsg);
+    notifyError(err, { fallback: "Failed to delete folder" });
   } finally {
     deletingFolder.value = false;
   }

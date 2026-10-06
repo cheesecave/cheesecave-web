@@ -8,14 +8,12 @@
       </div>
 
       <!-- Error State -->
-      <div v-else-if="error" class="card text-center py-12">
-        <div class="i-carbon-warning text-6xl text-red-500 mb-4 inline-block" />
-        <h2 class="text-2xl font-bold text-red-600 mb-2">Invalid Invitation</h2>
-        <p class="text-gray-600 dark:text-gray-400 mb-4">{{ error }}</p>
-        <el-button type="primary" @click="$router.push('/')">
-          Go to Home
-        </el-button>
-      </div>
+      <ErrorState
+        v-else-if="error"
+        :error="error"
+        :context="errorContext('invitation')"
+        :retry="loadInvitation"
+      />
 
       <!-- Invitation Details -->
       <div v-else-if="invitation" class="card">
@@ -164,6 +162,9 @@ import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { invitationAPI } from "@/utils/api";
 import { ElMessage } from "element-plus";
+import ErrorState from "@/components/common/ErrorState.vue";
+import { KIND, decodeError, notifyError } from "@/errors";
+import { useErrorContext } from "@/composables/useErrorContext";
 import dayjs from "dayjs";
 
 const route = useRoute();
@@ -174,6 +175,7 @@ const loading = ref(true);
 const accepting = ref(false);
 const invitation = ref(null);
 const error = ref(null);
+const errorContext = useErrorContext();
 
 function formatDate(date) {
   return dayjs(date).format("MMM D, YYYY [at] h:mm A");
@@ -228,12 +230,8 @@ async function loadInvitation() {
     invitation.value = data;
   } catch (err) {
     console.error("Failed to load invitation:", err);
-    if (err.response?.status === 404) {
-      error.value =
-        "Invitation not found. It may have been deleted or is invalid.";
-    } else {
-      error.value = "Failed to load invitation details.";
-    }
+    const decoded = decodeError(err);
+    if (decoded.kind !== KIND.CANCELLED) error.value = decoded;
   } finally {
     loading.value = false;
   }
@@ -256,15 +254,7 @@ async function acceptInvitation() {
     }, 1500);
   } catch (err) {
     console.error("Failed to accept invitation:", err);
-    const detail = err.response?.data?.detail;
-
-    if (typeof detail === "string") {
-      ElMessage.error(detail);
-    } else if (detail?.error) {
-      ElMessage.error(detail.error);
-    } else {
-      ElMessage.error("Failed to accept invitation");
-    }
+    notifyError(err, { fallback: "Failed to accept invitation" });
 
     // Reload invitation to get updated status
     await loadInvitation();

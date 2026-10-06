@@ -11,6 +11,13 @@
       </p>
     </div>
 
+    <ErrorState
+      v-else-if="profileError"
+      :error="profileError"
+      :context="errorContext('user')"
+      :retry="load"
+    />
+
     <!-- User Not Found -->
     <div v-else-if="userNotFound" class="text-center py-20">
       <div
@@ -375,8 +382,17 @@
             </div>
           </section>
 
+          <!-- The repositories could not be listed: say so, not "no models" -->
+          <ErrorState
+            v-if="reposError"
+            :error="reposError"
+            :context="errorContext('repositories')"
+            mode="inline-panel"
+            :retry="reloadRepos"
+          />
+
           <!-- Models Section -->
-          <section class="mb-8">
+          <section v-if="!reposError" class="mb-8">
             <div
               class="flex items-center justify-between gap-3 flex-wrap mb-4 pb-3 border-b-2 border-blue-500"
             >
@@ -499,7 +515,7 @@
           </section>
 
           <!-- Datasets Section -->
-          <section class="mb-8">
+          <section v-if="!reposError" class="mb-8">
             <div
               class="flex items-center justify-between gap-3 flex-wrap mb-4 pb-3 border-b-2 border-green-500"
             >
@@ -624,7 +640,7 @@
           </section>
 
           <!-- Spaces Section -->
-          <section>
+          <section v-if="!reposError">
             <div
               class="flex items-center justify-between gap-3 flex-wrap mb-4 pb-3 border-b-2 border-purple-500"
             >
@@ -765,6 +781,9 @@ import {
   setRepoSortPreference,
 } from "@/utils/repoSortPreference";
 import axios from "axios";
+import ErrorState from "@/components/common/ErrorState.vue";
+import { KIND, decodeError } from "@/errors";
+import { useErrorContext } from "@/composables/useErrorContext";
 
 const route = useRoute();
 const router = useRouter();
@@ -776,6 +795,10 @@ const profileInfo = ref(null);
 const repos = ref({ models: [], datasets: [], spaces: [] });
 const userCard = ref("");
 const userNotFound = ref(false);
+// Why the profile / the repository lists could not be loaded (AppError)
+const errorContext = useErrorContext();
+const profileError = ref(null);
+const reposError = ref(null);
 const quotaInfo = ref(null);
 const selectedSorts = reactive({
   model: getRepoSortPreference({
@@ -968,13 +991,17 @@ async function checkUserExists() {
       userNotFound.value = true;
       return false;
     }
-    // Other errors - continue anyway
+    // Anything else (network, server): do not guess, say what happened
     console.error("Failed to check user existence:", err);
-    return true;
+    const decoded = decodeError(err);
+    if (decoded.kind === KIND.CANCELLED) return true;
+    profileError.value = decoded;
+    return false;
   }
 }
 
 async function loadUserData() {
+  reposError.value = null;
   try {
     const [models, datasets, spaces] = await Promise.all([
       loadRepoType("model"),
@@ -989,9 +1016,11 @@ async function loadUserData() {
     };
     return true;
   } catch (err) {
-    // Even if repos fail to load, if user exists we show empty state
+    // The user exists, so the lists are not "empty": show why they failed
     console.error("Failed to load user repos:", err);
     repos.value = { models: [], datasets: [], spaces: [] };
+    const decoded = decodeError(err);
+    if (decoded.kind !== KIND.CANCELLED) reposError.value = decoded;
     return true;
   }
 }
@@ -1075,9 +1104,20 @@ async function loadQuotaInfo() {
   }
 }
 
-onMounted(async () => {
+async function reloadRepos() {
+  loading.value = true;
+  try {
+    await loadUserData();
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function load() {
   try {
     loading.value = true;
+    profileError.value = null;
+    userNotFound.value = false;
 
     // Check if this is actually an organization
     const isOrg = await checkIfOrganization();
@@ -1101,5 +1141,7 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
-});
+}
+
+onMounted(load);
 </script>

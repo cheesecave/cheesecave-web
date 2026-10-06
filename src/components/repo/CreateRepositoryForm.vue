@@ -121,7 +121,7 @@ import { repoAPI, orgAPI } from "@/utils/api";
 import { useAuthStore } from "@/stores/auth";
 import { ElMessage } from "element-plus";
 import { createRepositoryNameRules } from "@/utils/repo-creation";
-import { getApiErrorMessage } from "@/utils/api-error";
+import { notifyError } from "@/errors";
 import { REPOSITORY_TYPES, isRepositoryType } from "@/utils/repository-types";
 const props = defineProps({
   fixedType: String,
@@ -228,9 +228,7 @@ async function handleSubmit() {
       router.push(`/${payload.type}s/${repoId}`);
     } catch (error) {
       if (!disposed && sequence === createSequence)
-        ElMessage.error(
-          getApiErrorMessage(error, `Failed to create ${payload.type}`),
-        );
+        notifyError(error, { fallback: `Failed to create ${payload.type}` });
     } finally {
       if (!disposed && sequence === createSequence) creating.value = false;
     }

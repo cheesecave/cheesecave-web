@@ -69,6 +69,7 @@
 </template>
 
 <script setup>
+import { notifyError } from "@/errors";
 import { useAuthStore } from "@/stores/auth";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
@@ -123,7 +124,7 @@ async function handleSubmit() {
         router.push("/");
       }
     } catch (err) {
-      ElMessage.error(err.response?.data?.detail || "Login failed");
+      notifyError(err, { fallback: "Login failed" });
     } finally {
       loading.value = false;
     }
