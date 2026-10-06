@@ -76,6 +76,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build production assets
         run: pnpm build
+      - name: Check button backgrounds in the built stylesheets
+        run: node scripts/check-button-cascade.mjs dist
 
   docker:
     name: Container build

@@ -73,6 +73,7 @@ export default defineConfig({
       reporter: ["text", "text-summary", "cobertura"],
       reportsDirectory: "coverage",
       include: [
+        "scripts/check-button-cascade.mjs",
         "src/App.vue",
         "src/stores/auth.js",
         "src/stores/theme.js",
