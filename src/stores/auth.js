@@ -6,6 +6,7 @@ import { KIND, decodeError } from "@/errors";
 
 // One check of the session is enough for a burst of refused requests
 const SESSION_CHECK_WINDOW_MS = 30_000;
+const INCONCLUSIVE_RECHECK_MS = 5_000;
 
 // 401 is the only answer that means "you are not signed in"; a server that
 // is down or slow says nothing about it
@@ -215,6 +216,11 @@ export const useAuthStore = defineStore("auth", {
         await settingsAPI.whoamiV2();
       } catch (err) {
         if (signedOut(err)) this.expireSession();
+        // could not tell (network, 5xx): look again soon, not in 30 s, or a
+        // session that really ended in that window would go unnoticed
+        else
+          this.lastSessionCheck =
+            Date.now() - SESSION_CHECK_WINDOW_MS + INCONCLUSIVE_RECHECK_MS;
       } finally {
         this.checkingSession = false;
       }

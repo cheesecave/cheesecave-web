@@ -1,4 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
+import { KeepAlive, h, ref } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -176,6 +177,77 @@ describe("RepoViewer failure states", () => {
     await settle();
     expect(unknown.vm.isLiked).toBe(false);
     expect(unknown.find('[data-testid="error-state"]').exists()).toBe(false);
+  });
+
+  it("does not let an answer that arrives after a newer request write behind it", async () => {
+    let calls = 0;
+    server.use(
+      http.get(BASE, async () => {
+        const mine = ++calls;
+        if (mine === 1)
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        return jsonResponse({ ...info(), likes: mine === 1 ? 3 : 7 });
+      }),
+    );
+    const wrapper = mountViewer();
+    await flushPromises();
+    await wrapper.vm.loadRepoInfo(); // supersedes the slow first one
+    expect(wrapper.vm.likesCount).toBe(7);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await settle();
+    expect(wrapper.vm.likesCount).toBe(7);
+  });
+
+  it("stops retrying while it is hidden by keep-alive, and checks again when shown", async () => {
+    let calls = 0;
+    server.use(
+      http.get(BASE, () => {
+        calls += 1;
+        return new HttpResponse("oops", { status: 503 });
+      }),
+    );
+    const shown = ref(true);
+    const host = mount({
+      render: () =>
+        h(KeepAlive, null, () =>
+          shown.value
+            ? h(RepoViewer, {
+                repoType: "dataset",
+                namespace: "open-media-lab",
+                name: "big-repo",
+                branch: "main",
+                currentPath: "",
+                tab: "files",
+              })
+            : h("div", "elsewhere"),
+        ),
+      global: {
+        stubs: {
+          ...ElementPlusStubs,
+          ElTooltip: true,
+          ElTable: true,
+          ElTableColumn: true,
+          RouterLink: RouterLinkStub,
+          MarkdownViewer: true,
+          MetadataHeader: true,
+          DetailedMetadataPanel: true,
+          ReferencedDatasetsCard: true,
+          SidebarRelationshipsCard: true,
+          DatasetViewer: true,
+          DatasetViewerTab: true,
+        },
+      },
+    });
+    mounted.push(host);
+    await settle();
+    expect(calls).toBe(1);
+    shown.value = false; // hidden, still alive in the cache
+    await settle();
+    await new Promise((resolve) => setTimeout(resolve, 1300));
+    expect(calls).toBe(1); // its countdown did not fire in the background
+    shown.value = true;
+    await settle();
+    expect(calls).toBe(2); // shown again: it asks again
   });
 
   it("tells a dropped connection from a missing repository", async () => {

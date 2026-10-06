@@ -4,6 +4,7 @@ export {
   describeError,
   requestLine,
   retryDelaySeconds,
+  safeReturn,
   signInPath,
 } from "./copy";
 export { hubFetch, probeUrl, downloadMessage } from "./http";

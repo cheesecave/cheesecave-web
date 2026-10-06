@@ -1,5 +1,5 @@
 import { mount } from "@vue/test-utils";
-import { defineComponent, h } from "vue";
+import { defineComponent, h, nextTick, reactive } from "vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import ErrorState from "@/components/common/ErrorState.vue";
@@ -127,6 +127,22 @@ describe("ErrorState", () => {
     );
   });
 
+  it("keeps the sign-in link on the route the page is on now", async () => {
+    const route = reactive({ fullPath: "/models/a/b" });
+    const w = mount(ErrorState, {
+      props: { error: err(KIND.AUTH_REQUIRED) },
+      global: { stubs, config: { globalProperties: { $route: route } } },
+    });
+    expect(q(w, "error-action-signin").attributes("href")).toBe(
+      "/login?return=%2Fmodels%2Fa%2Fb",
+    );
+    route.fullPath = "/models/a/b/tree/main";
+    await nextTick();
+    expect(q(w, "error-action-signin").attributes("href")).toBe(
+      "/login?return=%2Fmodels%2Fa%2Fb%2Ftree%2Fmain",
+    );
+  });
+
   it("goes back, goes home, opens settings, and reloads", async () => {
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
     const w = mountWith(err(KIND.NOT_FOUND));
@@ -161,6 +177,8 @@ describe("ErrorState", () => {
       autoRetryIn: 3,
     });
     expect(q(w, "error-autoretry").text()).toContain("Retrying in 3 s");
+    // the countdown is not announced every second
+    expect(q(w, "error-autoretry").attributes("aria-live")).toBe("off");
     await q(w, "error-autoretry-cancel").trigger("click");
     expect(w.emitted("cancel-auto-retry")).toHaveLength(1);
     expect(

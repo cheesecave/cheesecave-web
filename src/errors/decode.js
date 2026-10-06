@@ -28,12 +28,15 @@ const CODE_KIND = {
 };
 
 const PASCAL_CASE = /^[A-Z][A-Za-z0-9]+$/;
+// a wrong login. "Invalid user token" is NOT here: that is what the backend
+// says to an expired or missing session, which means "sign in"
 const BAD_CREDENTIALS =
-  /invalid (token|credentials?|username|password)|incorrect|wrong (password|username)/i;
-const LOGIN_NEEDED = /authenticat|log ?in|sign ?in/i;
+  /invalid (credentials?|username|password)|incorrect|wrong (password|username)/i;
+const LOGIN_NEEDED =
+  /not authenticated|authentication (is )?required|(log|sign) ?in (is )?required|(log|sign) ?in to |must (be )?(logged|signed) in/i;
 const ALREADY_THERE =
   /already (exists?|in use|taken|registered)|is taken|duplicate/i;
-const TOO_BIG = /too (large|big)|exceed|quota|at most|maximum/i;
+const TOO_BIG = /too (large|big)|exceeds?|quota|max(imum)? (file )?size/i;
 const FETCH_FAILED =
   /failed to fetch|networkerror|load failed|network request failed/i;
 const LOCATION_PREFIXES = new Set([
@@ -160,6 +163,14 @@ function kindByStatus(status, message, html) {
   return KIND.REJECTED;
 }
 
+/** `Retry-After` is a number of seconds or an HTTP date; milliseconds, or null. */
+function retryAfterMs(value) {
+  if (!value) return null;
+  if (/^\d+$/.test(value)) return Number(value) * 1000;
+  const at = Date.parse(value);
+  return Number.isNaN(at) ? null : Math.max(0, at - Date.now());
+}
+
 const offline = () =>
   typeof navigator !== "undefined" && navigator.onLine === false;
 
@@ -202,9 +213,7 @@ export function decodeResponse({ status, headers, body }, cause = null) {
     serverMessage,
     fields,
     requestId: header(headers, "x-request-id") || null,
-    retryAfter: /^\d+$/.test(retryHeader || "")
-      ? Number(retryHeader) * 1000
-      : null,
+    retryAfter: retryAfterMs(retryHeader),
     sources: object && Array.isArray(object.sources) ? object.sources : null,
     cause,
   });

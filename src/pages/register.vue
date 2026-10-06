@@ -98,7 +98,7 @@
 </template>
 
 <script setup>
-import { notifyError } from "@/errors";
+import { notifyError, safeReturn } from "@/errors";
 import { useAuthStore } from "@/stores/auth";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
@@ -183,7 +183,7 @@ async function handleSubmit() {
         // Redirect based on context
         const returnUrl = route.query.return;
         if (returnUrl) {
-          router.push(decodeURIComponent(returnUrl));
+          router.push(safeReturn(returnUrl));
         } else if (invitationToken.value) {
           // If registered with invitation, redirect to home
           router.push("/");

@@ -5,6 +5,7 @@ import {
   describeError,
   requestLine,
   retryDelaySeconds,
+  safeReturn,
   signInPath,
 } from "@/errors/copy";
 
@@ -230,6 +231,26 @@ describe("helpers", () => {
     expect(signInPath("")).toBe("/login");
     expect(signInPath("/login")).toBe("/login");
     expect(signInPath(undefined)).toBe("/login");
+    expect(signInPath("/\\evil.example")).toBe("/login");
+    expect(signInPath("/ok\u0009//evil")).toBe("/login");
+  });
+
+  it("returns only to this site after signing in, never to another origin", () => {
+    expect(safeReturn("/datasets/a/b?tab=files")).toBe(
+      "/datasets/a/b?tab=files",
+    );
+    expect(safeReturn(["/first", "/second"])).toBe("/first");
+    for (const hostile of [
+      "//evil.example",
+      "/\\evil.example",
+      "https://evil.example",
+      "javascript:alert(1)",
+      "/a\u0000b",
+      "",
+      undefined,
+      null,
+    ])
+      expect(safeReturn(hostile)).toBe("/");
   });
 
   it("writes the line to quote to whoever runs the server", () => {

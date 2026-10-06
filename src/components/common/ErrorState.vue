@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed } from "vue";
+import { computed, getCurrentInstance } from "vue";
 import { KIND, decodeError } from "@/errors";
 import { describeError, requestLine, signInPath } from "@/errors/copy";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -75,8 +75,15 @@ const titleSize = computed(() =>
 const actions = computed(() =>
   described.value.actions.filter((a) => a !== "retry" || props.retry),
 );
+// Where Sign in comes back to: the route as it is now (it changes while a
+// cached page stays mounted), or the address bar when there is no router.
+// `$route` is the router's own reactive property; reading it needs no import.
+const instance = getCurrentInstance();
 const signInTo = computed(() =>
-  signInPath(`${window.location.pathname}${window.location.search}`),
+  signInPath(
+    instance?.appContext.config.globalProperties.$route?.fullPath ??
+      `${window.location.pathname}${window.location.search}`,
+  ),
 );
 
 const quote = computed(() => requestLine(appError.value));
@@ -130,6 +137,7 @@ const reload = () => window.location.reload();
     <p
       v-if="autoRetryIn !== null"
       class="mt-3 text-xs text-gray-500 dark:text-gray-400"
+      aria-live="off"
       data-testid="error-autoretry"
     >
       Retrying in {{ autoRetryIn }} s…

@@ -68,11 +68,13 @@ export async function hubFetch(
  */
 export async function probeUrl(url) {
   try {
-    await hubFetch(url, {
+    const response = await hubFetch(url, {
       method: "GET",
       headers: { Range: "bytes=0-0" },
       redirect: "follow",
     });
+    // a host that ignores Range would stream the whole file: take no more
+    response.body?.cancel().catch(() => {}); // not awaited: there is nothing to wait for
     return { ok: true, error: null };
   } catch (error) {
     return { ok: false, error };

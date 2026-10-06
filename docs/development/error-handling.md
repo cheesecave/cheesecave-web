@@ -101,7 +101,7 @@ as an `AppError`.
   repository public).
 - **A failed list is not an empty list.** Say why it failed; do not show "no models".
 - **Only a 401 signs out.** A network failure or a 5xx while checking the session keeps
-  the sign-in and shows a "could not be verified, Retry" banner.
+  the sign-in and shows a "we couldn't check whether you're signed in, Retry" banner.
 - Do not read `err.response.data.detail` by hand: `test/errors/test_architecture.test.js`
   fails if a page does.
 

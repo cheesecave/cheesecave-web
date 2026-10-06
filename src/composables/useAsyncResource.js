@@ -10,6 +10,7 @@ import {
 import { AppError, KIND, decodeError } from "@/errors";
 
 const DEFAULT_TIMEOUT_MS = 30000;
+const MAX_AUTO_WAIT_MS = 60000;
 
 /**
  * One load that can fail: idle | loading | ready | empty | failed.
@@ -53,7 +54,10 @@ export function useAsyncResource(fetcher, options = {}) {
   }
 
   function scheduleRetry(err) {
+    // a wait the server asked for that is longer than a minute is for the
+    // user to decide: the page says how long, and does not count it down
     if (!err.retriable || retries >= maxRetries) return;
+    if (err.retryAfter > MAX_AUTO_WAIT_MS) return;
     retries += 1;
     // what the server asked for, else 1 s, 2 s, 4 s ... (at most 8 s)
     autoRetryIn.value =
@@ -112,6 +116,16 @@ export function useAsyncResource(fetcher, options = {}) {
     requestId += 1;
     cancelAutoRetry();
     retrying.value = false;
+    // what was in flight will never answer: go back to what is known
+    if (status.value === "loading") {
+      status.value = error.value
+        ? "failed"
+        : data.value === null
+          ? "idle"
+          : isEmpty(data.value)
+            ? "empty"
+            : "ready";
+    }
   }
 
   if (sources.length) watch(sources, () => load());

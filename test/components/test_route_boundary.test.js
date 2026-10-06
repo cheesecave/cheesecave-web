@@ -37,6 +37,33 @@ describe("RouteBoundary", () => {
     expect(wrapper.get('[data-testid="boundary-error"]').text()).toBe("bug");
   });
 
+  it("leaves the page alone when only an event handler throws, and passes the error on", async () => {
+    const reported = [];
+    const Clicky = defineComponent({
+      setup: () => () =>
+        h(
+          "button",
+          {
+            onClick: () => {
+              throw new Error("handler failed");
+            },
+          },
+          "go",
+        ),
+    });
+    const wrapper = mount(RouteBoundary, {
+      slots: { default: () => h(Clicky) },
+      global: {
+        stubs: { ErrorState: ErrorStateStub },
+        config: { errorHandler: (err) => reported.push(err.message) },
+      },
+    });
+    await wrapper.get("button").trigger("click");
+    expect(wrapper.find('[data-testid="boundary-error"]').exists()).toBe(false);
+    expect(wrapper.text()).toBe("go");
+    expect(reported).toEqual(["handler failed"]);
+  });
+
   it("clears the failure when the route changes", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const page = shallowRef(Boom);

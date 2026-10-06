@@ -168,6 +168,21 @@ describe("probeUrl and downloadMessage", () => {
     expect(fetchMock.mock.calls[0][1].headers.Range).toBe("bytes=0-0");
   });
 
+  it("does not read on after the answer: a host that ignores Range would send the whole file", async () => {
+    const cancel = vi.fn(async () => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        body: { cancel },
+      })),
+    );
+    expect((await probeUrl("/f")).ok).toBe(true);
+    expect(cancel).toHaveBeenCalled();
+  });
+
   it("returns the error for an unreachable one instead of throwing", async () => {
     vi.stubGlobal(
       "fetch",

@@ -32,7 +32,7 @@ const signIn = computed(() => signInPath(route.fullPath));
       >
     </template>
     <template v-else>
-      <span>Your sign-in could not be verified right now.</span>
+      <span>We couldn't check whether you're signed in right now.</span>
       <button
         type="button"
         class="underline font-medium"

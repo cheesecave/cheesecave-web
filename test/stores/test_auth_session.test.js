@@ -135,6 +135,21 @@ describe("a session that expires while the page is open", () => {
     expect(store.user.username).toBe("owner");
   });
 
+  it("looks again soon, not after the whole window, when the check could not be made", async () => {
+    const store = await signedIn();
+    serve({ status: 500, body: {} });
+    await store.handleAuthRequired(authRequired);
+    expect(whoami.calls).toBe(1);
+    await store.handleAuthRequired(authRequired); // right away: not again yet
+    expect(whoami.calls).toBe(1);
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 6_000);
+    serve({ status: 401, body: { detail: "Invalid user token" } }); // resets the count
+    await store.handleAuthRequired(authRequired);
+    expect(whoami.calls).toBe(1);
+    expect(store.sessionExpired).toBe(true);
+  });
+
   it("is not assumed when the check says the session is fine", async () => {
     const store = await signedIn();
     serve();

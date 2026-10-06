@@ -13,7 +13,14 @@ import ErrorState from "@/components/common/ErrorState.vue";
 const props = defineProps({ routeKey: { type: String, default: "" } });
 const failure = ref(null);
 
-onErrorCaptured((err) => {
+// A page that cannot render or set itself up has nothing to show. An error in
+// an event handler, a watcher or a hook does not: the page and what the user
+// typed stay, and the error goes on to the app-level handler (a toast).
+// (In a production build `info` is a link ending in the error's code.)
+const CANNOT_RENDER = /render function|setup function|#runtime-[01]$/;
+
+onErrorCaptured((err, _instance, info) => {
+  if (!CANNOT_RENDER.test(String(info))) return true;
   console.error(err);
   failure.value = new AppError({ kind: KIND.BUG, cause: err });
   return false;

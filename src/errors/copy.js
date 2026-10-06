@@ -31,16 +31,37 @@ export function retryDelaySeconds(error) {
   return error.retryAfter > 0 ? Math.ceil(error.retryAfter / 1000) : 5;
 }
 
-/** The sign-in page, coming back to `path` afterwards. Only a local path is kept. */
-export function signInPath(path) {
+/**
+ * `path` if it stays on this site, else null. Another origin can be spelled
+ * "//host", "/\\host" (browsers read the backslash as a slash) or with a
+ * control character in front, so all of those are refused.
+ */
+function localPath(path) {
   if (
     typeof path !== "string" ||
     !path.startsWith("/") ||
     path.startsWith("//") ||
-    path.startsWith("/login")
+    path.includes("\\") ||
+    /[\u0000-\u001f]/.test(path)
   )
-    return "/login";
-  return `/login?return=${encodeURIComponent(path)}`;
+    return null;
+  return path;
+}
+
+/** The sign-in page, coming back to `path` afterwards. Only a local path is kept. */
+export function signInPath(path) {
+  const local = localPath(path);
+  if (!local || local.startsWith("/login")) return "/login";
+  return `/login?return=${encodeURIComponent(local)}`;
+}
+
+/**
+ * Where to go after signing in: the `?return=` query (already decoded once by
+ * the router) if it is a path on this site, else the home page. Never an
+ * address on another origin.
+ */
+export function safeReturn(raw) {
+  return localPath(Array.isArray(raw) ? raw[0] : raw) ?? "/";
 }
 
 /** "HTTP 500 · ServerError · request abc": the line to quote when reporting it. */

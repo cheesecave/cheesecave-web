@@ -1494,20 +1494,16 @@ const REPO_PAGE_FIELDS = [
   "storage",
 ];
 
-async function fetchRepoInfo() {
+async function fetchRepoInfo({ signal }) {
   const { data } = await repoAPI.getInfo(
     props.repoType,
     props.namespace,
     props.name,
     REPO_PAGE_FIELDS,
   );
-  repoInfo.value = data;
-  likesCount.value = data.likes || 0;
-
-  // Check if namespace is an org (for correct linking)
-  checkIfNamespaceIsOrg();
 
   // Check if current user has liked (only if authenticated)
+  let liked = null;
   if (authStore.isAuthenticated) {
     try {
       const { data: likeData } = await likesAPI.checkLiked(
@@ -1515,11 +1511,22 @@ async function fetchRepoInfo() {
         props.namespace,
         props.name,
       );
-      isLiked.value = likeData.liked;
+      liked = likeData.liked;
     } catch (err) {
       console.error("Failed to check liked status:", err);
     }
   }
+
+  // Timed out or superseded while waiting: the screen has moved on, so an
+  // answer that arrives now must not write behind it.
+  if (signal.aborted) throw new DOMException("superseded", "AbortError");
+
+  repoInfo.value = data;
+  likesCount.value = data.likes || 0;
+  if (liked !== null) isLiked.value = liked;
+
+  // Check if namespace is an org (for correct linking)
+  checkIfNamespaceIsOrg();
   return data;
 }
 
@@ -1536,6 +1543,19 @@ const error = computed(() =>
   repoInfoResource.failed.value ? repoInfoResource.error.value : null,
 );
 const loadRepoInfo = () => repoInfoResource.reload();
+
+// A cached (keep-alive) page that is hidden does not keep retrying in the
+// background; it checks again when it is shown, if it never got its answer.
+let wasHidden = false;
+onDeactivated(() => {
+  wasHidden = true;
+  repoInfoResource.stop();
+});
+onActivated(() => {
+  if (!wasHidden) return;
+  wasHidden = false;
+  if (!repoInfoResource.ready.value) repoInfoResource.reload();
+});
 
 async function toggleLike() {
   if (!authStore.isAuthenticated) {

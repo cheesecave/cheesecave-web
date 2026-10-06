@@ -46,7 +46,7 @@ describe("SessionBanner", () => {
     auth.verifyError = new Error("down");
     auth.retryVerify = vi.fn(async () => {});
     const wrapper = mountBanner();
-    expect(wrapper.text()).toContain("could not be verified");
+    expect(wrapper.text()).toContain("couldn't check whether you're signed in");
     await wrapper.get('[data-testid="session-retry"]').trigger("click");
     await flushPromises();
     expect(auth.retryVerify).toHaveBeenCalled();

@@ -134,6 +134,46 @@ describe("useAsyncResource", () => {
     expect(r.error.value.kind).toBe(KIND.TIMEOUT);
   });
 
+  it("goes back to what it knew when stopped mid-load", async () => {
+    let n = 0;
+    const r = make(
+      async () => {
+        n += 1;
+        if (n === 1) return { id: 1 };
+        return new Promise(() => {});
+      },
+      { autoRetry: false },
+    );
+    await flush();
+    r.reload();
+    expect(r.status.value).toBe("loading");
+    r.stop();
+    expect(r.status.value).toBe("ready");
+    expect(r.data.value).toEqual({ id: 1 });
+
+    const fresh = make(() => new Promise(() => {}), { autoRetry: false });
+    fresh.stop();
+    expect(fresh.status.value).toBe("idle");
+    const empty = make(async () => [], { autoRetry: false });
+    await flush();
+    empty.reload();
+    empty.stop();
+    expect(empty.status.value).toBe("empty");
+    let fail = false;
+    const failed = make(
+      async () => {
+        if (fail) return new Promise(() => {});
+        throw failure(404);
+      },
+      { autoRetry: false },
+    );
+    await flush();
+    fail = true;
+    failed.reload();
+    failed.stop();
+    expect(failed.status.value).toBe("failed");
+  });
+
   it("stays quiet about a request it cancelled itself", async () => {
     const r = make(
       (ctx) =>
@@ -220,6 +260,21 @@ describe("useAsyncResource", () => {
       await vi.advanceTimersByTimeAsync(2001);
       await flush();
       expect(n).toBe(2);
+    });
+
+    it("does not count down a wait of more than a minute", async () => {
+      const r = make(async () => {
+        throw failure(429, {
+          response: {
+            status: 429,
+            headers: { "retry-after": "3600" },
+            data: {},
+          },
+        });
+      });
+      await flush();
+      expect(r.status.value).toBe("failed");
+      expect(r.autoRetryIn.value).toBeNull();
     });
 
     it("stops retrying after the allowed attempts", async () => {

@@ -69,7 +69,7 @@
 </template>
 
 <script setup>
-import { notifyError } from "@/errors";
+import { notifyError, safeReturn } from "@/errors";
 import { useAuthStore } from "@/stores/auth";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
@@ -118,12 +118,7 @@ async function handleSubmit() {
       ElMessage.success("Login successful");
 
       // Check for return URL query parameter
-      const returnUrl = route.query.return;
-      if (returnUrl) {
-        router.push(decodeURIComponent(returnUrl));
-      } else {
-        router.push("/");
-      }
+      router.push(safeReturn(route.query.return));
     } catch (err) {
       notifyError(err, { fallback: "Login failed" });
     } finally {

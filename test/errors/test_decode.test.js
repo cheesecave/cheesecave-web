@@ -301,8 +301,16 @@ describe("decodeResponse · headers in the shapes callers have", () => {
     expect(decodeResponse({ status: 401, body: null }).kind).toBe(
       KIND.AUTH_REQUIRED,
     );
+    // what the backend says to an expired or missing session: sign in again
     expect(
-      decodeResponse({ status: 401, body: { detail: "Invalid token" } }).kind,
+      decodeResponse({ status: 401, body: { detail: "Invalid user token" } })
+        .kind,
+    ).toBe(KIND.AUTH_REQUIRED);
+    expect(
+      decodeResponse({
+        status: 401,
+        body: { detail: "Invalid username or password" },
+      }).kind,
     ).toBe(KIND.INVALID_CREDENTIALS);
     expect(
       decodeResponse({ status: 401, body: { detail: "Invalid credentials" } })
@@ -362,16 +370,28 @@ describe("decodeResponse · headers in the shapes callers have", () => {
     expect(e.kind).toBe(KIND.CONFLICT);
   });
 
-  it("reads Retry-After in seconds, and ignores a date or junk", () => {
+  it("reads Retry-After in seconds or as an HTTP date, and ignores junk", () => {
     expect(
       decodeResponse({ status: 429, headers: { "retry-after": "3" } })
         .retryAfter,
     ).toBe(3000);
+    const inThirtySeconds = new Date(Date.now() + 30000).toUTCString();
+    const dated = decodeResponse({
+      status: 429,
+      headers: { "retry-after": inThirtySeconds },
+    }).retryAfter;
+    expect(dated).toBeGreaterThan(27000);
+    expect(dated).toBeLessThanOrEqual(30000);
+    // a date already past is no wait at all
     expect(
       decodeResponse({
         status: 429,
         headers: { "retry-after": "Wed, 21 Oct 2015 07:28:00 GMT" },
       }).retryAfter,
+    ).toBe(0);
+    expect(
+      decodeResponse({ status: 429, headers: { "retry-after": "soon" } })
+        .retryAfter,
     ).toBeNull();
     expect(decodeResponse({ status: 429, headers: {} }).retryAfter).toBeNull();
   });
@@ -402,6 +422,26 @@ describe("decodeResponse · headers in the shapes callers have", () => {
 });
 
 describe("decodeError · things that are not HTTP responses", () => {
+  it("does not call a length rule 'too large', nor a stray 'log in' a login request", () => {
+    expect(
+      decodeResponse({
+        status: 400,
+        body: { detail: "Description must be at most 500 characters" },
+      }).kind,
+    ).toBe(KIND.INVALID);
+    expect(
+      decodeResponse({
+        status: 403,
+        body: {
+          detail: "You do not have permission to log in as another user",
+        },
+      }).kind,
+    ).toBe(KIND.FORBIDDEN);
+    expect(
+      decodeResponse({ status: 403, body: { detail: "Login required" } }).kind,
+    ).toBe(KIND.AUTH_REQUIRED);
+  });
+
   it("reads a LakeFS 404 wrapped in a 500 as not found, without showing the internal URL", () => {
     const error = decodeResponse({
       status: 500,
