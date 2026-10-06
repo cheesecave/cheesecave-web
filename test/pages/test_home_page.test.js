@@ -299,6 +299,21 @@ describe("home page", () => {
     expect(wrapper.text()).toContain("Your next idea starts here.");
   });
 
+  it("says so when the repository previews cannot be loaded", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    installHandlers();
+    server.use(
+      http.get("/api/models", () => jsonResponse({}, { status: 503 })),
+    );
+    mountPage();
+    await flushPromises();
+    expect(mocks.elMessage.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining("Failed to load repository previews"),
+      }),
+    );
+  });
+
   it("handles missing users and renders fallback metrics", async () => {
     mocks.route.query = {
       error: "user_not_found",
@@ -373,7 +388,7 @@ describe("home page", () => {
     ).toEqual(["5", "4", "2"]);
   });
 
-  it("ignores unknown query errors and load failures without redirecting", async () => {
+  it("ignores unknown query errors and, on a load failure, reports it without redirecting", async () => {
     mocks.route.query = {
       error: "something_else",
     };
@@ -386,7 +401,7 @@ describe("home page", () => {
     const wrapper = mountPage();
     await flushPromises();
 
-    expect(mocks.elMessage.error).not.toHaveBeenCalled();
+    expect(mocks.elMessage.error).toHaveBeenCalledTimes(1);
     expect(mocks.router.replace).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain("Your next idea starts here.");
   });

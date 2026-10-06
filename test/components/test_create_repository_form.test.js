@@ -105,6 +105,18 @@ describe("shared repository creation form", () => {
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
+  it("says so when the user's organizations cannot be listed", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.getUserOrgs.mockRejectedValueOnce(new Error("down"));
+    mountForm({ initialType: "space" });
+    await flushPromises();
+    expect(mocks.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining("Failed to load your organizations"),
+      }),
+    );
+  });
+
   it("keeps draft text on failure and permits correcting it before retry", async () => {
     mocks.create.mockRejectedValueOnce({
       isAxiosError: true,

@@ -152,6 +152,7 @@ async function loadSiteConfig() {
     }
   } catch (err) {
     console.error("Failed to load site config:", err);
+    notifyError(err, { fallback: "Failed to load site settings" });
   }
 }
 

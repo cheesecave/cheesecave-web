@@ -200,8 +200,10 @@ watch(
       if (!disposed && sequence === organizationSequence)
         loadedOrgs.value = data.organizations || [];
     } catch (error) {
-      if (!disposed && sequence === organizationSequence)
+      if (!disposed && sequence === organizationSequence) {
         console.error("Failed to load organizations:", error);
+        notifyError(error, { fallback: "Failed to load your organizations" });
+      }
     }
   },
   { immediate: true, flush: "sync" },
