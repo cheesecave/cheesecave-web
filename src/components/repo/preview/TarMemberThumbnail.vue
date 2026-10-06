@@ -33,6 +33,9 @@ const props = defineProps({
   // Optional `read(member, size, { signal })`; the zip browser passes its
   // archive reader, indexed tars Range-read from `tarUrl`.
   read: { type: Function, default: null },
+  // Optional `readRange(member, offset, length, { signal })`: the tar panel
+  // can read inside a member, which lets a PSD thumbnail skip its layers.
+  readRange: { type: Function, default: null },
 });
 
 const rootRef = ref(null);
@@ -46,6 +49,7 @@ const { state, thumbUrl } = useTarThumbnail({
   member: props.member,
   rootRef,
   read: props.read,
+  readRange: props.readRange,
 });
 
 // Fixed-size mode (list view) sets explicit width/height in px.

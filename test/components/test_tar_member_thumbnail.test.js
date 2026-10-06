@@ -305,3 +305,25 @@ describe("TarMemberThumbnail · environments without IntersectionObserver", () =
     }
   });
 });
+
+describe("TarMemberThumbnail · readRange", () => {
+  it("passes readRange to the extraction, so a PSD is range-read, not read whole", async () => {
+    const calls = [];
+    const wrapper = mountThumb({
+      member: { name: "art.psd", path: "art.psd", offset: 0, size: 100 },
+      read: async () => {
+        throw new Error("the prefix reader must not be used");
+      },
+      readRange: async (member, offset, length) => {
+        calls.push([member.name, offset, length]);
+        return new Uint8Array(0);
+      },
+    });
+    await flushPromises();
+    FakeIntersectionObserver.instances[0].fire(true);
+    await flushPromises();
+    // the head read is the first thing a PSD does; whatever it gets back, no prefix read happened
+    expect(calls[0]).toEqual(["art.psd", 0, 65536 > 100 ? 100 : 65536]);
+    wrapper.unmount();
+  });
+});

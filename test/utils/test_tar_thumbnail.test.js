@@ -211,7 +211,7 @@ describe("strategy registry", () => {
   it("exposes jpeg-exif first so EXIF probes win before any full read", () => {
     const names = _STRATEGIES.map((s) => s.name);
     expect(names[0]).toBe("jpeg-exif");
-    expect(names).toEqual(["jpeg-exif", "small-image", "medium-image"]);
+    expect(names).toEqual(["jpeg-exif", "small-image", "medium-image", "psd"]);
   });
 
   it("matches members by extension and size buckets", () => {

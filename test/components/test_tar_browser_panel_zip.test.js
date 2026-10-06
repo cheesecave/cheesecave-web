@@ -13,7 +13,14 @@ import { nextTick } from "vue";
 import { http, HttpResponse, passthrough } from "@/testing/msw";
 
 import { ElementPlusStubs } from "../helpers/vue";
+import { buildPsd } from "../helpers/psd-builder";
 import { server } from "../setup/msw-server";
+
+// jsdom has no canvas: the PSD preview's encoder is stood in for
+vi.mock("@/utils/psd-preview", async (importOriginal) => ({
+  ...(await importOriginal()),
+  rgbaToBlob: vi.fn(async () => new Blob(["pixels"], { type: "image/png" })),
+}));
 
 import TarBrowserPanel from "@/components/repo/preview/TarBrowserPanel.vue";
 
@@ -93,7 +100,7 @@ const FilePreviewDialogStub = {
 const thumbnails = [];
 const TarMemberThumbnailStub = {
   name: "TarMemberThumbnail",
-  props: ["tarUrl", "member", "placeholderIcon", "size", "read"],
+  props: ["tarUrl", "member", "placeholderIcon", "size", "read", "readRange"],
   setup(props) {
     thumbnails.push(props);
     return {};
@@ -403,6 +410,42 @@ describe("TarBrowserPanel · zip mode", () => {
     expect(Array.from(await props.read(props.member, 4))).toEqual([
       0x89, 0x50, 0x4e, 0x47,
     ]);
+    wrapper.unmount();
+  });
+
+  it("shows a PSD member as its flattened image, read whole out of the zip", async () => {
+    const psd = buildPsd({ width: 60, height: 40, layerBytes: 5000 });
+    serveRepo({ "art.zip": await makeZip([["art.psd", psd]]) });
+    const wrapper = mountPanel("art.zip");
+    await until(() => expect(rowFor(wrapper, "art.psd")).toBeTruthy());
+    await rowFor(wrapper, "art.psd").trigger("click");
+    await until(() =>
+      expect(wrapper.find('[data-testid="psd-preview-image"]').exists()).toBe(true),
+    );
+    expect(wrapper.text()).toContain("60×40 px");
+    wrapper.unmount();
+  });
+
+  it("explains a zip member that is not a PSD at all", async () => {
+    serveRepo({ "bad.zip": await makeZip([["art.psd", new Uint8Array(100)]]) });
+    const wrapper = mountPanel("bad.zip");
+    await until(() => expect(rowFor(wrapper, "art.psd")).toBeTruthy());
+    await rowFor(wrapper, "art.psd").trigger("click");
+    await until(() =>
+      expect(wrapper.find('[data-testid="psd-preview-error"]').text()).toContain("not a PSD"),
+    );
+    wrapper.unmount();
+  });
+
+  it("hands PSD rows a thumbnail through the zip reader", async () => {
+    const psd = buildPsd({ width: 60, height: 40 });
+    serveRepo({ "art.zip": await makeZip([["art.psd", psd]]) });
+    const wrapper = mountPanel("art.zip");
+    await until(() => expect(thumbnails.length).toBeGreaterThan(0));
+    expect(thumbnails[0].member.name).toBe("art.psd");
+    expect(thumbnails[0].placeholderIcon).toContain("i-carbon-image");
+    // a zip entry has no byte ranges: only the prefix reader is given
+    expect(thumbnails[0].readRange).toBeFalsy();
     wrapper.unmount();
   });
 

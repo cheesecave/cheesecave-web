@@ -20,7 +20,14 @@
 //                        — only the remainder is fetched.
 //                        Bandwidth: size (one-time, with cache reuse).
 //
-// > 5 MB: no strategy matches. Caller must show the placeholder icon.
+//   4. psd             — for .psd members: the embedded thumbnail, else the
+//                        flattened image at the end of the file, read by
+//                        Range and decoded straight into a thumbnail
+//                        (utils/psd-preview). Never downloads more than
+//                        LIST_PREVIEW_MAX_BYTES (32 MB); a zip member, which
+//                        cannot be read by range, is skipped over that size.
+//
+// > 5 MB: no image strategy matches. Caller must show the placeholder icon.
 //
 // Failure semantics: every strategy resolves to either a Blob (the
 // final small thumbnail) or null (didn't apply / didn't find what it
@@ -34,6 +41,13 @@
 
 import { ref, onMounted, onUnmounted } from "vue";
 import { extractMemberBytes } from "@/utils/indexed-tar";
+import {
+  LIST_PREVIEW_MAX_BYTES,
+  createBytesSource,
+  isPsdPath,
+  readPsdPreview,
+  rgbaToBlob,
+} from "@/utils/psd-preview";
 import { IMAGE_EXTENSIONS as IMAGE_TYPES, mediaMime } from "@/utils/media-types";
 
 // -----------------------------------------------------------------------
@@ -68,6 +82,21 @@ export function isImageMember(member) {
   if (dot < 0) return false;
   const ext = member.name.slice(dot + 1).toLowerCase();
   return IMAGE_EXTENSIONS.has(ext);
+}
+
+// A PSD gets a thumbnail too, made from its flattened image
+function isPsdMember(member) {
+  return (
+    !!member &&
+    typeof member.name === "string" &&
+    isPsdPath(member.name) &&
+    member.size > 0
+  );
+}
+
+/** A member the listing can show a thumbnail for: a raster image or a PSD. */
+export function isThumbnailMember(member) {
+  return isImageMember(member) || isPsdMember(member);
 }
 
 export function detectImageMime(bytes) {
@@ -341,7 +370,7 @@ export function _resetThumbnailCache() {
 // -----------------------------------------------------------------------
 
 class ExtractionContext {
-  constructor({ tarUrl, member, signal, read }) {
+  constructor({ tarUrl, member, signal, read, readRange }) {
     this.tarUrl = tarUrl;
     this.member = member;
     this.signal = signal;
@@ -352,6 +381,19 @@ class ExtractionContext {
       read ||
       ((m, size, options) =>
         extractMemberBytes(tarUrl, { offset: m.offset, size }, options));
+    // An indexed tar member can be read from the middle: by the default
+    // reader, or by the `readRange(member, offset, length, { signal })` the
+    // tar panel hands in beside its prefix reader. A custom `read` alone
+    // (the zip browser's) is a prefix of a decompressed entry: no ranges.
+    this.canRange = !!readRange || !read;
+    this.readRange = readRange
+      ? (offset, length) => readRange(member, offset, length, { signal })
+      : (offset, length) =>
+          extractMemberBytes(
+            tarUrl,
+            { offset: member.offset + offset, size: length },
+            { signal },
+          );
     this._head = null;
     this._full = null;
   }
@@ -448,7 +490,49 @@ const mediumImageStrategy = {
   },
 };
 
-const STRATEGIES = [jpegExifStrategy, smallImageStrategy, mediumImageStrategy];
+/**
+ * Strategy 4 — PSD: embedded thumbnail, else the composite image at the end
+ * of the file. A tar member is read by range (head, then only the
+ * composite); a zip member has to be read whole, so it must fit the cap.
+ */
+const psdStrategy = {
+  name: "psd",
+  match: isPsdMember,
+  async extract(ctx) {
+    let source;
+    if (ctx.canRange) {
+      source = { size: ctx.member.size, read: ctx.readRange };
+    } else {
+      if (ctx.member.size > LIST_PREVIEW_MAX_BYTES) return null;
+      source = createBytesSource(await ctx.getFull());
+    }
+    const out = await readPsdPreview(source, {
+      maxSide: THUMB_MAX_DIM,
+      maxBytes: LIST_PREVIEW_MAX_BYTES,
+      signal: ctx.signal,
+    });
+    if (out.kind === "thumbnail") {
+      return new Blob([out.jpeg], { type: "image/jpeg" });
+    }
+    if (out.kind === "composite") {
+      return await rgbaToBlob(
+        out.rgba,
+        out.width,
+        out.height,
+        THUMB_OUTPUT_MIME,
+        THUMB_QUALITY,
+      );
+    }
+    return null; // too large, or a colour mode we cannot decode
+  },
+};
+
+const STRATEGIES = [
+  jpegExifStrategy,
+  smallImageStrategy,
+  mediumImageStrategy,
+  psdStrategy,
+];
 
 export const _STRATEGIES = STRATEGIES; // for unit-testing the registry
 
@@ -515,7 +599,15 @@ function loadImageElement(src) {
 // Orchestrator — runs the strategy chain inside the pool
 // -----------------------------------------------------------------------
 
-export async function extractThumbnail({ tarUrl, member, signal, pool, cache, read }) {
+export async function extractThumbnail({
+  tarUrl,
+  member,
+  signal,
+  pool,
+  cache,
+  read,
+  readRange,
+}) {
   const c = cache || defaultCache;
   const cached = c.get(tarUrl, member);
   if (cached) return cached;
@@ -528,7 +620,13 @@ export async function extractThumbnail({ tarUrl, member, signal, pool, cache, re
       throw err;
     }
 
-    const ctx = new ExtractionContext({ tarUrl, member, signal, read });
+    const ctx = new ExtractionContext({
+      tarUrl,
+      member,
+      signal,
+      read,
+      readRange,
+    });
     let resultBlob = null;
     for (const strategy of STRATEGIES) {
       if (signal?.aborted) {
@@ -627,7 +725,7 @@ export function _resetThumbnailToggle() {
  * if the row scrolls out before extraction completes, and returns
  * reactive `state` + `thumbUrl` refs the template can render against.
  */
-export function useTarThumbnail({ tarUrl, member, rootRef, read }) {
+export function useTarThumbnail({ tarUrl, member, rootRef, read, readRange }) {
   const state = ref("idle"); // idle | loading | ready | fallback
   const thumbUrl = ref(null);
   let observer = null;
@@ -643,7 +741,13 @@ export function useTarThumbnail({ tarUrl, member, rootRef, read }) {
     }
     state.value = "loading";
     controller = new AbortController();
-    extractThumbnail({ tarUrl, member, signal: controller.signal, read })
+    extractThumbnail({
+      tarUrl,
+      member,
+      signal: controller.signal,
+      read,
+      readRange,
+    })
       .then((url) => {
         if (controller && controller.signal.aborted) return;
         if (url) {

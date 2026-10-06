@@ -20,7 +20,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "@/testing/msw";
 
 import { ElementPlusStubs } from "../helpers/vue";
+import { buildPsd } from "../helpers/psd-builder";
 import { server } from "../setup/msw-server";
+
+// jsdom has no canvas: the PSD preview's encoder is stood in for
+vi.mock("@/utils/psd-preview", async (importOriginal) => ({
+  ...(await importOriginal()),
+  rgbaToBlob: vi.fn(async () => new Blob(["pixels"], { type: "image/png" })),
+}));
 
 import TarBrowserPanel from "@/components/repo/preview/TarBrowserPanel.vue";
 
@@ -919,5 +926,86 @@ describe("TarBrowserPanel · thumbnails in tar mode", () => {
     expect(thumb.props("tarUrl")).toBe(TAR_URL);
     const head = await thumb.props("read")(thumb.props("member"), 4);
     expect(Array.from(head)).toEqual([0x89, 0x50, 0x4e, 0x47]);
+  });
+});
+
+describe("TarBrowserPanel · psd members", () => {
+  const psd = buildPsd({ width: 60, height: 40, layerBytes: 200000 });
+  const psdRow = (wrapper) =>
+    wrapper.findAll(".cursor-pointer").find((w) => w.text().startsWith("art.psd"));
+
+  it("shows the member as its flattened image, reading the head and the composite only", async () => {
+    const archive = buildArchive([["art.psd", psd], ["notes.txt", text("hi")]]);
+    serveArchive(archive);
+    const ranges = [];
+    const serve = rangeResponder(archive.buffer);
+    server.use(
+      http.get(TAR_URL, (ctx) => {
+        ranges.push(ctx.request.headers.get("range"));
+        return serve(ctx);
+      }),
+    );
+
+    const wrapper = mountPanel();
+    await flushPromises();
+    await psdRow(wrapper).trigger("click");
+    await flushPromises();
+
+    const img = wrapper.find('[data-testid="psd-preview-image"]');
+    expect(img.exists()).toBe(true);
+    expect(img.attributes("alt")).toBe("art.psd");
+    const sizes = ranges.map((r) => {
+      const [, a, b] = /^bytes=(\d+)-(\d+)$/.exec(r);
+      return Number(b) - Number(a) + 1;
+    });
+    expect(sizes).toHaveLength(2);
+    expect(sizes.reduce((x, y) => x + y)).toBeLessThan(psd.length / 2);
+  });
+
+  it("goes down the PSD route whatever the member's size, not the inline-size screens", async () => {
+    // claims 250 MB: past the inline cap that applies to other binary members
+    const archive = buildArchive([["art.psd", psd]]);
+    archive.files["art.psd"].size = 250 * 1024 * 1024;
+    serveArchive(archive);
+    const wrapper = mountPanel();
+    await flushPromises();
+    await psdRow(wrapper).trigger("click");
+    await flushPromises();
+    expect(wrapper.text()).not.toContain("too large");
+    // the Range read it then makes cannot be satisfied: the preview says so
+    expect(wrapper.find('[data-testid="psd-preview-error"]').exists()).toBe(true);
+  });
+
+  it("gives PSD rows a thumbnail and an image icon, and other rows none", async () => {
+    serveArchive(buildArchive([["art.psd", psd], ["notes.txt", text("hi")]]));
+    localStorage.setItem("kohaku-tar-thumbnail-enabled", "1");
+    const wrapper = mountPanel();
+    await flushPromises();
+    const thumbs = wrapper.findAllComponents({ name: "TarMemberThumbnail" });
+    expect(thumbs).toHaveLength(1);
+    expect(thumbs[0].props("member").name).toBe("art.psd");
+    expect(thumbs[0].props("placeholderIcon")).toContain("i-carbon-image");
+  });
+
+  it("hands PSD rows a range reader in tar mode", async () => {
+    const archive = buildArchive([["pad.bin", new Uint8Array(1000)], ["art.psd", psd]]);
+    serveArchive(archive);
+    localStorage.setItem("kohaku-tar-thumbnail-enabled", "1");
+    const wrapper = mountPanel();
+    await flushPromises();
+    const thumb = wrapper
+      .findAllComponents({ name: "TarMemberThumbnail" })
+      .find((t) => t.props("member").name === "art.psd");
+    const member = thumb.props("member");
+    const slice = await thumb.props("readRange")(member, 26, 8, {});
+    expect(Array.from(slice)).toEqual(Array.from(psd.subarray(26, 34)));
+  });
+
+  it("shows a PSD row with no thumbnail when thumbnails are off", async () => {
+    serveArchive(buildArchive([["art.psd", psd]]));
+    const wrapper = mountPanel();
+    await flushPromises();
+    expect(wrapper.findAllComponents({ name: "TarMemberThumbnail" })).toHaveLength(0);
+    expect(psdRow(wrapper).exists()).toBe(true);
   });
 });

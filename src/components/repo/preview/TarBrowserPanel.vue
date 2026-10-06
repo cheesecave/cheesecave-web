@@ -30,7 +30,7 @@ import {
   downloadBytesAs,
 } from "@/utils/indexed-tar";
 import { classifyError } from "@/utils/http-errors";
-import { useThumbnailToggle, isImageMember } from "@/utils/tar-thumbnail";
+import { useThumbnailToggle, isThumbnailMember } from "@/utils/tar-thumbnail";
 import {
   readViewMode,
   writeViewMode,
@@ -43,6 +43,8 @@ import CodeViewer from "@/components/common/CodeViewer.vue";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import FilePreviewDialog from "@/components/repo/preview/FilePreviewDialog.vue";
 import TarMemberThumbnail from "@/components/repo/preview/TarMemberThumbnail.vue";
+import PsdPreview from "@/components/repo/preview/PsdPreview.vue";
+import { createBytesSource } from "@/utils/psd-preview";
 import { ElMessage } from "element-plus";
 
 const props = defineProps({
@@ -189,6 +191,13 @@ async function startLoad() {
       url: tarUrl,
       read: (node, size, options) =>
         extractMemberBytes(tarUrl, { offset: node.offset, size }, options),
+      // A tar member can be read from the middle (a zip entry cannot)
+      readRange: (node, offset, length, options) =>
+        extractMemberBytes(
+          tarUrl,
+          { offset: node.offset + offset, size: length },
+          options,
+        ),
     };
     tree.value = buildTreeFromIndex(payload.files);
     state.value = "ready";
@@ -378,6 +387,7 @@ function iconForFile(name) {
   // row text against the left edge.
   if (cls === "safetensors") return "i-carbon-data-vis-1 text-blue-500";
   if (cls === "parquet") return "i-carbon-data-table text-orange-500";
+  if (cls === "psd") return "i-carbon-image text-purple-500";
   if (["js", "ts", "jsx", "tsx"].includes(ext))
     return "i-carbon-code text-yellow-500";
   if (ext === "py") return "i-carbon-code text-blue-600";
@@ -414,12 +424,44 @@ async function openMember(node) {
     text: null,
     blobUrl: null,
     bytes: null,
+    psdSource: null,
   };
 
   // Empty members: nothing to render but still allow "download" of an
   // empty file so the action is not silently denied.
   if (node.size === 0) {
     memberView.value.state = "ready";
+    return;
+  }
+
+  // A PSD is shown as its flattened image, whatever its size: a tar member
+  // is read by range (the head and the composite), a zip member, which
+  // cannot be, is read whole and its bytes kept for the Download button.
+  if (cls === "psd") {
+    try {
+      if (props.zip) {
+        const bytes = await memberSource.value.read(node, node.size, {
+          signal: controller.signal,
+        });
+        if (memberAbortController !== controller) return; // superseded
+        memberView.value.bytes = bytes;
+        memberView.value.psdSource = createBytesSource(bytes);
+      } else {
+        const tarUrl = memberSource.value.url;
+        memberView.value.psdSource = {
+          size: node.size,
+          read: (offset, length) =>
+            extractMemberBytes(
+              tarUrl,
+              { offset: node.offset + offset, size: length },
+              { signal: controller.signal },
+            ),
+        };
+      }
+      memberView.value.state = "ready";
+    } catch (err) {
+      failMember(err);
+    }
     return;
   }
 
@@ -472,16 +514,20 @@ async function openMember(node) {
       memberView.value.state = "ready";
     }
   } catch (err) {
-    if (err?.name === "AbortError") return;
-    passwordError.value = "";
-    if (err?.kind === "password" || err?.kind === "unsupported") {
-      memberView.value.state = err.kind;
-      memberView.value.message = err.message;
-      return;
-    }
-    memberView.value.state = "error";
-    memberView.value.error = classifyZipError(err);
+    failMember(err);
   }
+}
+
+function failMember(err) {
+  if (err?.name === "AbortError") return;
+  passwordError.value = "";
+  if (err?.kind === "password" || err?.kind === "unsupported") {
+    memberView.value.state = err.kind;
+    memberView.value.message = err.message;
+    return;
+  }
+  memberView.value.state = "error";
+  memberView.value.error = classifyZipError(err);
 }
 
 async function downloadMember(node) {
@@ -526,7 +572,7 @@ function shouldRenderThumbnail(entry) {
   return (
     thumbnailsEnabled.value &&
     entry.type !== "dir" &&
-    isImageMember(entry)
+    isThumbnailMember(entry)
   );
 }
 
@@ -748,6 +794,12 @@ watch(innerPreviewProps, (val) => {
           </p>
         </div>
 
+        <PsdPreview
+          v-else-if="memberView.state === 'ready' && memberView.cls === 'psd'"
+          :source="memberView.psdSource"
+          :filename="memberView.name"
+        />
+
         <div v-else-if="memberView.state === 'ready' && memberView.cls === 'image'" class="text-center">
           <img
             v-if="!memberView.imageFailed"
@@ -965,6 +1017,7 @@ watch(innerPreviewProps, (val) => {
               v-if="shouldRenderThumbnail(entry)"
               :tar-url="memberSource.url"
               :read="memberSource.read"
+              :read-range="memberSource.readRange"
               :member="entry"
               :placeholder-icon="iconForFile(entry.name)"
               :size="48"
@@ -1020,6 +1073,7 @@ watch(innerPreviewProps, (val) => {
               v-if="shouldRenderThumbnail(entry)"
               :tar-url="memberSource.url"
               :read="memberSource.read"
+              :read-range="memberSource.readRange"
               :member="entry"
               :placeholder-icon="iconForFile(entry.name)"
               class="mb-2"
