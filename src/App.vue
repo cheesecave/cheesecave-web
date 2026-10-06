@@ -4,13 +4,16 @@
     class="app-shell w-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors flex flex-col"
     :class="{ 'workspace-shell': isWorkspaceHome }"
   >
+    <SessionBanner class="shrink-0" />
     <TheHeader class="shrink-0" :expanded="authStore.isAuthenticated" />
     <PageScrollArea>
       <main class="site-main flex-1 min-w-0">
         <RouterView v-slot="{ Component, route }">
-          <keep-alive :include="['RepoViewer']">
-            <component :is="Component" :key="getRouteKey(route)" />
-          </keep-alive>
+          <RouteBoundary :route-key="route.path">
+            <keep-alive :include="['RepoViewer']">
+              <component :is="Component" :key="getRouteKey(route)" />
+            </keep-alive>
+          </RouteBoundary>
         </RouterView>
       </main>
       <TheFooter v-if="!isWorkspaceHome" />
@@ -19,6 +22,8 @@
 </template>
 
 <script setup>
+import RouteBoundary from "@/components/common/RouteBoundary.vue";
+import SessionBanner from "@/components/common/SessionBanner.vue";
 import TheHeader from "@/components/layout/TheHeader.vue";
 import TheFooter from "@/components/layout/TheFooter.vue";
 import PageScrollArea from "@/components/layout/PageScrollArea.vue";
