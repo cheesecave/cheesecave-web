@@ -87,7 +87,7 @@ onBeforeUnmount(() => {
   <div>
     <div v-if="state === 'loading'" class="py-16 flex flex-col items-center">
       <el-icon class="is-loading" :size="32">
-        <div class="i-carbon-loading" />
+        <div class="i-carbon-circle-dash" />
       </el-icon>
       <p class="mt-3 text-sm text-gray-600 dark:text-gray-300">
         Reading the preview from the PSD…

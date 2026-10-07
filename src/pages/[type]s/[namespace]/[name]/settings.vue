@@ -83,7 +83,7 @@
                       </div>
                     </div>
                     <div class="option-icon">
-                      <div class="i-carbon-unlock text-xl" />
+                      <div class="i-carbon-unlocked text-xl" />
                     </div>
                     <div class="option-content">
                       <div class="option-title">Public</div>
@@ -535,7 +535,7 @@
             </div>
             <div v-else class="text-center py-8">
               <el-icon class="is-loading" :size="40">
-                <div class="i-carbon-loading" />
+                <div class="i-carbon-circle-dash" />
               </el-icon>
               <p class="mt-4 text-gray-500 dark:text-gray-400">
                 Loading storage info...

@@ -42,7 +42,7 @@
     <!-- Loading State -->
     <div v-if="loading" class="text-center py-20">
       <el-icon class="is-loading" :size="40">
-        <div class="i-carbon-loading" />
+        <div class="i-carbon-circle-dash" />
       </el-icon>
       <p class="mt-4 text-gray-500 dark:text-gray-400">
         Loading storage information...

@@ -42,7 +42,7 @@
 
     <div v-if="loading" class="text-center py-20">
       <el-icon class="is-loading" :size="40">
-        <div class="i-carbon-loading" />
+        <div class="i-carbon-circle-dash" />
       </el-icon>
     </div>
 

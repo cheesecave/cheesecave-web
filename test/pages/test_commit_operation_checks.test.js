@@ -369,6 +369,38 @@ describe("commit page media diff", () => {
     });
   });
 
+  it("shows an icon in every View File button, not an empty <view> element", async () => {
+    const unreadable = "\u0000".repeat(60);
+    vi.spyOn(axios, "get").mockImplementation((url) =>
+      Promise.resolve({
+        data: url.endsWith("/diff")
+          ? {
+              files: [
+                // LFS file: the "After" summary branch
+                { path: "weights/model.bin", type: "added", is_lfs: true, size_bytes: 10, sha256: "a".repeat(64) },
+                // a diff that cannot be shown as text, on a new file
+                { path: "data/new.dat", type: "added", is_lfs: false, size_bytes: 10, diff: unreadable },
+                // the same on a changed file: the "diff not available" branch
+                { path: "data/old.dat", type: "changed", is_lfs: false, size_bytes: 10, diff: unreadable },
+              ],
+            }
+          : { commit_id: "commit-1", message: "Add data", author: "owner", date: 1 },
+      }),
+    );
+
+    const wrapper = mountPage();
+    await flushPromises();
+
+    const buttons = wrapper
+      .findAll("button")
+      .filter((button) => button.text().includes("View File"));
+    expect(buttons).toHaveLength(3);
+    for (const button of buttons)
+      expect(button.find(".i-carbon-view").exists()).toBe(true);
+    // an Element Plus `icon` given as a string renders an unknown <view> element
+    expect(wrapper.find("view").exists()).toBe(false);
+  });
+
   it("compares an added AVIF as an image, and leaves a TIFF to the binary note", async () => {
     vi.spyOn(axios, "get").mockImplementation((url) =>
       Promise.resolve({

@@ -579,11 +579,8 @@
 
                 <!-- View file button -->
                 <div v-if="file.type !== 'removed'" class="mt-3">
-                  <el-button
-                    size="small"
-                    @click="viewFile(file.path)"
-                    :icon="'View'"
-                  >
+                  <el-button size="small" @click="viewFile(file.path)">
+                    <div class="i-carbon-view inline-block mr-1" />
                     View File
                   </el-button>
                 </div>
@@ -594,11 +591,8 @@
                 <div class="text-xs text-green-600 dark:text-green-400 mb-2">
                   New file created
                 </div>
-                <el-button
-                  size="small"
-                  @click="viewFile(file.path)"
-                  :icon="'View'"
-                >
+                <el-button size="small" @click="viewFile(file.path)">
+                  <div class="i-carbon-view inline-block mr-1" />
                   View File
                 </el-button>
               </div>
@@ -623,8 +617,8 @@
                   v-if="file.type !== 'removed'"
                   size="small"
                   @click="viewFile(file.path)"
-                  :icon="'View'"
                 >
+                  <div class="i-carbon-view inline-block mr-1" />
                   View File
                 </el-button>
               </div>
