@@ -321,7 +321,7 @@ function formatSize(bytes) {
               class="text-center py-8 px-3 text-gray-600 dark:text-gray-400"
             >
               <div
-                class="i-carbon-loading inline-block text-2xl animate-spin mb-2"
+                class="i-carbon-circle-dash inline-block text-2xl animate-spin mb-2"
               />
               <p class="text-sm">Loading folder...</p>
             </div>
@@ -460,7 +460,7 @@ function formatSize(bytes) {
         <!-- Loading state -->
         <div v-if="loadingUrl" class="card text-center py-20">
           <el-icon class="is-loading" :size="40">
-            <div class="i-carbon-loading" />
+            <div class="i-carbon-circle-dash" />
           </el-icon>
           <p class="mt-4 text-gray-600 dark:text-gray-400">
             Loading file URL...

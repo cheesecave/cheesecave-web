@@ -43,7 +43,7 @@
 
     <div v-if="loading" class="text-center py-20">
       <el-icon class="is-loading" :size="40">
-        <div class="i-carbon-loading" />
+        <div class="i-carbon-circle-dash" />
       </el-icon>
     </div>
 
@@ -295,7 +295,7 @@
           <div class="max-w-full overflow-x-auto">
             <div v-if="readmeLoading" class="text-center py-12">
               <el-icon class="is-loading" :size="40">
-                <div class="i-carbon-loading" />
+                <div class="i-carbon-circle-dash" />
               </el-icon>
               <p class="mt-4 text-gray-500 dark:text-gray-400">
                 Loading README...
@@ -491,7 +491,7 @@
           <div class="divide-y divide-gray-200 dark:divide-gray-700">
             <div v-if="filesLoading" class="py-12 text-center">
               <el-icon class="is-loading" :size="40">
-                <div class="i-carbon-loading" />
+                <div class="i-carbon-circle-dash" />
               </el-icon>
               <p class="mt-4 text-gray-500 dark:text-gray-400">
                 Loading files...

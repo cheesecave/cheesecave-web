@@ -591,7 +591,7 @@ watch(innerPreviewProps, (val) => {
   <div class="tar-browser-panel">
     <div v-if="state === 'loading'" class="py-10 flex flex-col items-center">
       <el-icon class="is-loading" :size="40">
-        <div class="i-carbon-loading" />
+        <div class="i-carbon-circle-dash" />
       </el-icon>
       <p class="mt-4 text-sm text-gray-600 dark:text-gray-300">
         {{ phase }}
@@ -728,7 +728,7 @@ watch(innerPreviewProps, (val) => {
           class="py-10 flex flex-col items-center"
         >
           <el-icon class="is-loading" :size="32">
-            <div class="i-carbon-loading" />
+            <div class="i-carbon-circle-dash" />
           </el-icon>
           <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
             Range-reading {{ formatBytes(memberView.size) }} from the

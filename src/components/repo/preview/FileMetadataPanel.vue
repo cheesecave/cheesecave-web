@@ -268,7 +268,7 @@ const previewTitle = computed(() => {
 <template>
   <div v-if="state === 'loading'" class="py-10 flex flex-col items-center">
     <el-icon class="is-loading" :size="40">
-      <div class="i-carbon-loading" />
+      <div class="i-carbon-circle-dash" />
     </el-icon>
     <p class="mt-4 text-sm text-gray-600 dark:text-gray-300">
       {{ phase }}

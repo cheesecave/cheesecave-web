@@ -40,7 +40,7 @@
 
     <div v-if="loading" class="text-center py-20">
       <el-icon class="is-loading" :size="40">
-        <div class="i-carbon-loading" />
+        <div class="i-carbon-circle-dash" />
       </el-icon>
     </div>
 
@@ -621,7 +621,7 @@ function getFileIcon(filename) {
   if (["json", "xml", "yaml", "yml"].includes(ext))
     return "i-carbon-data-structured text-orange-500";
   if (["zip", "tar", "gz", "rar", "7z"].includes(ext))
-    return "i-carbon-zip-archive text-gray-500";
+    return "i-carbon-zip text-gray-500";
 
   return "i-carbon-document text-gray-500";
 }
