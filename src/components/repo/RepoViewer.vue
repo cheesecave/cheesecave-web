@@ -2,7 +2,7 @@
 <template>
   <div class="container-main">
     <el-breadcrumb
-      v-if="activeTab === 'viewer' || error"
+      v-if="error"
       separator="/"
       class="repo-breadcrumb mb-6 text-gray-700 dark:text-gray-300"
       aria-label="Repository navigation"
@@ -57,18 +57,11 @@
       @cancel-auto-retry="repoInfoResource.cancelAutoRetry"
     />
 
-    <div
-      v-else
-      :class="
-        activeTab === 'viewer'
-          ? ''
-          : 'grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6'
-      "
-    >
+    <div v-else class="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
       <!-- Main Content -->
       <main class="min-w-0">
-        <!-- Repo Header (hidden for viewer tab) -->
-        <div v-if="activeTab !== 'viewer'" class="card repo-header mb-6">
+        <!-- Repo Header -->
+        <div class="card repo-header mb-6">
           <div
             class="flex flex-col sm:flex-row items-start justify-between gap-4 mb-4"
           >
@@ -200,9 +193,9 @@
           </div>
         </div>
 
-        <!-- Metadata Header (Key badges) (hidden for viewer tab) -->
+        <!-- Metadata Header (Key badges) -->
         <MetadataHeader
-          v-if="hasMetadataHeader && activeTab !== 'viewer'"
+          v-if="hasMetadataHeader"
           :metadata="readmeMetadata"
           :repo-type="repoType"
           @navigate-to-metadata="navigateToTab('metadata')"
@@ -269,23 +262,6 @@
               @click="navigateToTab('metadata')"
             >
               Metadata
-            </button>
-            <button
-              v-if="repoType === 'dataset'"
-              :class="[
-                'px-4 py-2 font-medium transition-colors',
-                activeTab === 'viewer'
-                  ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200',
-              ]"
-              :aria-current="activeTab === 'viewer' ? 'page' : undefined"
-              title="Open dataset viewer"
-              @click="navigateToTab('viewer')"
-            >
-              <span class="inline-flex items-center gap-2">
-                Viewer
-                <span class="i-carbon-launch text-sm" aria-hidden="true" />
-              </span>
             </button>
           </div>
         </div>
@@ -367,33 +343,6 @@
               Add YAML frontmatter to README.md to display metadata
             </p>
           </div>
-        </div>
-
-        <!-- Viewer Tab (for datasets only) -->
-        <div v-if="activeTab === 'viewer' && repoType === 'dataset'">
-          <div
-            v-if="filesLoading"
-            class="card"
-            role="status"
-            aria-label="Loading dataset files"
-          >
-            <el-skeleton :rows="6" animated />
-          </div>
-          <ErrorState
-            v-else-if="treeError"
-            :error="treeError"
-            :context="errorContext('file list')"
-            mode="inline-panel"
-            :retry="loadFileTree"
-          />
-          <DatasetViewerTab
-            v-else
-            :repo-type="repoType"
-            :namespace="namespace"
-            :name="name"
-            :branch="currentBranch"
-            :files="fileTree"
-          />
         </div>
 
         <div v-if="activeTab === 'files'" class="card">
@@ -798,10 +747,7 @@
       </main>
 
       <!-- Sidebar (Compact) -->
-      <aside
-        v-if="activeTab !== 'viewer'"
-        class="space-y-4 lg:sticky lg:top-4 lg:self-start"
-      >
+      <aside class="space-y-4 lg:sticky lg:top-4 lg:self-start">
         <!-- Relationships (Author + Base Model + Datasets from YAML) -->
         <SidebarRelationshipsCard
           :namespace="namespace"
@@ -1030,7 +976,6 @@ import MetadataHeader from "@/components/repo/metadata/MetadataHeader.vue";
 import DetailedMetadataPanel from "@/components/repo/metadata/DetailedMetadataPanel.vue";
 import ReferencedDatasetsCard from "@/components/repo/metadata/ReferencedDatasetsCard.vue";
 import SidebarRelationshipsCard from "@/components/repo/metadata/SidebarRelationshipsCard.vue";
-import DatasetViewerTab from "@/components/repo/DatasetViewerTab.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import FilePreviewDialog from "@/components/repo/preview/FilePreviewDialog.vue";
 import TarBrowserDialog from "@/components/repo/preview/TarBrowserDialog.vue";
@@ -1429,12 +1374,6 @@ function navigateToTab(tab) {
       router.push({
         path: `/${props.repoType}s/${props.namespace}/${props.name}`,
         query: { tab: "metadata" },
-      });
-      break;
-    case "viewer":
-      router.push({
-        path: `/${props.repoType}s/${props.namespace}/${props.name}`,
-        query: { tab: "viewer" },
       });
       break;
     default:
@@ -2275,7 +2214,7 @@ let tabLoadId = 0;
 async function loadActiveTab() {
   const requestId = ++tabLoadId;
   const tab = activeTab.value;
-  if (["files", "card", "metadata", "viewer"].includes(tab)) {
+  if (["files", "card", "metadata"].includes(tab)) {
     const context = getFileTreeContext();
     if (
       fileTreeContext !== context ||

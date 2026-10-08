@@ -399,27 +399,6 @@
     }
   },
   {
-    "name": "viewer-rate-limited",
-    "request": {
-      "method": "POST",
-      "path": "/api/dataset-viewer/tar/list"
-    },
-    "response": {
-      "status": 429,
-      "headers": {
-        "x-request-id": "28c99eaf67b74610a727aa6eda00ae0f",
-        "content-type": "application/json"
-      },
-      "body": {
-        "detail": {
-          "error": "Too many concurrent requests",
-          "limit": 3,
-          "current": 3
-        }
-      }
-    }
-  },
-  {
     "name": "repo-create-name-too-long",
     "request": {
       "method": "POST",

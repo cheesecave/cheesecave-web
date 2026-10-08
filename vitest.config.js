@@ -117,7 +117,6 @@ export default defineConfig({
         "src/components/common/ErrorState.vue",
         "src/components/common/RouteBoundary.vue",
         "src/components/common/SessionBanner.vue",
-        "src/components/DatasetViewer/DatasetViewer.vue",
         "src/components/profile/AvatarUpload.vue",
         "src/components/repo/CreateRepositoryForm.vue",
         "src/components/repo/metadata/LanguageCard.vue",

@@ -35,10 +35,10 @@ repository follows a different policy and retains the complete original Git hist
 ## Licenses and project information
 
 The original root `LICENSE` and `LICENSING.md` texts are preserved. Core code keeps
-its AGPL-3.0 terms. The web Dataset Viewer retains its separate license at
-`src/components/DatasetViewer/LICENSE`; the Admin repository does not contain that
-implementation. Historical monorepo paths in LICENSING.md are kept as source
-information. Rebranding and separate repositories do not replace license terms.
+its AGPL-3.0 terms. The web Dataset Viewer, which retained its separate license at
+`src/components/DatasetViewer/LICENSE`, was removed on 2026-10-08; its license text
+and history remain in the git history. Historical monorepo paths in LICENSING.md
+are kept as source information. Rebranding and separate repositories do not replace license terms.
 Original copyright notices and author attribution remain credited.
 
 See `README.upstream.md` and `CHANGELOG.upstream.md` for original project

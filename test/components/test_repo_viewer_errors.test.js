@@ -55,7 +55,6 @@ const mountViewerRaw = (tab) =>
         DetailedMetadataPanel: true,
         ReferencedDatasetsCard: true,
         SidebarRelationshipsCard: true,
-        DatasetViewerTab: true,
       },
     },
   });
@@ -233,8 +232,6 @@ describe("RepoViewer failure states", () => {
           DetailedMetadataPanel: true,
           ReferencedDatasetsCard: true,
           SidebarRelationshipsCard: true,
-          DatasetViewer: true,
-          DatasetViewerTab: true,
         },
       },
     });

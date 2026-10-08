@@ -140,7 +140,6 @@ We welcome contributions from the community! Here's how you can participate:
 We're constantly working to improve CheeseCave. Upcoming features include:
 
 - **Model Cards**: Structured documentation for models
-- **Dataset Viewers**: Built-in preview for common formats
 - **Metrics Tracking**: Model performance monitoring
 - **Enhanced Search**: Advanced filtering and discovery
 - **Webhooks**: Integration with CI/CD pipelines

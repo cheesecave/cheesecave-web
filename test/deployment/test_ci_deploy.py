@@ -171,7 +171,7 @@ class DeploymentBoundaryTests(unittest.TestCase):
         for name, value in {
             "dist/index.html": "<script src='/assets/app.js'></script>", "dist/assets/app.js": "test",
             "LICENSE": "license", "LICENSING.md": "licensing", "NOTICE.md": "notice",
-            "provenance/README.md": "upstream", "src/components/DatasetViewer/LICENSE": "viewer",
+            "provenance/README.md": "upstream",
         }.items():
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -187,8 +187,9 @@ class DeploymentBoundaryTests(unittest.TestCase):
             self.assertIn("index.html", names)
             self.assertNotIn("dist/index.html", names)
             for name in ("legal/LICENSE", "legal/LICENSING.md", "legal/NOTICE.md",
-                         "legal/provenance/README.md", "legal/DatasetViewer.LICENSE"):
+                         "legal/provenance/README.md"):
                 self.assertIn(name, names)
+            self.assertNotIn("legal/DatasetViewer.LICENSE", names)
             metadata = json.load(archive.extractfile("provenance.json"))
             self.assertEqual(metadata["git_sha"], SHA)
             self.assertEqual(metadata["component"], "web")
