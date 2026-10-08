@@ -17,5 +17,6 @@ Documentation, images, `public/` assets and other resources do not start the tes
 components, stores, composables and the error model. It excludes:
 
 - tests, scripts and tooling (`scripts/`, build helpers, deployment and CI scripts);
-- generic utility modules under `src/utils/` (the coverage list omits them);
 - generated declarations, documentation, images and other resources.
+
+The `src/utils/` modules that the application imports are measured like the rest of `src/`.
