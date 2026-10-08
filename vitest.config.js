@@ -74,7 +74,6 @@ export default defineConfig({
       reportsDirectory: "coverage",
       // `\\[` escapes the brackets of file-route names, which are glob classes otherwise
       include: [
-        "scripts/check-button-cascade.mjs",
         "src/App.vue",
         "src/stores/auth.js",
         "src/stores/theme.js",
