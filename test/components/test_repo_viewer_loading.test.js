@@ -50,7 +50,6 @@ function mountViewer(tab, props = {}) {
         DetailedMetadataPanel: true,
         ReferencedDatasetsCard: true,
         SidebarRelationshipsCard: true,
-        DatasetViewerTab: true,
       },
     },
   });
@@ -271,64 +270,24 @@ describe("RepoViewer loading on a big repository", () => {
     expect(rootLink.attributes("href")).toBe(
       "/datasets/open-media-lab/big-repo/tree/main",
     );
-    await wrapper.setProps({ tab: "viewer", currentPath: "" });
-    expect(wrapper.find(".repo-header").exists()).toBe(false);
-    expect(wrapper.find(".repo-breadcrumb").exists()).toBe(true);
-    expect(wrapper.get(".repo-breadcrumb").text()).toContain("big-repo");
     await flushPromises();
     wrapper.unmount();
   });
 
-  it("loads the root tree when entering Viewer directly from Commits", async () => {
-    const wrapper = mountViewer("commits");
-    await vi.waitFor(() => expect(wrapper.text()).toContain("Commit on main"));
-    expect(seen.filter((request) => request.what === "tree")).toHaveLength(0);
-    await wrapper.setProps({ tab: "viewer" });
+  it("loads the root tree for the card after a populated folder listing", async () => {
+    const wrapper = mountViewer("files", { currentPath: "nested" });
+    await vi.waitFor(() => expect(wrapper.text()).toContain("data.csv"));
+    await wrapper.setProps({ tab: "card", currentPath: "" });
     await vi.waitFor(() =>
       expect(
-        wrapper.findComponent({ name: "DatasetViewerTab" }).props("files"),
-      ).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ path: "README.md" }),
-        ]),
-      ),
+        seen.filter((request) => request.what === "tree" && request.path === ""),
+      ).toHaveLength(1),
     );
-    expect(wrapper.find("h1").exists()).toBe(false);
-    expect(wrapper.find("aside").exists()).toBe(false);
+    await vi.waitFor(() =>
+      expect(wrapper.find("article").text()).toContain("Big repo main"),
+    );
     wrapper.unmount();
   });
-
-  it.each(["viewer", "card"])(
-    "loads the root tree for %s after a populated folder listing",
-    async (tab) => {
-      const wrapper = mountViewer("files", { currentPath: "nested" });
-      await vi.waitFor(() => expect(wrapper.text()).toContain("data.csv"));
-      await wrapper.setProps({ tab, currentPath: "" });
-      await vi.waitFor(() =>
-        expect(
-          seen.filter(
-            (request) => request.what === "tree" && request.path === "",
-          ),
-        ).toHaveLength(1),
-      );
-      if (tab === "card") {
-        await vi.waitFor(() =>
-          expect(wrapper.find("article").text()).toContain("Big repo main"),
-        );
-      } else {
-        await vi.waitFor(() =>
-          expect(
-            wrapper.findComponent({ name: "DatasetViewerTab" }).props("files"),
-          ).toEqual(
-            expect.arrayContaining([
-              expect.objectContaining({ path: "README.md" }),
-            ]),
-          ),
-        );
-      }
-      wrapper.unmount();
-    },
-  );
 
   it("does not let a previous branch's delayed README overwrite the current branch", async () => {
     const oldGate = deferred();

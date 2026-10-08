@@ -75,10 +75,6 @@ const EXPECT = {
   },
   "repo-create-bad-enum": { kind: KIND.INVALID, fieldPaths: ["type"] },
   "lfs-batch-bad-request": { kind: KIND.INVALID },
-  "viewer-rate-limited": {
-    kind: KIND.RATE_LIMITED,
-    serverMessage: "Too many concurrent requests",
-  },
   "repo-create-name-too-long": { kind: KIND.SERVER, code: "ServerError" },
   "unhandled-exception-plain-text": {
     kind: KIND.SERVER,

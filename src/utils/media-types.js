@@ -1,7 +1,7 @@
 /**
  * Browser-renderable media: the one table every preview path reads (the
  * blob page, members inside an indexed tar and their thumbnails, the
- * commit diff, the dataset viewer).
+ * commit diff).
  *
  * Only formats every current browser decodes natively are listed; a file
  * whose decode still fails shows a "cannot display" note, not a broken

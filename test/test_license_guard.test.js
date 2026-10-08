@@ -9,6 +9,8 @@ import { describe, expect, it } from "vitest";
 
 const SRC = resolve(__dirname, "../src");
 const MARKER = "kohaku software license";
+// LICENSE, LICENSE.md, LICENSE.txt: not a component such as LicenseCard.vue
+const LICENSE_FILE = /^LICENSE(\.[a-z]+)?$/i;
 const TEXT_EXTENSIONS = new Set([".js", ".vue", ".ts", ".md", ".json", ".css", ".txt", ".html"]);
 
 function* walk(dir) {
@@ -30,17 +32,17 @@ describe("license guard", () => {
     const offenders = files
       .filter((path) => {
         const name = path.split("/").pop();
-        const text = /^LICENSE/i.test(name) || TEXT_EXTENSIONS.has(name.slice(name.lastIndexOf(".")));
+        const text = LICENSE_FILE.test(name) || TEXT_EXTENSIONS.has(name.slice(name.lastIndexOf(".")));
         return text && readFileSync(path, "utf8").toLowerCase().includes(MARKER);
       })
       .map((path) => relative(SRC, path));
     expect(offenders).toEqual([]);
   });
 
-  it("no LICENSE file lives under src", () => {
+  it("only vendored third-party code carries its own LICENSE file under src", () => {
     const licenses = files
-      .filter((path) => /^LICENSE/i.test(path.split("/").pop()))
+      .filter((path) => LICENSE_FILE.test(path.split("/").pop()))
       .map((path) => relative(SRC, path));
-    expect(licenses).toEqual([]);
+    expect(licenses.filter((path) => !path.startsWith("vendor/"))).toEqual([]);
   });
 });

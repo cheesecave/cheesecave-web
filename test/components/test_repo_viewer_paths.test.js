@@ -91,7 +91,6 @@ describe("RepoViewer path handling", () => {
           DetailedMetadataPanel: true,
           ReferencedDatasetsCard: true,
           SidebarRelationshipsCard: true,
-          DatasetViewerTab: true,
         },
       },
     });
@@ -1261,7 +1260,6 @@ describe("RepoViewer path handling", () => {
           DetailedMetadataPanel: true,
           ReferencedDatasetsCard: true,
           SidebarRelationshipsCard: true,
-          DatasetViewerTab: true,
           TarBrowserDialog: TarBrowserDialogStub,
         },
       },

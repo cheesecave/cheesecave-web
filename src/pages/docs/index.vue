@@ -16,13 +16,6 @@ const mainSections = [
     color: "text-purple-600 dark:text-purple-400",
   },
   {
-    title: "Non-Commercial Features",
-    description: "Dataset Viewer, KohakuBoard (experiment tracking)",
-    path: "/docs/non-commercial",
-    icon: "i-carbon-analytics",
-    color: "text-pink-600 dark:text-pink-400",
-  },
-  {
     title: "Deployment",
     description: "Docker, production, security, scaling, backups",
     path: "/docs/deployment",

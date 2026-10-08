@@ -178,19 +178,6 @@ function main() {
     copyFile(licensingSource, licensingDest);
   }
 
-  // Copy BUILD_WITHOUT_DATASET_VIEWER.md
-  const buildGuideSource = path.join(
-    rootDir,
-    "BUILD_WITHOUT_DATASET_VIEWER.md",
-  );
-  const buildGuideDest = path.join(
-    docsPublicDir,
-    "build-without-dataset-viewer.md",
-  );
-  if (fs.existsSync(buildGuideSource)) {
-    copyFile(buildGuideSource, buildGuideDest);
-  }
-
   // Copy logo files
   console.log("\nCopying logo files...");
   const logoFiles = [

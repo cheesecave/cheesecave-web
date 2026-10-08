@@ -101,6 +101,5 @@ jobs:
             test -s /usr/share/doc/cheesecave-web/LICENSE
             test -s /usr/share/doc/cheesecave-web/LICENSING.md
             test -s /usr/share/doc/cheesecave-web/NOTICE.md
-            test -s /usr/share/doc/cheesecave-web/DatasetViewer.LICENSE
-            grep -Fq "This Software is licensed under the Kohaku Software License" /usr/share/nginx/html/documentation/notices.md
+            if grep -qi "Kohaku Software License" /usr/share/doc/cheesecave-web/NOTICE.md /usr/share/nginx/html/documentation/notices.md; then echo "Kohaku Software License text is still shipped"; exit 1; fi
           '

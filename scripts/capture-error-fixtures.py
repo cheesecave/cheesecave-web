@@ -66,7 +66,6 @@ def main():
         ("repo-create-missing-fields", session, "POST", "/api/repos/create", {}),
         ("repo-create-bad-enum", session, "POST", "/api/repos/create", {"type": "banana", "name": "x1"}),
         ("lfs-batch-bad-request", anon, "POST", "/nobody-ns/nothing.git/info/lfs/objects/batch", {}),
-        ("viewer-rate-limited", anon, "POST", "/api/dataset-viewer/tar/list", {}),
         ("repo-create-name-too-long", session, "POST", "/api/repos/create", {"type": "dataset", "name": "x" * 300, "private": True}),
     ]
     out = []

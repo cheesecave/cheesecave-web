@@ -67,11 +67,6 @@ def package_static(component, commit, source, output):
         members.append((path, "legal/" + name))
     for path, name in static_members(source / "provenance"):
         members.append((path, "legal/provenance/" + name))
-    if component == "web":
-        path = source / "src/components/DatasetViewer/LICENSE"
-        if path.is_symlink() or not path.is_file() or not path.stat().st_size:
-            raise DeploymentError("DatasetViewer license is missing")
-        members.append((path, "legal/DatasetViewer.LICENSE"))
     metadata = json.dumps({
         "component": component, "git_sha": commit,
         "repository": "cheesecave/cheesecave-" + component,

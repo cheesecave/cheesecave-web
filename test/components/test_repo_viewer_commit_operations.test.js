@@ -126,7 +126,6 @@ describe("RepoViewer commit operation badges", () => {
           DetailedMetadataPanel: true,
           ReferencedDatasetsCard: true,
           SidebarRelationshipsCard: true,
-          DatasetViewerTab: true,
         },
       },
     });

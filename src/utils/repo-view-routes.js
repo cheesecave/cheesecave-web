@@ -6,7 +6,7 @@ const REPO_VIEW_ROUTES = new Map([
   ["/[type]s/[namespace]/[name]/tree/[branch]/[...path]", "files"],
   ["/[type]s/[namespace]/[name]/commits/[branch]/", "commits"],
 ]);
-const ROOT_TABS = new Set(["card", "metadata", "viewer"]);
+const ROOT_TABS = new Set(["card", "metadata"]);
 const loadRepoViewer = () => import("../components/repo/RepoViewer.vue");
 
 /** A tuple preserves repository boundaries even when both names contain hyphens. */
