@@ -37,7 +37,7 @@ const response = (value) => ({
 function expectFixedCredits(wrapper) {
   const credit = wrapper.get(".footer-attribution");
   expect(credit.text()).toContain("Powered by DeepGHS · Based on KohakuHub");
-  expect(credit.text()).toContain("© 2025 KohakuHub. Licensed under AGPL-3.0");
+  expect(credit.text()).toContain("Derived from KohakuHub © 2025 KohakuBlueLeaf and contributors");
   expect(credit.get(`a[href="${FOOTER_ATTRIBUTION.project_url}"]`).text()).toBe(
     FOOTER_ATTRIBUTION.project_label,
   );
