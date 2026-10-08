@@ -97,7 +97,7 @@ describe("RepoViewer path handling", () => {
     });
   }
 
-  it("marks Viewer as a separate page action and navigates to its full-width view", async () => {
+  it("has no dataset viewer action: the feature is removed", async () => {
     server.use(
       http.get(
         "/api/datasets/open-media-lab/hierarchy-crawl-fixtures/tree/main",
@@ -110,23 +110,10 @@ describe("RepoViewer path handling", () => {
     );
     const wrapper = mountViewer();
     await flushPromises();
-    const viewerButton = wrapper.get('button[title="Open dataset viewer"]');
-    expect(viewerButton.text()).toBe("Viewer");
-    expect(viewerButton.get(".i-carbon-launch").attributes("aria-hidden")).toBe(
-      "true",
+    expect(wrapper.find('button[title="Open dataset viewer"]').exists()).toBe(
+      false,
     );
-    expect(viewerButton.attributes("aria-current")).toBeUndefined();
-    await viewerButton.trigger("click");
-    expect(mocks.router.push).toHaveBeenCalledWith({
-      path: "/datasets/open-media-lab/hierarchy-crawl-fixtures",
-      query: { tab: "viewer" },
-    });
-    await wrapper.setProps({ tab: "viewer" });
-    expect(
-      wrapper
-        .get('button[title="Open dataset viewer"]')
-        .attributes("aria-current"),
-    ).toBe("page");
+    expect(wrapper.text()).not.toContain("Viewer");
     wrapper.unmount();
   });
 
