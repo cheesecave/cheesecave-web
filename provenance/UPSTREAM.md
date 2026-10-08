@@ -34,7 +34,7 @@ repository follows a different policy and retains the complete original Git hist
 
 ## Licenses and project information
 
-The original root `LICENSE` and `LICENSING.md` texts are preserved. Core code keeps
+The original root `LICENSE` text is preserved. The upstream `LICENSING.md` guide moved to `provenance/LICENSING.upstream.md`; the root `LICENSING.md` now states the AGPL-3.0 licence and this origin. Core code keeps
 its AGPL-3.0 terms. The web Dataset Viewer, which retained its separate license at
 `src/components/DatasetViewer/LICENSE`, was removed on 2026-10-08; its license text
 and history remain in the git history. Historical monorepo paths in LICENSING.md

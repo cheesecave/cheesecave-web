@@ -85,6 +85,6 @@ docker compose up -d --no-deps hub-web
 
 CheeseCave 源自 [KohakuBlueLeaf 的 KohakuHub](https://github.com/KohakuBlueleaf/KohakuHub) 与 [DeepGHS/KohakuHub](https://github.com/deepghs/KohakuHub)，保留原作者署名、版权及原仓库信息。CheeseCave 是独立衍生项目。
 
-原始 [LICENSE](LICENSE) 和 [LICENSING.md](LICENSING.md) 原文保留。核心代码沿用 AGPL-3.0。Dataset Viewer 是唯一带独立许可证的组件，已于 2026-10-08 移除，本仓库代码均适用 AGPL-3.0（内置的第三方代码保留其各自声明），详见 [NOTICE.md](NOTICE.md)。原项目 README 和变更记录保存在 [provenance/](provenance/)。
+[LICENSE](LICENSE) 是 AGPL-3.0 原文，[LICENSING.md](LICENSING.md) 说明本分叉的许可，上游许可指南保存在 [provenance/LICENSING.upstream.md](provenance/LICENSING.upstream.md)。核心代码沿用 AGPL-3.0。Dataset Viewer 是唯一带独立许可证的组件，已于 2026-10-08 移除，本仓库代码均适用 AGPL-3.0（内置的第三方代码保留其各自声明），详见 [NOTICE.md](NOTICE.md)。原项目 README 和变更记录保存在 [provenance/](provenance/)。
 
 修改及署名声明见 [NOTICE.md](NOTICE.md)。
