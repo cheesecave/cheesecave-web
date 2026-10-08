@@ -71,7 +71,7 @@
                 class="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1"
               >
                 {{ formatSize(fileSize) }}
-                <span v-if="fileSize" class="mx-2">•</span>
+                <span v-if="fileSize !== null" class="mx-2">•</span>
                 <span>{{ fileExtension || "No extension" }}</span>
               </div>
             </div>
@@ -379,7 +379,7 @@ const loading = ref(true);
 const loadError = ref(null);
 const errorContext = useErrorContext();
 const fileContent = ref("");
-const fileSize = ref(0);
+const fileSize = ref(null); // null until known; 0 is a real empty file
 const fileHeaders = ref({});
 const markdownView = ref("preview");
 const deleting = ref(false);
@@ -626,8 +626,29 @@ function getFileIcon(filename) {
   return "i-carbon-document text-gray-500";
 }
 
+// Size of this file from the backend (paths-info, the same source the zip
+// download uses). Returns null when the backend cannot say.
+async function fetchFileSize() {
+  try {
+    const { data } = await repoAPI.getPathsInfo(
+      repoType.value,
+      namespace.value,
+      name.value,
+      branch.value,
+      [filePath.value],
+    );
+    const entry = data.find(
+      (e) => e.type === "file" && e.path === filePath.value,
+    );
+    return entry ? entry.size : null;
+  } catch {
+    return null;
+  }
+}
+
 function formatSize(bytes) {
-  if (!bytes || bytes === 0) return "0 B";
+  if (bytes === null || bytes === undefined) return "";
+  if (bytes === 0) return "0 B";
   if (bytes < 1000) return bytes + " B";
   if (bytes < 1000 * 1000) return (bytes / 1000).toFixed(1) + " KB";
   if (bytes < 1000 * 1000 * 1000)
@@ -699,10 +720,9 @@ async function loadFileInfo() {
         }
       }
     } else {
-      // For media/binary files, we don't need size upfront
-      // Just set a flag that file exists (img/video tags will handle loading)
-      // If they fail to load, browser will show broken image/video
-      fileSize.value = 0; // Unknown, will be loaded by browser
+      // Media and binary files are not downloaded here, so the page has no size
+      // of its own. Ask the backend for it; if that fails the size stays unknown.
+      fileSize.value = await fetchFileSize();
       fileHeaders.value = {};
     }
   } catch (err) {
