@@ -60,7 +60,7 @@ export const FOOTER_ATTRIBUTION = Object.freeze({
   project_url: "https://github.com/deepghs/KohakuHub",
   upstream_label: "KohakuHub",
   upstream_url: "https://github.com/KohakuBlueleaf/KohakuHub",
-  copyright_text: "© 2025 KohakuHub",
+  copyright_text: "Derived from KohakuHub © 2025 KohakuBlueLeaf and contributors",
   license_label: "AGPL-3.0",
   license_url: "https://github.com/deepghs/KohakuHub/blob/main/LICENSE",
 });
