@@ -13,7 +13,7 @@ import { server } from "../setup/msw-server";
 const mocks = vi.hoisted(() => ({
   route: null,
   mode: "user",
-  listRepos: vi.fn(),
+  listAllRepos: vi.fn(),
   router: { push: vi.fn(), replace: vi.fn() },
 }));
 vi.mock("vue-router/auto", async (original) => ({
@@ -30,7 +30,7 @@ vi.mock("@/stores/auth", () => ({
   }),
 }));
 vi.mock("@/utils/api", () => ({
-  repoAPI: { listRepos: (...args) => mocks.listRepos(...args) },
+  repoAPI: { listAllRepos: (...args) => mocks.listAllRepos(...args) },
   orgAPI: { listMembers: async () => ({ data: { members: [] } }) },
   settingsAPI: {
     whoamiV2: async () => ({ data: { orgs: [] } }),
@@ -69,7 +69,7 @@ beforeEach(() => {
     query: {},
     fullPath: "/bob/models",
   });
-  mocks.listRepos.mockResolvedValue({ data: [] });
+  mocks.listAllRepos.mockResolvedValue({ data: [], incomplete: [] });
   server.use(
     http.get("*/org/:name", ({ request }) =>
       mocks.mode === "user"
@@ -126,15 +126,15 @@ describe.each(["user", "org"])("%s list page failures", (mode) => {
     expect(title()).toBe("Service unavailable");
     expect(wrapper.text()).not.toContain("Not Found");
     // the repositories were still listed: only the lookup is missing
-    expect(mocks.listRepos).toHaveBeenCalled();
-    const listed = mocks.listRepos.mock.calls.length;
+    expect(mocks.listAllRepos).toHaveBeenCalled();
+    const listed = mocks.listAllRepos.mock.calls.length;
     infoStatus = 200;
     await wrapper.get('[data-testid="error-action-retry"]').trigger("click");
     await flushPromises();
     await vi.waitFor(() =>
       expect(wrapper.find('[data-testid="error-state"]').exists()).toBe(false),
     );
-    expect(mocks.listRepos.mock.calls.length).toBe(listed);
+    expect(mocks.listAllRepos.mock.calls.length).toBe(listed);
   });
 
   it("switches to 'not found' when the retry learns the account does not exist", async () => {
@@ -163,9 +163,9 @@ describe.each(["user", "org"])("%s list page failures", (mode) => {
 
   it("says why the repositories could not be listed, instead of showing none", async () => {
     let up = false;
-    mocks.listRepos.mockImplementation(async () => {
+    mocks.listAllRepos.mockImplementation(async () => {
       if (!up) throw httpFailure(500);
-      return { data: [] };
+      return { data: [], incomplete: [] };
     });
     await mountProfile(mode);
     expect(title()).toBe("Something went wrong on the server");
@@ -179,7 +179,7 @@ describe.each(["user", "org"])("%s list page failures", (mode) => {
   });
 
   it("shows no error for a repository listing that was cancelled", async () => {
-    mocks.listRepos.mockRejectedValue(new DOMException("a", "AbortError"));
+    mocks.listAllRepos.mockRejectedValue(new DOMException("a", "AbortError"));
     await mountProfile(mode);
     expect(wrapper.find('[data-testid="error-state"]').exists()).toBe(false);
   });

@@ -58,6 +58,7 @@ declare module 'vue' {
     FrameworkCard: typeof import('./components/repo/metadata/FrameworkCard.vue')['default']
     GeneralMetadataAccordion: typeof import('./components/repo/metadata/GeneralMetadataAccordion.vue')['default']
     HelloWorld: typeof import('./components/HelloWorld.vue')['default']
+    IncompleteNotice: typeof import('./components/common/IncompleteNotice.vue')['default']
     LanguageCard: typeof import('./components/repo/metadata/LanguageCard.vue')['default']
     LicenseCard: typeof import('./components/repo/metadata/LicenseCard.vue')['default']
     MarkdownPage: typeof import('./components/common/MarkdownPage.vue')['default']

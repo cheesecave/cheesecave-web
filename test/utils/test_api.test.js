@@ -209,7 +209,7 @@ describe("frontend API client", () => {
       { timeout: 300000 },
     );
     expect(getSpy).toHaveBeenCalledWith("/api/datasets", {
-      params: { limit: 5, sort: "likes" },
+      params: { partial: "ok", limit: 5, sort: "likes" },
     });
     expect(getSpy).toHaveBeenCalledWith("/api/users/alice/repos", {
       params: { limit: 10, sort: "recent" },
