@@ -89,10 +89,31 @@ export const workspaceAPI = {
 
 export default api;
 
+// RFC 8288: `<url>; rel="next"`, possibly with other relations and parameters
 function getNextLinkFromHeader(linkHeader) {
   if (!linkHeader) return null;
-  const match = linkHeader.match(/<([^>]+)>;\s*rel="next"/i);
+  const match = linkHeader.match(
+    /<([^>]+)>\s*;(?:[^,<]*;)?\s*rel\s*=\s*"?(?:[^",<]*\s)?next(?:\s[^",<]*)?"?/i,
+  );
   return match ? match[1] : null;
+}
+
+// ponytail: 100 pages of 1000 = 100k repositories of one type; raise it when a namespace needs more
+const MAX_LIST_PAGES = 100;
+
+// A link is followed on our own origin only: the request carries the session and the tokens.
+function ownOriginTarget(url) {
+  const target = new URL(url, window.location.origin);
+  return target.pathname + target.search;
+}
+
+// X-Cheesecave-Incomplete: "A, B" names the external sources the server left out of a partial answer
+function incompleteSources(response) {
+  const header = response.headers?.["x-cheesecave-incomplete"] || "";
+  return header
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
 }
 
 function getQueryParamFromUrl(url, key) {
@@ -234,7 +255,33 @@ export const repoAPI = {
    * @param {Object} params - Query parameters { author?, limit? }
    * @returns {Promise} - Array of repositories
    */
-  listRepos: (type, params) => api.get(`/api/${type}s`, { params }),
+  // `partial=ok`: when an external source is down, answer without it and say so, instead of a 503
+  listRepos: (type, params) =>
+    api.get(`/api/${type}s`, { params: { partial: "ok", ...params } }),
+
+  /**
+   * Every repository of a listing: follows `Link: rel="next"` to the last page.
+   * `limit` is a hint (the server answers at most 1000 per page); the large value keeps a
+   * server that does not paginate answering in one piece.
+   * @returns {Promise<{ data: Array, incomplete: string[] }>} - `incomplete`: sources left out
+   */
+  listAllRepos: async (type, params) => {
+    let response = await repoAPI.listRepos(type, { limit: 100000, ...params });
+    const data = [...(response.data || [])];
+    const incomplete = new Set(incompleteSources(response));
+    const visited = new Set();
+    let next = getNextLinkFromHeader(response.headers?.link);
+    for (let pages = 1; next && pages < MAX_LIST_PAGES; pages++) {
+      const target = ownOriginTarget(next);
+      if (visited.has(target)) break; // a server that repeats a link would keep us here forever
+      visited.add(target);
+      response = await api.get(target);
+      data.push(...(response.data || []));
+      incompleteSources(response).forEach((name) => incomplete.add(name));
+      next = getNextLinkFromHeader(response.headers?.link);
+    }
+    return { data, incomplete: [...incomplete] };
+  },
 
   discoverRepos: (type, params) =>
     api.get(`/api/${type}s/discover`, { params }),

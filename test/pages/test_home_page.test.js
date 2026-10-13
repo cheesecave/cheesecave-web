@@ -201,6 +201,7 @@ describe("home page", () => {
           limit: "100",
           sort: "trending",
           fallback: "false",
+          partial: "ok",
         },
       },
       {
@@ -209,6 +210,7 @@ describe("home page", () => {
           limit: "100",
           sort: "trending",
           fallback: "false",
+          partial: "ok",
         },
       },
       {
@@ -217,6 +219,7 @@ describe("home page", () => {
           limit: "100",
           sort: "trending",
           fallback: "false",
+          partial: "ok",
         },
       },
     ]);
@@ -820,7 +823,12 @@ describe("home page", () => {
     expect(requests.filter((request) => request.type !== "personal")).toEqual([
       {
         type: "model",
-        params: { limit: "3", sort: "trending", fallback: "false" },
+        params: {
+          limit: "3",
+          sort: "trending",
+          fallback: "false",
+          partial: "ok",
+        },
       },
     ]);
   });
@@ -1227,11 +1235,21 @@ describe("home page", () => {
     expect(requests.filter((request) => request.type !== "personal")).toEqual([
       {
         type: "model",
-        params: { limit: "3", sort: "trending", fallback: "false" },
+        params: {
+          limit: "3",
+          sort: "trending",
+          fallback: "false",
+          partial: "ok",
+        },
       },
       {
         type: "dataset",
-        params: { limit: "3", sort: "trending", fallback: "false" },
+        params: {
+          limit: "3",
+          sort: "trending",
+          fallback: "false",
+          partial: "ok",
+        },
       },
     ]);
   });

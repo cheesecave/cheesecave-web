@@ -198,6 +198,9 @@
           :retry="loadRepos"
         />
 
+        <!-- A source was left out: the lists are right, but not everything -->
+        <IncompleteNotice v-if="!reposError" :sources="incompleteSources" />
+
         <section v-if="!reposError">
           <div
             class="flex items-center justify-between gap-3 flex-wrap mb-4 pb-3 border-b-2"
@@ -314,6 +317,8 @@
 import { repoAPI, orgAPI } from "@/utils/api";
 import axios from "axios";
 import ErrorState from "@/components/common/ErrorState.vue";
+import IncompleteNotice from "@/components/common/IncompleteNotice.vue";
+import { useIncompleteSources } from "@/composables/useIncompleteSources";
 import { KIND, decodeError } from "@/errors";
 import { useErrorContext } from "@/composables/useErrorContext";
 import { formatRelativeTime } from "@/utils/datetime";
@@ -341,6 +346,8 @@ const errorContext = useErrorContext();
 const orgError = ref(null);
 const lookupRetrying = ref(false);
 const reposError = ref(null);
+const { sources: incompleteSources, record: recordIncomplete } =
+  useIncompleteSources();
 const orgNotFound = ref(false);
 const orgInfo = ref(null);
 const members = ref([]);
@@ -528,9 +535,8 @@ async function loadRepos() {
 }
 
 async function loadRepoType(repoType) {
-  const { data } = await repoAPI.listRepos(repoType, {
+  const { data, incomplete } = await repoAPI.listAllRepos(repoType, {
     author: orgname.value,
-    limit: 100000,
     sort:
       repoType === currentRepoType.value
         ? selectedSort.value
@@ -541,6 +547,7 @@ async function loadRepoType(repoType) {
             fallback: "recent",
           }),
   });
+  recordIncomplete(repoType, incomplete);
   return data;
 }
 

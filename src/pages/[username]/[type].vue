@@ -192,6 +192,9 @@
           :retry="loadRepos"
         />
 
+        <!-- A source was left out: the lists are right, but not everything -->
+        <IncompleteNotice v-if="!reposError" :sources="incompleteSources" />
+
         <!-- Models Tab -->
         <div v-if="!reposError && repoType === 'model'">
           <div class="flex items-center justify-between mb-6">
@@ -520,6 +523,8 @@
 import { repoAPI, orgAPI } from "@/utils/api";
 import axios from "axios";
 import ErrorState from "@/components/common/ErrorState.vue";
+import IncompleteNotice from "@/components/common/IncompleteNotice.vue";
+import { useIncompleteSources } from "@/composables/useIncompleteSources";
 import { KIND, decodeError } from "@/errors";
 import { useErrorContext } from "@/composables/useErrorContext";
 import { formatRelativeTime } from "@/utils/datetime";
@@ -540,6 +545,8 @@ const errorContext = useErrorContext();
 const profileError = ref(null);
 const lookupRetrying = ref(false);
 const reposError = ref(null);
+const { sources: incompleteSources, record: recordIncomplete } =
+  useIncompleteSources();
 const userNotFound = ref(false);
 const userInfo = ref(null);
 const repos = ref({ model: [], dataset: [], space: [] });
@@ -671,7 +678,7 @@ async function loadRepos() {
   reposError.value = null;
   try {
     const [models, datasets, spaces] = await Promise.all([
-      repoAPI.listRepos("model", {
+      repoAPI.listAllRepos("model", {
         author: username.value,
         sort:
           repoType.value === "model"
@@ -682,9 +689,8 @@ async function loadRepos() {
                 allowedValues: ["recent", "updated", "downloads", "likes"],
                 fallback: "recent",
               }),
-        limit: 100000, // Very high limit to get all repos
       }),
-      repoAPI.listRepos("dataset", {
+      repoAPI.listAllRepos("dataset", {
         author: username.value,
         sort:
           repoType.value === "dataset"
@@ -695,9 +701,8 @@ async function loadRepos() {
                 allowedValues: ["recent", "updated", "downloads", "likes"],
                 fallback: "recent",
               }),
-        limit: 100000,
       }),
-      repoAPI.listRepos("space", {
+      repoAPI.listAllRepos("space", {
         author: username.value,
         sort:
           repoType.value === "space"
@@ -708,10 +713,12 @@ async function loadRepos() {
                 allowedValues: ["recent", "updated", "downloads", "likes"],
                 fallback: "recent",
               }),
-        limit: 100000,
       }),
     ]);
 
+    recordIncomplete("model", models.incomplete);
+    recordIncomplete("dataset", datasets.incomplete);
+    recordIncomplete("space", spaces.incomplete);
     repos.value = {
       model: models.data,
       dataset: datasets.data,

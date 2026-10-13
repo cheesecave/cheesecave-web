@@ -394,6 +394,9 @@
             :retry="reloadRepos"
           />
 
+          <!-- A source was left out: the lists are right, but not everything -->
+          <IncompleteNotice v-if="!reposError" :sources="incompleteSources" />
+
           <!-- Models Section -->
           <section v-if="!reposError" class="mb-8">
             <div
@@ -785,6 +788,8 @@ import {
 } from "@/utils/repoSortPreference";
 import axios from "axios";
 import ErrorState from "@/components/common/ErrorState.vue";
+import IncompleteNotice from "@/components/common/IncompleteNotice.vue";
+import { useIncompleteSources } from "@/composables/useIncompleteSources";
 import { KIND, decodeError } from "@/errors";
 import { useErrorContext } from "@/composables/useErrorContext";
 
@@ -803,6 +808,8 @@ const errorContext = useErrorContext();
 const profileError = ref(null);
 const lookupRetrying = ref(false);
 const reposError = ref(null);
+const { sources: incompleteSources, record: recordIncomplete } =
+  useIncompleteSources();
 const quotaInfo = ref(null);
 const selectedSorts = reactive({
   model: getRepoSortPreference({
@@ -1030,11 +1037,11 @@ async function loadUserData() {
 }
 
 async function loadRepoType(type) {
-  const { data } = await repoAPI.listRepos(type, {
+  const { data, incomplete } = await repoAPI.listAllRepos(type, {
     author: username.value,
     sort: selectedSorts[type],
-    limit: 100000,
   });
+  recordIncomplete(type, incomplete);
   return data;
 }
 

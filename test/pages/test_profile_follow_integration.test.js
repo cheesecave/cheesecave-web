@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   source: "local",
   missing: false,
   getFollowState: vi.fn(),
-  listRepos: vi.fn(),
+  listAllRepos: vi.fn(),
   router: { push: vi.fn(), replace: vi.fn() },
 }));
 vi.mock("vue-router/auto", async (original) => ({
@@ -29,7 +29,7 @@ vi.mock("@/stores/auth", () => ({
   }),
 }));
 vi.mock("@/utils/api", () => ({
-  repoAPI: { listRepos: (...args) => mocks.listRepos(...args) },
+  repoAPI: { listAllRepos: (...args) => mocks.listAllRepos(...args) },
   orgAPI: { listMembers: async () => ({ data: { members: [] } }) },
   settingsAPI: {
     whoamiV2: async () => ({ data: { orgs: [] } }),
@@ -52,7 +52,7 @@ describe("local profile Follow integration", () => {
     });
     mocks.source = "local";
     mocks.missing = false;
-    mocks.listRepos.mockResolvedValue({ data: [] });
+    mocks.listAllRepos.mockResolvedValue({ data: [], incomplete: [] });
     mocks.getFollowState.mockResolvedValue({
       data: {
         username: "bob",
