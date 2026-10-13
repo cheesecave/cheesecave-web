@@ -78,9 +78,13 @@ export const socialAPI = {
   unfollow: (username) =>
     api.delete(`/api/users/${encodeURIComponent(username)}/follow`),
   listFollowers: (username, params) =>
-    api.get(`/api/users/${encodeURIComponent(username)}/followers`, { params }),
+    api
+      .get(`/api/users/${encodeURIComponent(username)}/followers`, { params })
+      .then(normalizeFollowList),
   listFollowing: (username, params) =>
-    api.get(`/api/users/${encodeURIComponent(username)}/following`, { params }),
+    api
+      .get(`/api/users/${encodeURIComponent(username)}/following`, { params })
+      .then(normalizeFollowList),
 };
 
 export const workspaceAPI = {
@@ -123,6 +127,29 @@ function getQueryParamFromUrl(url, key) {
   } catch {
     return null;
   }
+}
+
+// Hub shape (bare array + `Link: rel="next"`) -> the `{items, next_cursor, has_more}` the follow dialog reads;
+// the legacy object passes through. Only the cursor is taken from the Link, never its host.
+function normalizeFollowList(response) {
+  if (!Array.isArray(response.data)) return response;
+  const nextCursor = getQueryParamFromUrl(
+    getNextLinkFromHeader(response.headers?.link),
+    "cursor",
+  );
+  return {
+    ...response,
+    data: {
+      items: response.data.map((x) => ({
+        username: x.user,
+        full_name: x.fullname,
+        is_org: x.type === "org",
+        avatar_url: x.avatarUrl,
+      })),
+      next_cursor: nextCursor,
+      has_more: Boolean(nextCursor),
+    },
+  };
 }
 
 function normalizeCommitListResponse(response) {
