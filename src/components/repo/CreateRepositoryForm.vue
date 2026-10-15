@@ -74,7 +74,8 @@
       </el-input>
       <div class="text-xs text-gray-500 mt-1">
         <div class="i-carbon-information inline-block mr-1" />
-        Use letters, numbers, hyphens, underscores, and dots only
+        1 to 96 letters, numbers, hyphens, underscores and dots; no -- or ..,
+        no hyphen or dot at either end, not ending in .git
       </div>
     </el-form-item>
 
@@ -104,7 +105,7 @@
       <el-checkbox v-model="form.private"
         >Make this {{ form.type }} private</el-checkbox
       >
-      <p class="text-xs text-gray-600 dark:text-gray-400">
+      <p class="w-full mt-1 text-xs text-gray-600 dark:text-gray-400">
         {{
           form.private
             ? "You choose who can see and commit to this repository"
