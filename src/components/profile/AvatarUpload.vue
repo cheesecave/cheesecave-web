@@ -57,6 +57,7 @@
 
     <!-- Crop Dialog -->
     <el-dialog
+      append-to-body
       v-model="showCropDialog"
       title="Crop Avatar"
       width="700px"

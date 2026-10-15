@@ -73,6 +73,7 @@ onBeforeUnmount(() => version++);
 
 <template>
   <el-dialog
+    append-to-body
     :model-value="modelValue"
     :title="title"
     width="min(480px, calc(100vw - 32px))"

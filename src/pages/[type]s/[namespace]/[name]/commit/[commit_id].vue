@@ -194,6 +194,7 @@
 
       <!-- Revert Dialog -->
       <el-dialog
+        append-to-body
         v-if="revertEnabled"
         v-model="revertDialogVisible"
         title="Revert Commit"
@@ -247,6 +248,7 @@
 
       <!-- Reset Dialog -->
       <el-dialog
+        append-to-body
         v-if="resetEnabled"
         v-model="resetDialogVisible"
         title="Reset Branch to This Commit"

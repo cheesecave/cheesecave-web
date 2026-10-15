@@ -144,6 +144,7 @@
 
     <!-- Mobile Menu Drawer -->
     <el-drawer
+      append-to-body
       v-model="mobileMenuOpen"
       direction="rtl"
       size="280px"

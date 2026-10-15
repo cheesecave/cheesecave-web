@@ -840,7 +840,12 @@
     </div>
 
     <!-- Clone Dialog -->
-    <el-dialog v-model="showCloneDialog" title="Clone Repository" width="700px">
+    <el-dialog
+      append-to-body
+      v-model="showCloneDialog"
+      title="Clone Repository"
+      width="700px"
+    >
       <div class="space-y-4">
         <!-- Git Clone Section -->
         <div>
