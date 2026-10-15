@@ -142,6 +142,7 @@ describe("new repository page", () => {
         name: "my-demo",
         organization: null,
         private: false,
+        sdk: "gradio", // a Space is created with the card that names its SDK
       },
     ]);
     expect(pushSpy).not.toHaveBeenCalled();

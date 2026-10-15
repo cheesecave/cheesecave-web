@@ -145,6 +145,71 @@ describe("shared repository creation form", () => {
     expect(mocks.push).toHaveBeenCalledWith("/spaces/alice/demo");
   });
 
+  describe("the SDK of a Space", () => {
+    const sdkSelect = (wrapper) => wrapper.find('select[aria-label="Select SDK"]');
+
+    it("asks for an SDK, Gradio unless chosen otherwise, only when creating a Space", async () => {
+      const space = mountForm({ fixedType: "space" });
+      const model = mountForm({ fixedType: "model" });
+      const dataset = mountForm({ fixedType: "dataset" });
+      await flushPromises();
+
+      expect(sdkSelect(space).exists()).toBe(true);
+      expect(sdkSelect(space).element.value).toBe("gradio");
+      expect(sdkSelect(space).findAll("option").map((o) => [o.element.value, o.text()])).toEqual([
+        ["gradio", "Gradio"],
+        ["streamlit", "Streamlit"],
+        ["docker", "Docker"],
+        ["static", "Static"],
+      ]);
+      expect(sdkSelect(model).exists()).toBe(false);
+      expect(sdkSelect(dataset).exists()).toBe(false);
+    });
+
+    it("sends the chosen SDK, so the Space starts with the card that names it", async () => {
+      const wrapper = mountForm({ fixedType: "space" });
+      await flushPromises();
+      await wrapper.get('input[placeholder="my-space"], input[placeholder="my-awesome-space"]').setValue("demo");
+      await sdkSelect(wrapper).setValue("static");
+      await button(wrapper, "Create Space").trigger("click");
+      await flushPromises();
+
+      expect(mocks.create).toHaveBeenCalledWith({ type: "space", name: "demo", organization: null, private: false, sdk: "static" });
+    });
+
+    it("sends Gradio when the choice was not touched", async () => {
+      const wrapper = mountForm({ fixedType: "space" });
+      await flushPromises();
+      await wrapper.get('input[placeholder="my-space"], input[placeholder="my-awesome-space"]').setValue("demo");
+      await button(wrapper, "Create Space").trigger("click");
+      await flushPromises();
+
+      expect(mocks.create.mock.calls[0][0].sdk).toBe("gradio");
+    });
+
+    it("sends no sdk for a model or a dataset, and not after the type changed from Space", async () => {
+      const wrapper = mountForm({ initialType: "space" });
+      await flushPromises();
+      await sdkSelect(wrapper).setValue("docker");
+      await wrapper.setProps({ initialType: "model" });
+      await wrapper.get('input[placeholder="my-model"], input[placeholder="my-awesome-model"]').setValue("m");
+      await button(wrapper, "Create Model").trigger("click");
+      await flushPromises();
+
+      expect(sdkSelect(wrapper).exists()).toBe(false);
+      expect(mocks.create).toHaveBeenCalledWith({ type: "model", name: "m", organization: null, private: false });
+    });
+
+    it("goes back to Gradio when the form is cancelled", async () => {
+      const wrapper = mountForm({ fixedType: "space" });
+      await flushPromises();
+      await sdkSelect(wrapper).setValue("streamlit");
+      await button(wrapper, "Cancel").trigger("click");
+
+      expect(sdkSelect(wrapper).element.value).toBe("gradio");
+    });
+  });
+
   it("clears account drafts and ignores late organization and creation responses", async () => {
     const oldOrganizations = deferred();
     const oldCreation = deferred();

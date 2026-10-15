@@ -6,6 +6,8 @@ import {
   getLanguageName,
 } from "@/utils/metadata-helpers";
 
+import { SPACE_SDKS } from "@/utils/repository-types";
+
 const props = defineProps({
   metadata: {
     type: Object,
@@ -15,29 +17,59 @@ const props = defineProps({
     type: String,
     required: true,
   },
+  // What the API knows (see `splitTags`): the libraries and frameworks, the free tags, the papers
+  libraries: { type: Array, default: () => [] },
+  others: { type: Array, default: () => [] },
+  arxiv: { type: Array, default: () => [] },
 });
 
 const emit = defineEmits(["navigate-to-metadata"]);
 
-const licenseName = computed(() => {
-  return props.metadata.license ? getLicenseName(props.metadata.license) : null;
+const MAX_OTHERS = 6;
+const MAX_PAPERS = 2;
+
+// Every chip leads to the discovery page of this kind of repository, filtered by it
+const discoverPath = computed(() => `/${props.repoType}s`);
+const to = (query) => ({ path: discoverPath.value, query });
+
+// An older backend gives no groups: the library the README names is then the only one
+const shownLibraries = computed(() => {
+  if (props.libraries.length) return props.libraries;
+  const name = props.metadata.library_name;
+  return name ? [{ id: name, label: name, query: { library: name } }] : [];
 });
 
-const languages = computed(() => {
-  if (!props.metadata.language) return [];
-  const langs = Array.isArray(props.metadata.language)
-    ? props.metadata.language
-    : [props.metadata.language];
-  return langs.slice(0, 3); // Show max 3 languages in header
+const shownOthers = computed(() => props.others.slice(0, MAX_OTHERS));
+const moreOthers = computed(() =>
+  Math.max(0, props.others.length - MAX_OTHERS),
+);
+const shownPapers = computed(() => props.arxiv.slice(0, MAX_PAPERS));
+
+// A card may write the license as a list; the first one is the one shown
+const license = computed(() => {
+  const value = Array.isArray(props.metadata.license)
+    ? props.metadata.license[0]
+    : props.metadata.license;
+  return typeof value === "string" && value ? value : null;
+});
+const licenseName = computed(() =>
+  license.value ? getLicenseName(license.value) : null,
+);
+// only used where there is a license
+const licenseId = computed(() => String(license.value).toLowerCase());
+
+const sdkName = computed(() => {
+  const sdk = props.metadata.sdk;
+  return SPACE_SDKS.find((item) => item.value === sdk)?.label || sdk;
 });
 
-const moreLanguages = computed(() => {
-  if (!props.metadata.language) return 0;
-  const langs = Array.isArray(props.metadata.language)
-    ? props.metadata.language
-    : [props.metadata.language];
-  return Math.max(0, langs.length - 3);
-});
+// A card writes some values as one string, some as a list
+const asList = (value) => (value ? [].concat(value) : []);
+
+const languages = computed(() => asList(props.metadata.language).slice(0, 3)); // max 3 in the header
+const moreLanguages = computed(() =>
+  Math.max(0, asList(props.metadata.language).length - 3),
+);
 
 const pipelineTag = computed(() => {
   return props.metadata.pipeline_tag
@@ -45,29 +77,16 @@ const pipelineTag = computed(() => {
     : null;
 });
 
-const taskCategories = computed(() => {
-  if (!props.metadata.task_categories) return [];
-  const tasks = Array.isArray(props.metadata.task_categories)
-    ? props.metadata.task_categories
-    : [props.metadata.task_categories];
-  return tasks.slice(0, 2); // Show max 2 tasks
-});
+const taskCategories = computed(() =>
+  asList(props.metadata.task_categories).slice(0, 2),
+); // max 2 tasks
+const moreTasks = computed(() =>
+  Math.max(0, asList(props.metadata.task_categories).length - 2),
+);
 
-const moreTasks = computed(() => {
-  if (!props.metadata.task_categories) return 0;
-  const tasks = Array.isArray(props.metadata.task_categories)
-    ? props.metadata.task_categories
-    : [props.metadata.task_categories];
-  return Math.max(0, tasks.length - 2);
-});
-
-const sizeCategory = computed(() => {
-  if (!props.metadata.size_categories) return null;
-  const size = Array.isArray(props.metadata.size_categories)
-    ? props.metadata.size_categories[0]
-    : props.metadata.size_categories;
-  return size;
-});
+const sizeCategory = computed(
+  () => asList(props.metadata.size_categories)[0] ?? null,
+);
 </script>
 
 <template>
@@ -75,23 +94,59 @@ const sizeCategory = computed(() => {
     class="metadata-header bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 mb-4"
   >
     <div class="flex flex-wrap items-center gap-2">
+      <!-- Pipeline Tag (Models) -->
+      <RouterLink
+        v-if="repoType === 'model' && pipelineTag"
+        :to="to({ task: metadata.pipeline_tag })"
+      >
+        <el-tag type="warning" size="small">
+          <div class="i-carbon-task inline-block mr-1" />
+          {{ pipelineTag }}
+        </el-tag>
+      </RouterLink>
+
+      <!-- Libraries and frameworks (Models) -->
+      <RouterLink
+        v-for="library in repoType === 'model' ? shownLibraries : []"
+        :key="library.id"
+        :to="to(library.query)"
+      >
+        <el-tag type="success" size="small">
+          <div class="i-carbon-cube inline-block mr-1" />
+          {{ library.label }}
+        </el-tag>
+      </RouterLink>
+
+      <!-- SDK (Spaces) -->
+      <RouterLink
+        v-if="repoType === 'space' && metadata.sdk"
+        :to="to({ sdk: metadata.sdk })"
+      >
+        <el-tag type="success" size="small">
+          <div class="i-carbon-application inline-block mr-1" />
+          {{ sdkName }}
+        </el-tag>
+      </RouterLink>
+
       <!-- License -->
-      <el-tag v-if="licenseName" type="info" size="small">
-        <div class="i-carbon-document inline-block mr-1" />
-        {{ licenseName }}
-      </el-tag>
+      <RouterLink v-if="licenseName" :to="to({ license: licenseId })">
+        <el-tag type="info" size="small">
+          <div class="i-carbon-document inline-block mr-1" />
+          {{ licenseName }}
+        </el-tag>
+      </RouterLink>
 
       <!-- Languages -->
-      <el-tag
+      <RouterLink
         v-for="lang in languages"
         :key="lang"
-        type="primary"
-        size="small"
-        effect="plain"
+        :to="to({ language: String(lang).toLowerCase() })"
       >
-        <div class="i-carbon-language inline-block mr-1" />
-        {{ getLanguageName(lang) }}
-      </el-tag>
+        <el-tag type="primary" size="small" effect="plain">
+          <div class="i-carbon-language inline-block mr-1" />
+          {{ getLanguageName(lang) }}
+        </el-tag>
+      </RouterLink>
       <el-tag
         v-if="moreLanguages > 0"
         size="small"
@@ -102,25 +157,37 @@ const sizeCategory = computed(() => {
         +{{ moreLanguages }} more
       </el-tag>
 
-      <!-- Framework (Models) -->
-      <el-tag
-        v-if="repoType === 'model' && metadata.library_name"
-        type="success"
-        size="small"
+      <!-- Free tags (Models) -->
+      <RouterLink
+        v-for="tag in repoType === 'model' ? shownOthers : []"
+        :key="tag.id"
+        :to="to(tag.query)"
       >
-        <div class="i-carbon-cube inline-block mr-1" />
-        {{ metadata.library_name }}
+        <el-tag size="small" effect="plain">{{ tag.label }}</el-tag>
+      </RouterLink>
+      <el-tag
+        v-if="repoType === 'model' && moreOthers > 0"
+        size="small"
+        effect="plain"
+        class="cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30"
+        @click="emit('navigate-to-metadata')"
+      >
+        +{{ moreOthers }} more
       </el-tag>
 
-      <!-- Pipeline Tag (Models) -->
-      <el-tag
-        v-if="repoType === 'model' && pipelineTag"
-        type="warning"
-        size="small"
+      <!-- Papers (Models): away from the site -->
+      <a
+        v-for="paper in repoType === 'model' ? shownPapers : []"
+        :key="paper.id"
+        :href="paper.url"
+        target="_blank"
+        rel="noopener noreferrer"
       >
-        <div class="i-carbon-task inline-block mr-1" />
-        {{ pipelineTag }}
-      </el-tag>
+        <el-tag size="small" effect="plain">
+          <div class="i-carbon-document-attachment inline-block mr-1" />
+          {{ paper.label }}
+        </el-tag>
+      </a>
 
       <!-- Size (Datasets) - IMPORTANT INFO -->
       <el-tag
@@ -134,9 +201,8 @@ const sizeCategory = computed(() => {
 
       <!-- Task Categories (Datasets) -->
       <el-tag
-        v-for="task in taskCategories"
+        v-for="task in repoType === 'dataset' ? taskCategories : []"
         :key="task"
-        v-if="repoType === 'dataset'"
         type="success"
         size="small"
       >
