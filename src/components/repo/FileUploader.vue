@@ -108,7 +108,7 @@
           :class="
             isHashing
               ? 'text-blue-600 dark:text-blue-400'
-              : 'text-green-600 dark:text-green-400'
+              : 'text-green-700 dark:text-green-400'
           "
         >
           {{

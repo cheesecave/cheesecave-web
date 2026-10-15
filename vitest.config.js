@@ -107,6 +107,7 @@ export default defineConfig({
         "src/components/pages/RepoListPage.vue",
         "src/components/profile/SocialLinks.vue",
         "src/components/repo/FileUploader.vue",
+        "src/components/repo/PrivateBadge.vue",
         "src/components/repo/RepoList.vue",
         "src/components/repo/RepoViewer.vue",
         "src/components/repo/preview/FileMetadataPanel.vue",

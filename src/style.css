@@ -133,6 +133,11 @@ html[data-site-theme]
   ) {
   border-color: var(--site-border);
 }
+/* A link written blue is a link: it takes the brand link colour, and so does a
+   blue span inside a link (the author's name) and the active repository tab,
+   so one page has one accent. The type colours (blue model, green dataset,
+   purple space) stay on icons and section headings: they say what a repository
+   is, the brand colour says what can be clicked. */
 html[data-site-theme]
   a:is(
     .text-blue-500,
@@ -141,8 +146,23 @@ html[data-site-theme]
     [class~="dark:text-blue-400"],
     [class~="dark:text-blue-500"]
   ),
+html[data-site-theme]
+  a
+  :is(
+    .text-blue-500,
+    .text-blue-600,
+    .text-blue-700,
+    [class~="dark:text-blue-400"],
+    [class~="dark:text-blue-500"]
+  ),
+html[data-site-theme]
+  .repo-tabs
+  :is(.text-blue-600, [class~="dark:text-blue-400"]),
 html[data-site-theme] a:hover {
   color: var(--site-context-link, var(--site-page-link));
+}
+html[data-site-theme] .repo-tabs .border-blue-500 {
+  border-color: var(--site-context-link, var(--site-page-link));
 }
 html[data-site-theme] :is(a, button)[class*="hover:bg-gray-"]:hover {
   background-color: var(--site-hover);
@@ -275,4 +295,29 @@ html[data-site-theme] .input:focus {
 html[data-site-theme] .app-shell :is(textarea, select) {
   color: var(--site-card-text);
   background-color: var(--site-card);
+}
+
+/* Element Plus's status colours are the 500 shades, 2.0 to 2.8:1 on their own
+   10 % tint. The light theme's tag labels and its info grey (input prepend and
+   counter, info tags) take shades that reach 4.5:1; the dark theme's info grey is
+   lightened to do the same on the dark card. A dark-effect tag keeps its white
+   label, and the selected type button keeps the primary button's label colour
+   (white on the dark theme's amber was 1.85:1). */
+html:not(.dark)[data-site-theme] {
+  --el-color-info: #656870;
+}
+html.dark[data-site-theme] {
+  --el-color-info: #a8abb2;
+}
+html:not(.dark)[data-site-theme] .el-tag--warning:not(.el-tag--dark) {
+  --el-tag-text-color: #8a5a0f;
+}
+html:not(.dark)[data-site-theme] .el-tag--success:not(.el-tag--dark) {
+  --el-tag-text-color: #3d7a1d;
+}
+html:not(.dark)[data-site-theme] .el-tag--danger:not(.el-tag--dark) {
+  --el-tag-text-color: #b83a3a;
+}
+html[data-site-theme] .el-radio-button {
+  --el-radio-button-checked-text-color: var(--site-primary-text);
 }

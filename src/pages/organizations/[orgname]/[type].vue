@@ -238,15 +238,16 @@
                 <div class="flex items-start gap-2 mb-2">
                   <div :class="iconClass" class="text-xl flex-shrink-0" />
                   <div class="flex-1 min-w-0">
-                    <h3 class="font-semibold">
+                    <h3 class="font-semibold flex items-center gap-2">
                       <RouterLink
                         :to="getRepoPath(repo)"
-                        class="block hover:underline truncate"
+                        class="block hover:underline truncate min-w-0"
                         :class="titleColor"
                         @click.stop
                       >
                         {{ repo.id }}
                       </RouterLink>
+                      <PrivateBadge v-if="repo.private" />
                     </h3>
                     <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">
                       Updated {{ formatDate(repo.lastModified) }}
@@ -316,6 +317,7 @@
 <script setup>
 import { repoAPI, orgAPI } from "@/utils/api";
 import axios from "axios";
+import PrivateBadge from "@/components/repo/PrivateBadge.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import IncompleteNotice from "@/components/common/IncompleteNotice.vue";
 import { useIncompleteSources } from "@/composables/useIncompleteSources";
@@ -392,18 +394,8 @@ const iconClass = computed(() => {
   }
 });
 
-const titleColor = computed(() => {
-  switch (currentType.value) {
-    case "models":
-      return "text-blue-600 dark:text-blue-400";
-    case "datasets":
-      return "text-green-600 dark:text-green-400";
-    case "spaces":
-      return "text-purple-600 dark:text-purple-400";
-    default:
-      return "text-blue-600 dark:text-blue-400";
-  }
-});
+// Repository names are links, and links take the brand colour whatever the type
+const titleColor = "text-blue-600 dark:text-blue-400";
 
 const borderColor = computed(() => {
   switch (currentType.value) {

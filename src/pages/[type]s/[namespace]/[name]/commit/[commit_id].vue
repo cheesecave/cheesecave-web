@@ -452,7 +452,7 @@
                     class="space-y-2"
                   >
                     <div
-                      class="text-xs font-semibold text-green-600 dark:text-green-400"
+                      class="text-xs font-semibold text-green-700 dark:text-green-400"
                     >
                       {{ file.type === "added" ? "Added" : "After" }}
                       <span v-if="file.size_bytes" class="ml-2 text-gray-500">
@@ -590,7 +590,7 @@
 
               <!-- Added files (no previous content) -->
               <div v-else-if="file.type === 'added'">
-                <div class="text-xs text-green-600 dark:text-green-400 mb-2">
+                <div class="text-xs text-green-700 dark:text-green-400 mb-2">
                   New file created
                 </div>
                 <el-button size="small" @click="viewFile(file.path)">

@@ -441,14 +441,15 @@
                       class="i-carbon-model text-blue-500 text-xl flex-shrink-0"
                     />
                     <div class="flex-1 min-w-0">
-                      <h3 class="font-semibold">
+                      <h3 class="font-semibold flex items-center gap-2">
                         <RouterLink
                           :to="getRepoPath('model', repo)"
-                          class="block text-blue-600 dark:text-blue-400 hover:underline truncate"
+                          class="block text-blue-600 dark:text-blue-400 hover:underline truncate min-w-0"
                           @click.stop
                         >
                           {{ repo.id }}
                         </RouterLink>
+                        <PrivateBadge v-if="repo.private" />
                       </h3>
                       <div
                         class="text-xs text-gray-600 dark:text-gray-400 mt-1"
@@ -566,14 +567,15 @@
                       class="i-carbon-data-table text-green-500 text-xl flex-shrink-0"
                     />
                     <div class="flex-1 min-w-0">
-                      <h3 class="font-semibold">
+                      <h3 class="font-semibold flex items-center gap-2">
                         <RouterLink
                           :to="getRepoPath('dataset', repo)"
-                          class="block text-green-600 dark:text-green-400 hover:underline truncate"
+                          class="block text-blue-600 dark:text-blue-400 hover:underline truncate min-w-0"
                           @click.stop
                         >
                           {{ repo.id }}
                         </RouterLink>
+                        <PrivateBadge v-if="repo.private" />
                       </h3>
                       <div
                         class="text-xs text-gray-600 dark:text-gray-400 mt-1"
@@ -691,14 +693,15 @@
                       class="i-carbon-application text-purple-500 text-xl flex-shrink-0"
                     />
                     <div class="flex-1 min-w-0">
-                      <h3 class="font-semibold">
+                      <h3 class="font-semibold flex items-center gap-2">
                         <RouterLink
                           :to="getRepoPath('space', repo)"
-                          class="block text-purple-600 dark:text-purple-400 hover:underline truncate"
+                          class="block text-blue-600 dark:text-blue-400 hover:underline truncate min-w-0"
                           @click.stop
                         >
                           {{ repo.id }}
                         </RouterLink>
+                        <PrivateBadge v-if="repo.private" />
                       </h3>
                       <div
                         class="text-xs text-gray-600 dark:text-gray-400 mt-1"
@@ -777,6 +780,7 @@
 
 <script setup>
 import { repoAPI, orgAPI, settingsAPI } from "@/utils/api";
+import PrivateBadge from "@/components/repo/PrivateBadge.vue";
 import EntityAvatar from "@/components/common/EntityAvatar.vue";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import SocialLinks from "@/components/profile/SocialLinks.vue";

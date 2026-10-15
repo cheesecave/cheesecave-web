@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from "vue";
 import { RouterLink } from "vue-router";
+import PrivateBadge from "./PrivateBadge.vue";
 import RepositoryStats from "./RepositoryStats.vue";
 import { facetLabel } from "@/utils/repo-discovery";
 import { getRepositoryType, isRepositoryType } from "@/utils/repository-types";
@@ -76,9 +77,7 @@ const metadata = computed(() => {
         aria-hidden="true"
       />
       <h3 :title="repo.id">{{ repo.id }}</h3>
-      <span v-if="repo.private" class="repo-private"
-        ><span class="i-carbon-locked" aria-hidden="true" />Private</span
-      >
+      <PrivateBadge v-if="repo.private" />
     </div>
     <div v-if="metadata.length" class="repo-card-metadata">
       <span
@@ -143,17 +142,6 @@ const metadata = computed(() => {
   font-size: 14px;
   line-height: 1.6;
   font-weight: 600;
-}
-.repo-private {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  flex-shrink: 0;
-  border: 1px solid var(--site-border, #dedfd4);
-  border-radius: 5px;
-  padding: 1px 4px;
-  color: var(--site-muted, #6b7068);
-  font-size: 9px;
 }
 .repo-card-metadata {
   display: flex;
