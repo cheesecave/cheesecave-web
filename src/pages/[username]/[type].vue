@@ -246,7 +246,7 @@
                   <h3 class="font-semibold flex items-center gap-2">
                     <RouterLink
                       :to="getRepoPath('model', repo)"
-                      class="keep-type-color block text-blue-600 dark:text-blue-400 hover:underline truncate min-w-0"
+                      class="block text-blue-600 dark:text-blue-400 hover:underline truncate min-w-0"
                       @click.stop
                     >
                       {{ repo.id }}
@@ -363,7 +363,7 @@
                   <h3 class="font-semibold flex items-center gap-2">
                     <RouterLink
                       :to="getRepoPath('dataset', repo)"
-                      class="block text-green-700 dark:text-green-400 hover:underline truncate min-w-0"
+                      class="block text-blue-600 dark:text-blue-400 hover:underline truncate min-w-0"
                       @click.stop
                     >
                       {{ repo.id }}
@@ -467,7 +467,7 @@
                   <h3 class="font-semibold flex items-center gap-2">
                     <RouterLink
                       :to="getRepoPath('space', repo)"
-                      class="block text-purple-600 dark:text-purple-400 hover:underline truncate min-w-0"
+                      class="block text-blue-600 dark:text-blue-400 hover:underline truncate min-w-0"
                       @click.stop
                     >
                       {{ repo.id }}

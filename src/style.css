@@ -135,11 +135,11 @@ html[data-site-theme]
 }
 /* A link written blue is a link: it takes the brand link colour, and so does a
    blue span inside a link (the author's name) and the active repository tab,
-   so one page has one accent. `keep-type-color` marks the one place blue means
-   something else, the model type (the names in the model lists, next to the
-   green datasets and purple spaces). */
+   so one page has one accent. The type colours (blue model, green dataset,
+   purple space) stay on icons and section headings: they say what a repository
+   is, the brand colour says what can be clicked. */
 html[data-site-theme]
-  a:not(.keep-type-color):is(
+  a:is(
     .text-blue-500,
     .text-blue-600,
     .text-blue-700,

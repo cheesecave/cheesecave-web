@@ -394,18 +394,8 @@ const iconClass = computed(() => {
   }
 });
 
-const titleColor = computed(() => {
-  switch (currentType.value) {
-    case "models":
-      return "keep-type-color text-blue-600 dark:text-blue-400";
-    case "datasets":
-      return "text-green-700 dark:text-green-400";
-    case "spaces":
-      return "text-purple-600 dark:text-purple-400";
-    default:
-      return "text-blue-600 dark:text-blue-400";
-  }
-});
+// Repository names are links, and links take the brand colour whatever the type
+const titleColor = "text-blue-600 dark:text-blue-400";
 
 const borderColor = computed(() => {
   switch (currentType.value) {

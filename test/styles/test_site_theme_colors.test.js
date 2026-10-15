@@ -47,14 +47,6 @@ describe("the brand link colour", () => {
     expect(brandColoured(mount(`<a ${BLUE}>x</a>`))).toBe(true);
   });
 
-  it("leaves a model name its type colour (blue like the heading and icon above it)", () => {
-    expect(
-      brandColoured(
-        mount(`<a ${BLUE.replace('class="', 'class="keep-type-color ')}>x</a>`),
-      ),
-    ).toBe(false);
-  });
-
   it("reaches the author link, a blue span inside a link", () => {
     mount(`<a href="#"><span ${BLUE}>demo</span></a>`);
     expect(brandColoured(document.querySelector("span"))).toBe(true);

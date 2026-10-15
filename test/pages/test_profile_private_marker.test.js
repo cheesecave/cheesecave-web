@@ -1,6 +1,7 @@
 // The user and organization pages draw their own repository cards. A private repository must say so there, as it
 // does on the home page, in the repository list and on the discovery card: its owner, or an organization member,
-// should be able to tell at a glance which of the repositories are private.
+// should be able to tell at a glance which of the repositories are private. And the names of the three types are
+// links in the same colour: the type colours belong to the icons and headings, not to the names.
 
 import { h, reactive } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
@@ -153,5 +154,21 @@ describe.each(PAGES)("%s", (_name, component, mode, params) => {
     expect(open.length).toBe(secret.length);
     for (const card of open)
       expect(card.find(".repo-private").exists()).toBe(false);
+  });
+
+  it("styles the name of a model, a dataset and a space alike: a link, in no type colour", async () => {
+    mocks.listAllRepos.mockImplementation(async (type) => ({
+      data: [repo(type, "open", false)],
+      incomplete: [],
+    }));
+    await mountPage(component, mode, params);
+
+    const names = wrapper
+      .findAll(".card h3 a")
+      .map((link) => link.classes().sort().join(" "));
+    expect(names.length).toBeGreaterThan(0);
+    expect(new Set(names).size).toBe(1);
+    expect(names[0]).toContain("text-blue-600");
+    expect(names[0]).not.toMatch(/text-(green|purple)-|keep-type-color/);
   });
 });
