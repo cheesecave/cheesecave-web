@@ -5,6 +5,7 @@ import EntityAvatar from "@/components/common/EntityAvatar.vue";
 import {
   buildEntityAvatarUrl,
   buildEntityProfilePath,
+  clearMissingEntityAvatars,
   invalidateEntityAvatar,
 } from "@/utils/entity-avatar";
 
@@ -18,6 +19,28 @@ describe("shared entity avatars", () => {
   afterEach(() => {
     wrappers.splice(0).forEach((wrapper) => wrapper.unmount());
     vi.restoreAllMocks();
+    clearMissingEntityAvatars();
+  });
+
+  it("remembers an avatar that failed to load: the next avatar for that account asks for nothing", async () => {
+    const first = render({ username: "no-avatar", name: "No Avatar" });
+    await first.get("img").trigger("error");
+
+    const second = render({ username: "no-avatar", name: "No Avatar" });
+
+    expect(second.find("img").exists()).toBe(false);
+    expect(second.text()).toBe("NO");
+    // and an avatar given an external address is still loaded
+    const external = render({
+      username: "no-avatar",
+      src: "https://cdn.example.com/a.png",
+    });
+    expect(external.get("img").attributes("src")).toBe(
+      "https://cdn.example.com/a.png",
+    );
+    // while an error of an external image is not blamed on the account's own avatar
+    await external.get("img").trigger("error");
+    expect(render({ username: "elsewhere" }).find("img").exists()).toBe(true);
   });
 
   it("uses encoded user and organization endpoints and profile paths", async () => {

@@ -321,3 +321,35 @@ html:not(.dark)[data-site-theme] .el-tag--danger:not(.el-tag--dark) {
 html[data-site-theme] .el-radio-button {
   --el-radio-button-checked-text-color: var(--site-primary-text);
 }
+
+/* The repository tab strip scrolls sideways where the tabs do not fit. The page
+   background fades over an edge that has more behind it, and the fade is gone
+   once the strip is scrolled to that end: the covers scroll with the content
+   (`local`), the fades stay on the box (`scroll`). */
+.repo-tabs {
+  background-image:
+    linear-gradient(to right, var(--site-bg, #f7f4eb), transparent),
+    linear-gradient(to left, var(--site-bg, #f7f4eb), transparent),
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--site-text, #2c332b) 18%, transparent),
+      transparent
+    ),
+    linear-gradient(
+      to left,
+      color-mix(in srgb, var(--site-text, #2c332b) 18%, transparent),
+      transparent
+    );
+  background-position:
+    left center,
+    right center,
+    left center,
+    right center;
+  background-size:
+    28px 100%,
+    28px 100%,
+    12px 100%,
+    12px 100%;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
+}

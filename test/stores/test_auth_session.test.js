@@ -99,7 +99,8 @@ describe("init when the server cannot answer", () => {
     const store = await createStore();
     await store.fetchUserInfo();
     serve({ status: 500, body: {} });
-    await expect(store.fetchUserInfo()).rejects.toBeDefined();
+    // (forced: an answer of the last few seconds would otherwise be reused without asking)
+    await expect(store.fetchUserInfo({ force: true })).rejects.toBeDefined();
     expect(store.user.username).toBe("owner");
     expect(store.userOrganizations.length).toBeGreaterThan(0);
   });

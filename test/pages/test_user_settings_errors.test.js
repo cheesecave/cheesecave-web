@@ -77,6 +77,27 @@ const httpFailure = (status) =>
     response: { status, headers: {}, data: {} },
   });
 
+describe("saving the account settings", () => {
+  it("saves the profile, then asks the server who we are again even though it was just asked (the email may have changed)", async () => {
+    mocks.settingsAPI.getUserProfile.mockResolvedValue({ data: {} });
+    mocks.settingsAPI.whoamiV2.mockResolvedValue({
+      data: { name: "alice", email: "a@x.io", orgs: [{ name: "acme" }] },
+    });
+    mocks.settingsAPI.updateUserSettings.mockResolvedValue({});
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(mocks.settingsAPI.whoamiV2).toHaveBeenCalledTimes(1);
+
+    await wrapper.vm.updateProfile();
+
+    expect(mocks.settingsAPI.updateUserSettings).toHaveBeenCalledWith(
+      "alice",
+      expect.objectContaining({ email: "a@x.io" }),
+    );
+    expect(mocks.settingsAPI.whoamiV2).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("account settings failures", () => {
   it("reports a profile that could not be saved", async () => {
     mocks.settingsAPI.getUserProfile.mockResolvedValueOnce({ data: {} });

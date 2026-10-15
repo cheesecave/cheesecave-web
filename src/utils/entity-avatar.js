@@ -1,7 +1,27 @@
 import { reactive } from "vue";
 
 const revisions = reactive(new Map());
+// Accounts whose avatar answered 404, with the time to forget that: the browser prints a red 404 in the console for
+// every <img> that asks, so an account without an avatar is asked about once, not at every place it is shown.
+export const MISSING_TTL_MS = 10 * 60 * 1000;
+const missing = reactive(new Map());
 const entityKey = (username, isOrg) => `${isOrg ? "org" : "user"}:${username}`;
+export const entityAvatarEndpoint = (username, isOrg = false) =>
+  `/api/${isOrg ? "organizations" : "users"}/${encodeURIComponent(username)}/avatar`;
+
+export function markEntityAvatarMissing(username, isOrg = false) {
+  if (!username) return;
+  missing.set(entityKey(username, isOrg), Date.now() + MISSING_TTL_MS);
+}
+
+export function isEntityAvatarMissing(username, isOrg = false) {
+  const until = missing.get(entityKey(username, isOrg));
+  return until !== undefined && Date.now() < until;
+}
+
+export function clearMissingEntityAvatars() {
+  missing.clear();
+}
 const revisionKey = (key) => `kohakuhub.avatar-revision.v1:${key}`;
 
 function cachedRevision(key) {
@@ -27,6 +47,8 @@ export function invalidateEntityAvatar(username, isOrg = false) {
   const key = entityKey(username, isOrg);
   const revision = Math.max(Date.now(), currentRevision(key) + 1);
   revisions.set(key, revision);
+  // An avatar was uploaded or deleted: whatever was known about it is out of date
+  missing.delete(key);
   // Avatar responses are cached for 24 hours. Keep the invalidation across
   // reloads so uploading/deleting cannot resurrect the previously cached image.
   try {
@@ -42,14 +64,13 @@ export function buildEntityAvatarUrl({
   src,
   version,
 } = {}) {
-  const endpoint = username
-    ? `/api/${isOrg ? "organizations" : "users"}/${encodeURIComponent(username)}/avatar`
-    : undefined;
+  const endpoint = username ? entityAvatarEndpoint(username, isOrg) : undefined;
   const source = src || endpoint;
   if (!source || !endpoint) return source;
   // Only our own avatar endpoint can be cache-invalidated. Preserve external and
   // signed image URLs, along with unrelated local image sources, byte-for-byte.
   if (source.split(/[?#]/, 1)[0] !== endpoint) return source;
+  if (isEntityAvatarMissing(username, isOrg)) return undefined;
   const revision = currentRevision(entityKey(username, isOrg));
   const hasVersion =
     version !== undefined && version !== null && version !== "";

@@ -211,7 +211,7 @@
           >
             <button
               :class="[
-                'px-4 py-2 font-medium transition-colors',
+                'px-2.5 sm:px-4 py-2 text-sm sm:text-base font-medium transition-colors',
                 activeTab === 'card'
                   ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200',
@@ -228,7 +228,7 @@
             </button>
             <button
               :class="[
-                'px-4 py-2 font-medium transition-colors',
+                'px-2.5 sm:px-4 py-2 text-sm sm:text-base font-medium transition-colors',
                 activeTab === 'files'
                   ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200',
@@ -239,7 +239,7 @@
             </button>
             <button
               :class="[
-                'px-4 py-2 font-medium transition-colors',
+                'px-2.5 sm:px-4 py-2 text-sm sm:text-base font-medium transition-colors',
                 activeTab === 'commits'
                   ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200',
@@ -257,7 +257,7 @@
             </button>
             <button
               :class="[
-                'px-4 py-2 font-medium transition-colors',
+                'px-2.5 sm:px-4 py-2 text-sm sm:text-base font-medium transition-colors',
                 activeTab === 'metadata'
                   ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200',

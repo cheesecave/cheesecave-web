@@ -171,6 +171,25 @@ describe("RepoViewer shows what the API knows next to what the README says", () 
     expect(card.exists()).toBe(true);
   });
 
+  it("keeps the four tabs on one line at phone width: tighter padding and text below the sm breakpoint", async () => {
+    const wrapper = mountViewer("model");
+    await settle(wrapper);
+
+    const tabs = wrapper.findAll(".repo-tabs button");
+    expect(tabs).toHaveLength(4);
+    for (const tab of tabs) {
+      expect(tab.classes()).toEqual(
+        expect.arrayContaining([
+          "px-2.5",
+          "sm:px-4",
+          "text-sm",
+          "sm:text-base",
+        ]),
+      );
+      expect(tab.classes()).not.toContain("px-4");
+    }
+  });
+
   it("renders the README one heading level down, under the page's own <h1>", async () => {
     const wrapper = mountViewer("model");
     await settle(wrapper);

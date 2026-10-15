@@ -161,6 +161,7 @@
     >
       <el-scrollbar height="100%" :tabindex="0">
         <RepoFilterPanel
+          :heading="false"
           :facets="facets"
           :selected="selectedFilters"
           @toggle="toggleFilter"

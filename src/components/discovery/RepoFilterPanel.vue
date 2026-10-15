@@ -4,6 +4,8 @@ import { computed, ref, useId, watch } from "vue";
 const props = defineProps({
   facets: { type: Array, default: () => [] },
   selected: { type: Object, default: () => ({}) },
+  // False where the panel sits under a title that already says "Filters" (the phone drawer)
+  heading: { type: Boolean, default: true },
 });
 const emit = defineEmits(["toggle", "clear"]);
 const search = ref("");
@@ -54,13 +56,14 @@ function visibleOptions(group) {
 
 <template>
   <section class="repo-filter-panel" aria-label="Repository filters">
-    <div class="filter-heading">
-      <h2>
+    <div v-if="heading || selectionCount" class="filter-heading">
+      <h2 v-if="heading">
         Filters
         <span v-if="selectionCount" class="selection-count">{{
           selectionCount
         }}</span>
       </h2>
+      <span v-else class="selection-count">{{ selectionCount }} selected</span>
       <button
         v-if="selectionCount"
         type="button"
