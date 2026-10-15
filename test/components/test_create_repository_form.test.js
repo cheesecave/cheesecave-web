@@ -54,6 +54,20 @@ describe("shared repository creation form", () => {
       .find((item) => item.text().includes(label));
   }
 
+  it("states the real name rules, and keeps the visibility help text on its own line", async () => {
+    const wrapper = mountForm();
+    await flushPromises();
+    // The hint under the name field is the rule the server applies
+    expect(wrapper.text()).toMatch(/1 to 96/);
+    expect(wrapper.text()).toContain(".git");
+    // The help text is a flex item next to a checkbox that is not full width:
+    // without w-full it is drawn on the same line as the label, run together
+    const help = wrapper
+      .findAll("p")
+      .find((item) => item.text().includes("Anyone on the internet"));
+    expect(help.classes()).toEqual(expect.arrayContaining(["w-full", "mt-1"]));
+  });
+
   it("uses the same organization, visibility, validation and fallback redirect for a fixed type", async () => {
     mocks.getUserOrgs.mockResolvedValue({
       data: {
