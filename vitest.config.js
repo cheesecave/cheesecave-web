@@ -78,6 +78,7 @@ export default defineConfig({
         "src/stores/auth.js",
         "src/stores/theme.js",
         "src/utils/api.js",
+        "src/utils/page-title.js",
         "src/utils/clipboard.js",
         "src/utils/datetime.js",
         "src/utils/externalTokens.js",

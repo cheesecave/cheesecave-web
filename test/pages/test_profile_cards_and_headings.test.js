@@ -1,7 +1,8 @@
 // The user and organization pages draw their own repository cards. A private repository must say so there, as it
 // does on the home page, in the repository list and on the discovery card: its owner, or an organization member,
 // should be able to tell at a glance which of the repositories are private. And the names of the three types are
-// links in the same colour: the type colours belong to the icons and headings, not to the names.
+// links in the same colour: the type colours belong to the icons and headings, not to the names. And each page has one
+// <h1>, the name of the account or the page's own title, so a screen reader's heading list starts somewhere.
 
 import { h, reactive } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
@@ -170,5 +171,30 @@ describe.each(PAGES)("%s", (_name, component, mode, params) => {
     expect(new Set(names).size).toBe(1);
     expect(names[0]).toContain("text-blue-600");
     expect(names[0]).not.toMatch(/text-(green|purple)-|keep-type-color/);
+  });
+
+  it("has exactly one <h1>", async () => {
+    mocks.listAllRepos.mockImplementation(async (type) => ({
+      data: [repo(type, "open", false)],
+      incomplete: [],
+    }));
+    await mountPage(component, mode, params);
+
+    expect(wrapper.findAll("h1")).toHaveLength(1);
+  });
+
+  it('has no link without a name (the "show all" link is only there when there is more to show)', async () => {
+    mocks.listAllRepos.mockImplementation(async (type) => ({
+      data: [repo(type, "open", false)],
+      incomplete: [],
+    }));
+    await mountPage(component, mode, params);
+
+    for (const link of wrapper.findAll("a")) {
+      expect(
+        link.text() || link.attributes("aria-label"),
+        link.html(),
+      ).toBeTruthy();
+    }
   });
 });

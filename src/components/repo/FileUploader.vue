@@ -58,6 +58,7 @@
             </div>
             <div class="flex-shrink-0" style="width: 300px">
               <el-input
+                aria-label="Path in repository"
                 v-model="fileItem.path"
                 size="small"
                 placeholder="Path in repository"

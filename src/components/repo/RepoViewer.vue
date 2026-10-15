@@ -283,6 +283,7 @@
             <div v-else-if="readmeContent">
               <MarkdownViewer
                 :content="readmeContent"
+                :heading-offset="1"
                 :repo-type="repoType"
                 :namespace="namespace"
                 :name="name"
@@ -354,6 +355,7 @@
           >
             <div class="flex items-center gap-2 min-w-0">
               <el-select
+                aria-label="Branch"
                 v-model="currentBranch"
                 size="small"
                 class="w-full min-w-28 sm:w-37 sm:min-w-37 sm:flex-none"
@@ -385,6 +387,7 @@
                 Upload Files
               </el-button>
               <el-input
+                aria-label="Filter files by name prefix"
                 v-model="fileSearchQuery"
                 placeholder="Filter by name prefix..."
                 size="small"
@@ -853,7 +856,12 @@
             <div class="i-carbon-code text-lg" />
             Clone with Git (Recommended)
           </label>
-          <el-input :value="gitCloneUrl" readonly class="font-mono text-sm">
+          <el-input
+            aria-label="Git clone URL"
+            :value="gitCloneUrl"
+            readonly
+            class="font-mono text-sm"
+          >
             <template #append>
               <el-button @click="copyGitCloneUrl">
                 <div class="i-carbon-copy" />

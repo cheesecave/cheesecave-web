@@ -904,6 +904,7 @@ watch(innerPreviewProps, (val) => {
         <!-- Toolbar. Search, view toggle, page size. -->
         <div class="flex flex-wrap items-center gap-2 mb-3">
           <el-input
+            aria-label="Filter in this folder"
             v-model="searchQuery"
             size="small"
             placeholder="Filter in this folder…"
@@ -929,6 +930,7 @@ watch(innerPreviewProps, (val) => {
             placement="top"
           >
             <el-select
+              aria-label="File name encoding"
               v-model="zipEncoding"
               size="small"
               class="!w-48"
@@ -948,6 +950,7 @@ watch(innerPreviewProps, (val) => {
             placement="top"
           >
             <el-switch
+              aria-label="Show thumbnails"
               :model-value="thumbnailsEnabled"
               @update:model-value="setThumbnailsEnabled"
               size="small"
@@ -966,6 +969,7 @@ watch(innerPreviewProps, (val) => {
             </el-radio-button>
           </el-radio-group>
           <el-select
+            aria-label="Entries per page"
             v-model="pageSize"
             size="small"
             class="!w-28"

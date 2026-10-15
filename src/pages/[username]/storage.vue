@@ -83,6 +83,7 @@
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-xl font-semibold">Repositories by Storage</h2>
           <el-input
+            aria-label="Search repositories"
             v-model="searchQuery"
             placeholder="Search repositories..."
             class="w-64"

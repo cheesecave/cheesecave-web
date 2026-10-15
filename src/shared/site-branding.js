@@ -297,10 +297,26 @@ export function saveCachedBranding(value) {
   }
 }
 
+// The title is "<page> · <site name>": the site name comes from the branding settings, the page from the route
+// (src/utils/page-title.js); whichever arrives last rewrites it.
+let siteTitle = "";
+let pageTitle = "";
+
+function renderDocumentTitle() {
+  if (!siteTitle || typeof document === "undefined") return;
+  document.title = pageTitle ? `${pageTitle} · ${siteTitle}` : siteTitle;
+}
+
+export function setDocumentPageTitle(title) {
+  pageTitle = title;
+  renderDocumentTitle();
+}
+
 export function applyDocumentBranding(value, { admin = false } = {}) {
   const branding = normalizeBranding(value);
   if (!branding || typeof document === "undefined") return;
-  document.title = `${branding.site_name}${admin ? " Admin Portal" : ""}`;
+  siteTitle = `${branding.site_name}${admin ? " Admin Portal" : ""}`;
+  renderDocumentTitle();
   const base = admin ? "/admin" : "";
   for (const [rel, fallback] of [
     ["icon", `${base}/favicon.svg`],

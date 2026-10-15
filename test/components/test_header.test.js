@@ -387,4 +387,53 @@ describe("TheHeader", () => {
     expect(home.text()).toBe("Renamed Hub");
     expect(home.get("img").attributes("alt")).toBe("Renamed Hub");
   });
+
+  describe("accessible names", () => {
+    const nameOf = (button) =>
+      button.attributes("aria-label") ||
+      button.attributes("title") ||
+      button.text().trim();
+
+    it("names every button, signed in or not", async () => {
+      for (const signedIn of [false, true]) {
+        localStorage.clear();
+        setActivePinia(createPinia());
+        if (signedIn) useAuthStore().user = { username: "alice" };
+        const wrapper = mountHeader();
+        await flushPromises();
+        const buttons = wrapper.findAll("button");
+        expect(buttons.length).toBeGreaterThan(0);
+        for (const button of buttons)
+          expect(nameOf(button), button.html()).not.toBe("");
+        wrapper.unmount();
+      }
+    });
+
+    it("says what the theme switch will do, and follows the theme", async () => {
+      const wrapper = mountHeader();
+      const switchLabels = () =>
+        wrapper
+          .findAll("button")
+          .map(nameOf)
+          .filter((name) => /theme/.test(name));
+      const before = switchLabels();
+      expect(before.length).toBeGreaterThan(0);
+      for (const name of before) expect(name).toBe("Switch to dark theme");
+
+      useThemeStore().toggle();
+      await nextTick();
+
+      for (const name of switchLabels())
+        expect(name).toBe("Switch to light theme");
+    });
+
+    it("names the create menu and the mobile menu button", async () => {
+      useAuthStore().user = { username: "alice" };
+      const wrapper = mountHeader();
+      await flushPromises();
+      const names = wrapper.findAll("button").map(nameOf);
+      expect(names).toContain("Create new");
+      expect(names).toContain("Open menu");
+    });
+  });
 });

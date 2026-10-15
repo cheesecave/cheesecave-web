@@ -208,10 +208,11 @@
           >
             <div class="flex items-center gap-2">
               <div :class="iconClass" class="text-xl md:text-2xl" />
-              <h2 class="text-xl md:text-2xl font-bold">{{ typeTitle }}</h2>
+              <h1 class="text-xl md:text-2xl font-bold">{{ typeTitle }}</h1>
             </div>
             <div class="flex items-center gap-3 ml-auto">
               <el-select
+                aria-label="Sort repositories"
                 v-model="selectedSort"
                 placeholder="Sort repositories"
                 class="w-44 sm:w-56"
