@@ -126,7 +126,7 @@
           <div
             class="flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm text-gray-600 dark:text-gray-400"
           >
-            <div class="flex items-center gap-1">
+            <div v-if="repoType !== 'space'" class="flex items-center gap-1">
               <div class="i-carbon-download" />
               <span>{{ repoInfo?.downloads || 0 }} downloads</span>
             </div>
@@ -973,6 +973,7 @@ import { useAsyncResource } from "@/composables/useAsyncResource";
 import { resolveRepoTreeEntryPath } from "@/utils/repo-paths";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import MetadataHeader from "@/components/repo/metadata/MetadataHeader.vue";
+import { CORE_REPO_FIELDS, repoPageFields } from "@/utils/repo-page-fields";
 import DetailedMetadataPanel from "@/components/repo/metadata/DetailedMetadataPanel.vue";
 import ReferencedDatasetsCard from "@/components/repo/metadata/ReferencedDatasetsCard.vue";
 import SidebarRelationshipsCard from "@/components/repo/metadata/SidebarRelationshipsCard.vue";
@@ -1422,24 +1423,26 @@ async function checkIfNamespaceIsOrg() {
 
 // What this page shows of repo info. Not the whole-repository file list:
 // the file list comes from the paginated tree (#101).
-const REPO_PAGE_FIELDS = [
-  "sha",
-  "lastModified",
-  "createdAt",
-  "private",
-  "downloads",
-  "likes",
-  "tags",
-  "storage",
-];
-
 async function fetchRepoInfo({ signal }) {
-  const { data } = await repoAPI.getInfo(
-    props.repoType,
-    props.namespace,
-    props.name,
-    REPO_PAGE_FIELDS,
-  );
+  let data;
+  try {
+    ({ data } = await repoAPI.getInfo(
+      props.repoType,
+      props.namespace,
+      props.name,
+      repoPageFields(props.repoType),
+    ));
+  } catch (err) {
+    // A backend that refuses one of the options (an older or newer one than this page) must
+    // not turn the page into an error: ask again for what every repository has
+    if (err?.response?.status !== 400) throw err;
+    ({ data } = await repoAPI.getInfo(
+      props.repoType,
+      props.namespace,
+      props.name,
+      CORE_REPO_FIELDS,
+    ));
+  }
 
   // Check if current user has liked (only if authenticated)
   let liked = null;
