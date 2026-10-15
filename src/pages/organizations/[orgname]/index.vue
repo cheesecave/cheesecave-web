@@ -853,6 +853,7 @@
 
 <script setup>
 import { repoAPI, orgAPI, settingsAPI } from "@/utils/api";
+import { useAuthStore } from "@/stores/auth";
 import PrivateBadge from "@/components/repo/PrivateBadge.vue";
 import EntityAvatar from "@/components/common/EntityAvatar.vue";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
@@ -871,6 +872,7 @@ import { KIND, decodeError } from "@/errors";
 import { useErrorContext } from "@/composables/useErrorContext";
 
 const route = useRoute();
+const authStore = useAuthStore();
 const router = useRouter();
 const orgname = computed(() => route.params.orgname);
 
@@ -1165,7 +1167,7 @@ async function loadProfileInfo() {
 
 async function checkUserRole() {
   try {
-    const { data } = await settingsAPI.whoamiV2();
+    const data = await authStore.fetchUserInfo();
     const org = data.orgs?.find((o) => o.name === orgname.value);
     userRole.value = org?.roleInOrg || org?.role || null;
   } catch (err) {

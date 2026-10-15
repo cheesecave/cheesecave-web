@@ -1,7 +1,11 @@
 <script setup>
 import { computed } from "vue";
 import { ElAvatar } from "element-plus";
-import { buildEntityAvatarUrl } from "@/utils/entity-avatar";
+import {
+  buildEntityAvatarUrl,
+  entityAvatarEndpoint,
+  markEntityAvatarMissing,
+} from "@/utils/entity-avatar";
 
 const props = defineProps({
   username: { type: String, default: null },
@@ -21,6 +25,15 @@ const source = computed(() =>
     version: props.version,
   }),
 );
+// The account's own avatar failed to load (404: it has none): remember, so nothing asks again
+function onError() {
+  if (
+    props.username &&
+    source.value?.split(/[?#]/, 1)[0] ===
+      entityAvatarEndpoint(props.username, props.isOrg)
+  )
+    markEntityAvatarMissing(props.username, props.isOrg);
+}
 const initials = computed(() =>
   Array.from((props.name || props.username || "").trim())
     .slice(0, 2)
@@ -30,7 +43,7 @@ const initials = computed(() =>
 </script>
 
 <template>
-  <ElAvatar :src="source" :size="size" class="entity-avatar">
+  <ElAvatar :src="source" :size="size" class="entity-avatar" @error="onError">
     <span
       v-if="icon || !username"
       :class="icon || 'i-carbon-user-avatar'"

@@ -395,7 +395,7 @@ async function loadTokens() {
 
 async function loadUserOrgs() {
   try {
-    const { data } = await settingsAPI.whoamiV2();
+    const data = await authStore.fetchUserInfo();
     userOrgs.value = data.orgs || [];
   } catch (err) {
     console.error("Failed to load organizations:", err);
@@ -420,7 +420,7 @@ async function updateProfile() {
     });
     ElMessage.success("Profile updated successfully");
     // Refresh user data
-    await authStore.fetchUserInfo();
+    await authStore.fetchUserInfo({ force: true });
     // Update form with latest data
     loadUserProfile();
   } catch (err) {

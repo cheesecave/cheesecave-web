@@ -29,7 +29,7 @@ const mocks = vi.hoisted(() => {
       delete: vi.fn(boom),
     },
     settingsAPI: { getOrgProfile: vi.fn(boom) },
-    route: { params: { org: "acme", orgname: "acme" } },
+    route: { params: { orgname: "acme" } },
   };
 });
 
@@ -53,8 +53,7 @@ vi.mock("element-plus", async (importOriginal) => ({
   ElMessageBox: { confirm: mocks.confirm },
 }));
 
-import OrgSettings from "@/pages/organizations/[org]/settings.vue";
-import LegacyOrgSettings from "@/pages/organizations/[orgname]/settings.vue";
+import OrgSettings from "@/pages/organizations/[orgname]/settings.vue";
 import { useAuthStore } from "@/stores/auth";
 
 const mountPage = (page) =>
@@ -82,7 +81,7 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
-describe("organization settings (by org)", () => {
+describe("organization settings", () => {
   it("refuses to save over a profile that did not load", async () => {
     const wrapper = mountPage(OrgSettings);
     await flushPromises();
@@ -127,46 +126,6 @@ describe("organization settings (by org)", () => {
     mocks.confirm.mockRejectedValue("cancel");
     await wrapper.vm.removeMember("bob");
     await wrapper.vm.deleteInvitation("tok");
-    expect(mocks.notify).not.toHaveBeenCalled();
-  });
-});
-
-describe("organization settings (by orgname)", () => {
-  it("refuses to save over a description that did not load", async () => {
-    const wrapper = mountPage(LegacyOrgSettings);
-    await flushPromises();
-    await wrapper.vm.saveGeneralSettings();
-    expect(mocks.orgAPI.updateSettings).not.toHaveBeenCalled();
-  });
-
-  it("reports each failed load and write", async () => {
-    const wrapper = mountPage(LegacyOrgSettings);
-    await flushPromises();
-    expectFallback("Failed to load organization information");
-    expectFallback("Failed to load members");
-
-    mocks.orgAPI.get.mockResolvedValueOnce({ data: { description: "d" } });
-    await wrapper.vm.loadOrgInfo();
-    await wrapper.vm.saveGeneralSettings();
-    expectFallback("Failed to update settings");
-
-    wrapper.vm.newMember.username = "carol";
-    await wrapper.vm.handleAddMember();
-    expectFallback("Failed to add member");
-
-    await wrapper.vm.handleUpdateRole({ user: "bob", role: "member" }, "admin");
-    expectFallback("Failed to update role");
-
-    await wrapper.vm.handleRemoveMember({ user: "bob" });
-    expectFallback("Failed to remove member");
-  });
-
-  it("stays quiet when the user cancels removing a member", async () => {
-    const wrapper = mountPage(LegacyOrgSettings);
-    await flushPromises();
-    mocks.notify.mockClear();
-    mocks.confirm.mockRejectedValue("cancel");
-    await wrapper.vm.handleRemoveMember({ user: "bob" });
     expect(mocks.notify).not.toHaveBeenCalled();
   });
 });

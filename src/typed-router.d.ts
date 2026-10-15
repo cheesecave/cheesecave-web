@@ -19,6 +19,7 @@ declare module 'vue-router/auto-routes' {
    */
   export interface RouteNamedMap {
     '/': RouteRecordInfo<'/', '/', Record<never, never>, Record<never, never>>,
+    '/[...all]': RouteRecordInfo<'/[...all]', '/:all(.*)', { all: ParamValue<true> }, { all: ParamValue<false> }>,
     '/[type]s/[namespace]/[name]/': RouteRecordInfo<'/[type]s/[namespace]/[name]/', '/:type()s/:namespace/:name', { type: ParamValue<true>, namespace: ParamValue<true>, name: ParamValue<true> }, { type: ParamValue<false>, namespace: ParamValue<false>, name: ParamValue<false> }>,
     '/[type]s/[namespace]/[name]/blob/[branch]/[...file]': RouteRecordInfo<'/[type]s/[namespace]/[name]/blob/[branch]/[...file]', '/:type()s/:namespace/:name/blob/:branch/:file(.*)', { type: ParamValue<true>, namespace: ParamValue<true>, name: ParamValue<true>, branch: ParamValue<true>, file: ParamValue<true> }, { type: ParamValue<false>, namespace: ParamValue<false>, name: ParamValue<false>, branch: ParamValue<false>, file: ParamValue<false> }>,
     '/[type]s/[namespace]/[name]/commit/[commit_id]': RouteRecordInfo<'/[type]s/[namespace]/[name]/commit/[commit_id]', '/:type()s/:namespace/:name/commit/:commit_id', { type: ParamValue<true>, namespace: ParamValue<true>, name: ParamValue<true>, commit_id: ParamValue<true> }, { type: ParamValue<false>, namespace: ParamValue<false>, name: ParamValue<false>, commit_id: ParamValue<false> }>,
@@ -42,7 +43,6 @@ declare module 'vue-router/auto-routes' {
     '/models': RouteRecordInfo<'/models', '/models', Record<never, never>, Record<never, never>>,
     '/new': RouteRecordInfo<'/new', '/new', Record<never, never>, Record<never, never>>,
     '/organizations/': RouteRecordInfo<'/organizations/', '/organizations', Record<never, never>, Record<never, never>>,
-    '/organizations/[org]/settings': RouteRecordInfo<'/organizations/[org]/settings', '/organizations/:org/settings', { org: ParamValue<true> }, { org: ParamValue<false> }>,
     '/organizations/[orgname]/': RouteRecordInfo<'/organizations/[orgname]/', '/organizations/:orgname', { orgname: ParamValue<true> }, { orgname: ParamValue<false> }>,
     '/organizations/[orgname]/[type]': RouteRecordInfo<'/organizations/[orgname]/[type]', '/organizations/:orgname/:type', { orgname: ParamValue<true>, type: ParamValue<true> }, { orgname: ParamValue<false>, type: ParamValue<false> }>,
     '/organizations/[orgname]/settings': RouteRecordInfo<'/organizations/[orgname]/settings', '/organizations/:orgname/settings', { orgname: ParamValue<true> }, { orgname: ParamValue<false> }>,
@@ -69,6 +69,10 @@ declare module 'vue-router/auto-routes' {
   export interface _RouteFileInfoMap {
     'src/pages/index.vue': {
       routes: '/'
+      views: never
+    }
+    'src/pages/[...all].vue': {
+      routes: '/[...all]'
       views: never
     }
     'src/pages/[type]s/[namespace]/[name]/index.vue': {
@@ -161,10 +165,6 @@ declare module 'vue-router/auto-routes' {
     }
     'src/pages/organizations/index.vue': {
       routes: '/organizations/'
-      views: never
-    }
-    'src/pages/organizations/[org]/settings.vue': {
-      routes: '/organizations/[org]/settings'
       views: never
     }
     'src/pages/organizations/[orgname]/index.vue': {

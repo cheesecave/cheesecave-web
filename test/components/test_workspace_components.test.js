@@ -11,8 +11,10 @@ import WorkspaceCommitDetail from "@/components/home/workspace/WorkspaceCommitDe
 import RepositoryCard from "@/components/repo/RepositoryCard.vue";
 import RepositoryStats from "@/components/repo/RepositoryStats.vue";
 import RepoDiscoveryCard from "@/components/discovery/RepoDiscoveryCard.vue";
+import { clearMissingEntityAvatars } from "@/utils/entity-avatar";
 
 describe("workspace sections", () => {
+  beforeEach(() => clearMissingEntityAvatars());
   const wrappers = [];
   beforeEach(() => setActivePinia(createPinia()));
   afterEach(() => wrappers.splice(0).forEach((wrapper) => wrapper.unmount()));
@@ -458,16 +460,14 @@ describe("workspace sections", () => {
     expect(wrapper.emitted("update:scope")).toEqual([["org:research-lab"]]);
     const trigger = wrapper.get('[aria-label="Filter activity"]');
     expect(trigger.get(".scope-label").text()).toBe("research-lab");
-    expect(trigger.getComponent({ name: "ElAvatar" }).props("src")).toBe(
-      "/api/organizations/research-lab/avatar",
-    );
+    // the organization's avatar already failed to load in its row: the trigger does not ask for it again
+    expect(trigger.getComponent({ name: "ElAvatar" }).props("src")).toBeFalsy();
+    expect(trigger.text()).toContain("RE");
     expect(rows[3].attributes("aria-current")).toBe("true");
     dropdown.vm.$emit("command", "self");
     await wrapper.vm.$nextTick();
     expect(trigger.get(".scope-label").text()).toBe("Self");
-    expect(trigger.getComponent({ name: "ElAvatar" }).props("src")).toBe(
-      "/api/users/alice/avatar",
-    );
+    expect(trigger.getComponent({ name: "ElAvatar" }).props("src")).toBeFalsy();
   });
 
   it("omits the organization separator when no memberships are available", () => {

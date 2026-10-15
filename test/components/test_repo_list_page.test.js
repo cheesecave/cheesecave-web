@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h, reactive } from "vue";
 
+import RepoFilterPanel from "@/components/discovery/RepoFilterPanel.vue";
 import { http } from "@/testing/msw";
 import {
   ElementPlusStubs,
@@ -231,6 +232,18 @@ describe("RepoListPage", () => {
     wrappers.push(wrapper);
     return wrapper;
   }
+
+  it("shows the filter panel's own heading in the sidebar, and not in the phone drawer, whose title says it", async () => {
+    const wrapper = mountPage("model");
+    await flushPromises();
+    await wrapper.get(".mobile-filter-button").trigger("click");
+
+    const headings = wrapper
+      .findAllComponents(RepoFilterPanel)
+      .map((panel) => panel.props("heading"));
+    expect(headings).toHaveLength(2);
+    expect(headings.sort()).toEqual([false, true]);
+  });
 
   it.each(["model", "dataset", "space"])(
     "keeps all %s sorting options connected to URL, preference and API state",

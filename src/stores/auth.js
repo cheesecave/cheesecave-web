@@ -7,6 +7,9 @@ import { KIND, decodeError } from "@/errors";
 // One check of the session is enough for a burst of refused requests
 const SESSION_CHECK_WINDOW_MS = 30_000;
 const INCONCLUSIVE_RECHECK_MS = 5_000;
+// `GET /api/whoami-v2` answers the app's start and the page that opens on it with one request, not two
+const USER_INFO_FRESH_MS = 5_000;
+const userInfoRequests = new WeakMap();
 
 // 401 is the only answer that means "you are not signed in"; a server that
 // is down or slow says nothing about it
@@ -29,6 +32,9 @@ export const useAuthStore = defineStore("auth", {
     verifyError: null,
     checkingSession: false,
     lastSessionCheck: 0,
+    // The last answer of whoami-v2, and when it came
+    userInfo: null,
+    userInfoAt: 0,
   }),
 
   getters: {
@@ -59,7 +65,7 @@ export const useAuthStore = defineStore("auth", {
         clearRepoSortPreference();
         this.sessionExpired = false;
         this.verifyError = null;
-        await this.fetchUserInfo();
+        await this.fetchUserInfo({ force: true });
         return data;
       } finally {
         this.loading = false;
@@ -88,6 +94,7 @@ export const useAuthStore = defineStore("auth", {
         await authAPI.logout();
       } finally {
         this.user = null;
+        this.userInfo = null;
         this.token = null;
         this.sessionExpired = false;
         localStorage.removeItem("hf_token");
@@ -112,9 +119,27 @@ export const useAuthStore = defineStore("auth", {
     },
 
     /**
-     * Fetch user info with organizations
+     * Fetch user info with organizations. A request already on its way is shared, and an answer of the last few
+     * seconds is reused; `force` asks the server again (after a sign-in, or a change to the account).
      */
-    async fetchUserInfo() {
+    async fetchUserInfo({ force = false } = {}) {
+      if (!force) {
+        const pending = userInfoRequests.get(this);
+        if (pending) return pending;
+        if (this.userInfo && Date.now() - this.userInfoAt < USER_INFO_FRESH_MS)
+          return this.userInfo;
+      }
+      const request = this.requestUserInfo();
+      userInfoRequests.set(this, request);
+      try {
+        return await request;
+      } finally {
+        if (userInfoRequests.get(this) === request)
+          userInfoRequests.delete(this);
+      }
+    },
+
+    async requestUserInfo() {
       try {
         const { data } = await settingsAPI.whoamiV2();
         this.user = {
@@ -124,10 +149,13 @@ export const useAuthStore = defineStore("auth", {
           id: data.id,
         };
         this.userOrganizations = data.orgs || [];
+        this.userInfo = data;
+        this.userInfoAt = Date.now();
         return data;
       } catch (err) {
         if (signedOut(err)) {
           this.user = null;
+          this.userInfo = null;
           this.userOrganizations = [];
           clearRepoSortPreference();
         }
@@ -143,7 +171,7 @@ export const useAuthStore = defineStore("auth", {
       this.token = token;
       localStorage.setItem("hf_token", token);
       clearRepoSortPreference();
-      await this.fetchUserInfo();
+      await this.fetchUserInfo({ force: true });
     },
 
     /**
@@ -229,6 +257,7 @@ export const useAuthStore = defineStore("auth", {
     /** The session ended under us: forget the sign-in, and remember why. */
     expireSession() {
       this.user = null;
+      this.userInfo = null;
       this.userOrganizations = [];
       this.token = null;
       this.externalTokens = [];

@@ -58,6 +58,28 @@ describe("RepoFilterPanel", () => {
     wrapper.unmount();
   });
 
+  it("can leave out its own heading (the drawer it sits in has the title), keeping the count and the clear button", async () => {
+    const wrapper = mount(RepoFilterPanel, {
+      props: { facets: facets(), heading: false },
+    });
+    expect(wrapper.find("h2").exists()).toBe(false);
+    expect(wrapper.find(".filter-heading").exists()).toBe(false);
+
+    await wrapper.setProps({ selected: { task: ["task-0", "task-1"] } });
+
+    expect(wrapper.find("h2").exists()).toBe(false);
+    expect(wrapper.get(".filter-heading").text()).toContain("2 selected");
+    await wrapper.get(".clear-filters").trigger("click");
+    expect(wrapper.emitted("clear")).toEqual([[]]);
+    wrapper.unmount();
+  });
+
+  it("has its heading by default", () => {
+    const wrapper = mount(RepoFilterPanel, { props: { facets: facets() } });
+    expect(wrapper.get("h2").text()).toBe("Filters");
+    wrapper.unmount();
+  });
+
   it("expands long groups, searches all options, and switches categories", async () => {
     const wrapper = mount(RepoFilterPanel, { props: { facets: facets() } });
     expect(wrapper.findAll('[aria-label="Tasks"] .facet-chip')).toHaveLength(8);

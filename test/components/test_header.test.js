@@ -31,12 +31,14 @@ vi.mock("element-plus", async (original) => ({
 }));
 
 import TheHeader from "@/components/layout/TheHeader.vue";
+import { clearMissingEntityAvatars } from "@/utils/entity-avatar";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
 import { useSiteBrandingStore } from "@/stores/siteBranding";
 
 describe("TheHeader", () => {
   beforeEach(() => {
+    clearMissingEntityAvatars();
     vi.clearAllMocks();
     localStorage.clear();
     document.documentElement.className = "";
@@ -297,7 +299,7 @@ describe("TheHeader", () => {
     },
   );
 
-  it("opens the mobile menu and uses the shared avatar fallback without changing its stable source", async () => {
+  it("opens the mobile menu and uses the shared avatar fallback; once the avatar failed, the account's other avatars do not ask again", async () => {
     const authStore = useAuthStore();
     authStore.user = {
       username: "alice",
@@ -322,10 +324,11 @@ describe("TheHeader", () => {
     expect(wrapper.findAllComponents({ name: "EntityAvatar" })[0].text()).toBe(
       "AL",
     );
-    const mobileAvatar = wrapper.get(
-      '[data-el-drawer="true"] img[alt="alice avatar"]',
-    );
-    expect(mobileAvatar.attributes("src")).toBe("/api/users/alice/avatar");
+    // the other avatar of the same account does not ask for what has just failed to load
+    expect(
+      wrapper.find('[data-el-drawer="true"] img[alt="alice avatar"]').exists(),
+    ).toBe(false);
+    expect(wrapper.get('[data-el-drawer="true"]').text()).toContain("AL");
   });
 
   it("shows an error message when logout fails", async () => {

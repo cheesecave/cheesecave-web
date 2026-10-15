@@ -117,7 +117,7 @@ import { notifyError } from "@/errors";
 import EntityAvatar from "@/components/common/EntityAvatar.vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
-import { orgAPI, settingsAPI } from "@/utils/api";
+import { orgAPI } from "@/utils/api";
 import { ElMessage } from "element-plus";
 
 const router = useRouter();
@@ -165,7 +165,7 @@ async function loadOrganizations() {
   try {
     // If user is authenticated, get their organizations with roles
     if (authStore.isAuthenticated) {
-      const { data } = await settingsAPI.whoamiV2();
+      const data = await authStore.fetchUserInfo();
       const userOrgs = data.orgs || [];
 
       // Fetch detailed info for each organization. The org info endpoint

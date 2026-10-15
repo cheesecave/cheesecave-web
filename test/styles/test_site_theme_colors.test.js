@@ -142,3 +142,18 @@ describe("contrast", () => {
     );
   });
 });
+
+describe("the repository tab strip", () => {
+  it("shows that it scrolls: fades at an edge that has more behind it, and none at the end it is scrolled to", () => {
+    const strip = mount('<div class="repo-tabs"></div>');
+    const attachments = declared(strip, "background-attachment");
+    // two covers that scroll with the content (hide the fades at the ends) over two fades fixed to the box
+    expect(attachments?.split(",").map((a) => a.trim())).toEqual([
+      "local",
+      "local",
+      "scroll",
+      "scroll",
+    ]);
+    expect(declared(strip, "background-image")).toMatch(/linear-gradient/);
+  });
+});
