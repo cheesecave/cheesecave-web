@@ -13,8 +13,15 @@ export const CORE_REPO_FIELDS = [
   "tags",
 ];
 
+// What only one kind of repository has: a model's files say its library, task, config and the size of its
+// weights; a Space has an sdk
+const EXTRA_FIELDS = {
+  model: ["pipeline_tag", "library_name", "config", "safetensors"],
+  space: ["sdk"],
+};
+
 export function repoPageFields(repoType) {
   const fields = [...CORE_REPO_FIELDS, "storage"];
   if (repoType !== "space") fields.splice(4, 0, "downloads");
-  return fields;
+  return [...fields, ...(EXTRA_FIELDS[repoType] || [])];
 }

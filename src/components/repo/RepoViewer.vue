@@ -196,7 +196,10 @@
         <!-- Metadata Header (Key badges) -->
         <MetadataHeader
           v-if="hasMetadataHeader"
-          :metadata="readmeMetadata"
+          :metadata="displayMetadata"
+          :libraries="tagGroups.libraries"
+          :others="tagGroups.others"
+          :arxiv="tagGroups.arxiv"
           :repo-type="repoType"
           @navigate-to-metadata="navigateToTab('metadata')"
         />
@@ -756,6 +759,9 @@
           :repo-type="repoType"
         />
 
+        <!-- What the files of a model say: its size, tensor types, architecture -->
+        <ModelInfoCard v-if="modelDetails" :summary="modelDetails" />
+
         <!-- Basic Metadata -->
         <div class="card">
           <h3 class="font-semibold mb-3">Info</h3>
@@ -973,6 +979,12 @@ import { useAsyncResource } from "@/composables/useAsyncResource";
 import { resolveRepoTreeEntryPath } from "@/utils/repo-paths";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import MetadataHeader from "@/components/repo/metadata/MetadataHeader.vue";
+import ModelInfoCard from "@/components/repo/metadata/ModelInfoCard.vue";
+import {
+  mergeDisplayMetadata,
+  modelSummary,
+  splitTags,
+} from "@/utils/repo-derived";
 import { CORE_REPO_FIELDS, repoPageFields } from "@/utils/repo-page-fields";
 import DetailedMetadataPanel from "@/components/repo/metadata/DetailedMetadataPanel.vue";
 import ReferencedDatasetsCard from "@/components/repo/metadata/ReferencedDatasetsCard.vue";
@@ -1253,15 +1265,39 @@ const showReferencedDatasetsCard = computed(() => {
   return referencedDatasets.value.length > 0;
 });
 
+// What the header shows: the README's metadata with what the API knows laid over it (the library
+// and task a model's files say, the sdk of a Space), and the tags of a model grouped as the Hub does.
+// The Metadata tab stays what the README wrote.
+const displayMetadata = computed(() =>
+  mergeDisplayMetadata(readmeMetadata.value, repoInfo.value, props.repoType),
+);
+const tagGroups = computed(() =>
+  props.repoType === "model"
+    ? splitTags(repoInfo.value?.tags, {
+        libraryName: displayMetadata.value.library_name,
+        pipelineTag: displayMetadata.value.pipeline_tag,
+        languages: [].concat(readmeMetadata.value.language || []),
+      })
+    : { libraries: [], others: [], arxiv: [] },
+);
+const modelDetails = computed(() =>
+  props.repoType === "model" ? modelSummary(repoInfo.value) : null,
+);
+
 // Metadata visibility
 const hasMetadataHeader = computed(() => {
+  const metadata = displayMetadata.value;
   return (
-    readmeMetadata.value.license ||
-    readmeMetadata.value.language ||
-    readmeMetadata.value.library_name ||
-    readmeMetadata.value.pipeline_tag ||
-    readmeMetadata.value.task_categories ||
-    readmeMetadata.value.size_categories
+    metadata.license ||
+    metadata.language ||
+    metadata.library_name ||
+    metadata.pipeline_tag ||
+    metadata.task_categories ||
+    metadata.size_categories ||
+    metadata.sdk ||
+    tagGroups.value.libraries.length ||
+    tagGroups.value.others.length ||
+    tagGroups.value.arxiv.length
   );
 });
 

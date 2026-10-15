@@ -38,3 +38,12 @@ export function getRepositoryType(type) {
     REPOSITORY_TYPES.find((item) => item.type === type) || REPOSITORY_TYPES[0]
   );
 }
+
+// The SDKs a Space can be created with (the backend writes the card that names it)
+export const SPACE_SDKS = Object.freeze([
+  { value: "gradio", label: "Gradio" },
+  { value: "streamlit", label: "Streamlit" },
+  { value: "docker", label: "Docker" },
+  { value: "static", label: "Static" },
+]);
+export const DEFAULT_SPACE_SDK = "gradio";

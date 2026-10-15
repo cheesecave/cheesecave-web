@@ -78,6 +78,27 @@
       </div>
     </el-form-item>
 
+    <!-- SDK (Spaces) -->
+    <el-form-item v-if="form.type === 'space'" label="SDK">
+      <el-select
+        v-model="form.sdk"
+        placeholder="Select SDK"
+        size="large"
+        class="w-full"
+      >
+        <el-option
+          v-for="sdk in SPACE_SDKS"
+          :key="sdk.value"
+          :label="sdk.label"
+          :value="sdk.value"
+        />
+      </el-select>
+      <div class="text-xs text-gray-500 mt-1">
+        <div class="i-carbon-information inline-block mr-1" />
+        The Space starts with a README.md that names it
+      </div>
+    </el-form-item>
+
     <!-- Visibility -->
     <el-form-item label="Visibility">
       <el-checkbox v-model="form.private"
@@ -122,7 +143,12 @@ import { useAuthStore } from "@/stores/auth";
 import { ElMessage } from "element-plus";
 import { createRepositoryNameRules } from "@/utils/repo-creation";
 import { notifyError } from "@/errors";
-import { REPOSITORY_TYPES, isRepositoryType } from "@/utils/repository-types";
+import {
+  DEFAULT_SPACE_SDK,
+  REPOSITORY_TYPES,
+  SPACE_SDKS,
+  isRepositoryType,
+} from "@/utils/repository-types";
 const props = defineProps({
   fixedType: String,
   initialType: { type: String, default: "model" },
@@ -146,6 +172,7 @@ const form = reactive({
   owner: currentUser.value,
   name: "",
   private: false,
+  sdk: DEFAULT_SPACE_SDK,
 });
 const rules = {
   type: [
@@ -168,6 +195,7 @@ function reset() {
   form.name = "";
   form.owner = currentUser.value;
   form.private = false;
+  form.sdk = DEFAULT_SPACE_SDK;
   formRef.value?.clearValidate?.();
 }
 function cancel() {
@@ -218,6 +246,8 @@ async function handleSubmit() {
       name: form.name,
       organization: form.owner !== currentUser.value ? form.owner : null,
       private: form.private,
+      // only a Space has one: the backend writes the card that names it
+      ...(form.type === "space" ? { sdk: form.sdk } : {}),
     };
     const owner = form.owner;
     creating.value = true;
