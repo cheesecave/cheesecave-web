@@ -297,18 +297,30 @@ export function saveCachedBranding(value) {
   }
 }
 
-// The title is "<page> · <site name>": the site name comes from the branding settings, the page from the route
-// (src/utils/page-title.js); whichever arrives last rewrites it.
-let siteTitle = "";
-let pageTitle = "";
-
-function renderDocumentTitle() {
-  if (!siteTitle || typeof document === "undefined") return;
-  document.title = pageTitle ? `${pageTitle} · ${siteTitle}` : siteTitle;
+// The document title: "<page> · <site name>", with the type of a repository before the site's name
+// ("owner/name · Datasets at <site>"), or the page alone for a page inside a repository (`site: false`), as Hugging
+// Face writes them. The site name comes from the branding settings, the page from the route
+// (src/utils/page-title.js); whichever arrives last rewrites the title.
+export function formatDocumentTitle(
+  { title = "", section = "", site = true } = {},
+  siteTitle,
+) {
+  if (!site && title) return title;
+  const where = section ? `${section} at ${siteTitle}` : siteTitle;
+  return title ? `${title} · ${where}` : where;
 }
 
-export function setDocumentPageTitle(title) {
-  pageTitle = title;
+let siteTitle = "";
+let page = {};
+
+function renderDocumentTitle() {
+  if (typeof document === "undefined") return;
+  if (!siteTitle && !(page.site === false && page.title)) return;
+  document.title = formatDocumentTitle(page, siteTitle);
+}
+
+export function setDocumentPageTitle(next) {
+  page = next;
   renderDocumentTitle();
 }
 

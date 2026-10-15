@@ -1,9 +1,10 @@
 // The document title of a page, worked out from the route alone: a repository id, an account name and a file path
-// are all in the URL, so nothing has to be fetched and the title is right on the first paint. The site name comes
-// from the branding settings (`setDocumentPageTitle` puts the two together).
+// are all in the URL, so nothing has to be fetched and the title is right on the first paint. The shape follows
+// Hugging Face's (see formatDocumentTitle in site-branding.js, which also adds the site name); the site name comes
+// from the branding settings.
 import { setDocumentPageTitle } from "@/shared/site-branding";
 
-const NOT_FOUND = "Page not found";
+const NOT_FOUND = { title: "404" };
 
 const STATIC = {
   "/": "",
@@ -25,28 +26,14 @@ const STATIC = {
   "/docs": "Documentation",
 };
 
-const TYPES = new Set(["models", "datasets", "spaces"]);
+// What a repository of each type is called before the site's name: a model is just "owner/name · <site>"
+const SECTIONS = { models: "", datasets: "Datasets", spaces: "Spaces" };
 const ACCOUNT_VIEWS = {
   models: "Models",
   datasets: "Datasets",
   spaces: "Spaces",
   storage: "Storage",
 };
-
-const last = (path) => path.split("/").at(-1);
-
-// What follows /{type}s/{namespace}/{name}: a pattern for each view the router has, and its title
-const REPO_VIEWS = [
-  [/^$/, (_, id) => id],
-  [/^tree\/[^/]+$/, (_, id) => id],
-  [/^tree\/[^/]+\/(.+)$/, (m, id) => `${last(m[1])} · ${id}`],
-  [/^blob\/[^/]+\/(.+)$/, (m, id) => `${last(m[1])} · ${id}`],
-  [/^edit\/[^/]+\/(.+)$/, (m, id) => `Edit ${last(m[1])} · ${id}`],
-  [/^commits\/[^/]+$/, (_, id) => `Commits · ${id}`],
-  [/^commit\/([^/]+)$/, (m, id) => `Commit ${m[1].slice(0, 7)} · ${id}`],
-  [/^settings$/, (_, id) => `Settings · ${id}`],
-  [/^upload\/[^/]+$/, (_, id) => `Upload files · ${id}`],
-];
 
 function decode(segment) {
   try {
@@ -55,31 +42,66 @@ function decode(segment) {
     return segment;
   }
 }
+const last = (path) => decode(path.split("/").at(-1));
 
-function repositoryTitle(parts) {
-  const id = `${parts[1]}/${parts[2]}`;
+// What follows /{type}s/{namespace}/{name}, still percent-encoded (a branch may have a slash in it): a pattern for
+// each view the router has, and its title. A page inside a repository names the repository, not the site.
+const REPO_VIEWS = [
+  [
+    /^tree\/(?<branch>[^/]+)$/,
+    (m, id) => `${id} at ${decode(m.groups.branch)}`,
+  ],
+  [
+    /^tree\/(?<branch>[^/]+)\/(?<path>.+)$/,
+    (m, id) => `${last(m.groups.path)} · ${id} at ${decode(m.groups.branch)}`,
+  ],
+  [
+    /^blob\/(?<branch>[^/]+)\/(?<path>.+)$/,
+    (m, id) => `${last(m.groups.path)} · ${id} at ${decode(m.groups.branch)}`,
+  ],
+  [
+    /^edit\/(?<branch>[^/]+)\/(?<path>.+)$/,
+    (m, id) =>
+      `Edit ${last(m.groups.path)} · ${id} at ${decode(m.groups.branch)}`,
+  ],
+  [/^commits\/[^/]+$/, (_, id) => `Commits · ${id}`],
+  [
+    /^commit\/(?<sha>[^/]+)$/,
+    (m, id) => `Commit ${decode(m.groups.sha).slice(0, 7)} · ${id}`,
+  ],
+  [/^settings$/, (_, id) => `Settings · ${id}`],
+  [/^upload\/[^/]+$/, (_, id) => `Upload files · ${id}`],
+];
+
+function repositoryTitle(type, parts) {
+  const id = `${decode(parts[1])}/${decode(parts[2])}`;
+  if (parts.length === 3) return { title: id, section: SECTIONS[type] };
   const view = parts.slice(3).join("/");
   for (const [pattern, title] of REPO_VIEWS) {
     const match = pattern.exec(view);
-    if (match) return title(match, id);
+    if (match) return { title: title(match, id), site: false };
   }
   return NOT_FOUND;
 }
 
 function accountTitle(name, views, view) {
-  if (view === undefined) return name;
-  return views[view] ? `${views[view]} · ${name}` : NOT_FOUND;
+  if (view === undefined) return { title: name };
+  return views[view] ? { title: `${views[view]} · ${name}` } : NOT_FOUND;
 }
 
-/** The page part of the title for a route (`{ path }` is enough), "" for the home page. */
+/**
+ * The title of the page for a route (`{ path }` is enough): `{ title, section?, site? }`, for
+ * `formatDocumentTitle`. The home page has no title of its own.
+ */
 export function titleForRoute({ path }) {
-  if (path in STATIC) return STATIC[path];
-  const parts = path.split("/").filter(Boolean).map(decode);
-  const [first, second, third] = parts;
-  if (first === "docs") return "Documentation";
+  if (path in STATIC) return { title: STATIC[path] };
+  const parts = path.split("/").filter(Boolean);
+  const [first, second, third] = parts.map(decode);
+  if (first === "docs") return { title: "Documentation" };
   if (first === "invite" && parts.length === 2)
-    return "Organization invitation";
-  if (TYPES.has(first) && parts.length >= 3) return repositoryTitle(parts);
+    return { title: "Organization invitation" };
+  if (first in SECTIONS && parts.length >= 3)
+    return repositoryTitle(first, parts);
   if (first === "organizations" && parts.length <= 3)
     return accountTitle(
       second,
