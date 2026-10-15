@@ -37,7 +37,7 @@
                 <el-input v-model="profileForm.email" />
                 <div
                   v-if="user?.email_verified"
-                  class="text-sm text-green-600 mt-1"
+                  class="text-sm text-green-700 dark:text-green-400 mt-1"
                 >
                   <div class="i-carbon-checkmark-filled inline-block" />
                   Verified

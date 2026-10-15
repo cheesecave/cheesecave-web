@@ -238,7 +238,7 @@
                   </div>
                   <div
                     v-else-if="invite.usage_count > 0"
-                    class="text-sm text-green-600"
+                    class="text-sm text-green-700 dark:text-green-400"
                   >
                     ✓ Used {{ invite.usage_count }} time{{
                       invite.usage_count !== 1 ? "s" : ""
