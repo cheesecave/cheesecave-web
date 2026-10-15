@@ -106,6 +106,8 @@ jobs:
         run: pnpm build
       - name: Check button backgrounds in the built stylesheets
         run: node scripts/check-button-cascade.mjs dist
+      - name: Check every icon class has a rule in the built stylesheets
+        run: node scripts/check-icon-css.mjs dist
 
   docker:
     name: Container build

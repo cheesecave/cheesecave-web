@@ -152,6 +152,7 @@
       />
     </div>
     <el-drawer
+      append-to-body
       v-model="showFilters"
       title="Filters"
       direction="btt"
@@ -174,6 +175,7 @@
     </el-drawer>
     <!-- Create Repository Dialog -->
     <el-dialog
+      append-to-body
       v-model="showCreateDialog"
       :title="`Create New ${repoTypeLabel}`"
       width="min(500px, calc(100vw - 32px))"

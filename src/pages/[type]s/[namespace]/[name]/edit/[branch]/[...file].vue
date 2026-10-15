@@ -97,6 +97,7 @@
 
       <!-- Commit Dialog -->
       <el-dialog
+        append-to-body
         v-model="showCommitDialog"
         title="Commit Changes"
         width="500px"

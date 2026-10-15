@@ -41,6 +41,7 @@ const title = computed(() => {
 
 <template>
   <el-dialog
+    append-to-body
     v-model="dialogVisible"
     :title="title"
     width="760px"

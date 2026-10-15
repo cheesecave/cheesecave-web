@@ -4,6 +4,18 @@ import { presetWind } from '@unocss/preset-wind3'
 
 
 export default defineConfig({
+  // UnoCSS extracts from .vue and the like but not from plain .js by default;
+  // an icon class named only in a .js table (menus, error pages) would get no
+  // CSS and render as an empty box. scripts/check-icon-css.mjs checks the build.
+  content: {
+    pipeline: {
+      include: [
+        /\.(vue|svelte|[jt]sx|vine.ts|mdx?|astro|elm|php|phtml|html)($|\?)/,
+        /\/src\/.*\.js($|\?)/
+      ]
+    }
+  },
+
   presets: [
     presetWind(),
     presetAttributify(),

@@ -277,6 +277,7 @@
 
     <!-- Invite Member Dialog -->
     <el-dialog
+      append-to-body
       v-model="showInviteDialog"
       :title="
         inviteForm.type === 'reusable'

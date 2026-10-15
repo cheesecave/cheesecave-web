@@ -32,6 +32,7 @@ const dialogVisible = computed({
 
 <template>
   <el-dialog
+    append-to-body
     v-model="dialogVisible"
     :title="`${zip ? 'Zip archive' : 'Indexed tar'} · ${filename}`"
     width="900px"
