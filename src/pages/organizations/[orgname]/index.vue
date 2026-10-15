@@ -59,7 +59,7 @@
               />
 
               <div>
-                <h2 class="text-xl font-bold">{{ orgname }}</h2>
+                <h1 class="text-xl font-bold">{{ orgname }}</h1>
                 <p class="text-sm text-gray-600 dark:text-gray-400">
                   Organization
                 </p>
@@ -474,6 +474,7 @@
               <div class="flex items-center gap-3 ml-auto shrink-0">
                 <div class="w-56 sm:w-64 lg:w-72 shrink-0">
                   <el-select
+                    aria-label="Sort models"
                     v-model="selectedSorts.model"
                     placeholder="Sort repositories"
                     class="w-full"
@@ -570,8 +571,11 @@
               </div>
 
               <!-- Show More button -->
-              <RouterLink :to="`/organizations/${orgname}/models`">
-                <el-button v-if="hasMoreRepos('model')" class="w-full">
+              <RouterLink
+                v-if="hasMoreRepos('model')"
+                :to="`/organizations/${orgname}/models`"
+              >
+                <el-button class="w-full">
                   Show all {{ getCount("model") }} models ->
                 </el-button>
               </RouterLink>
@@ -600,6 +604,7 @@
               <div class="flex items-center gap-3 ml-auto shrink-0">
                 <div class="w-56 sm:w-64 lg:w-72 shrink-0">
                   <el-select
+                    aria-label="Sort datasets"
                     v-model="selectedSorts.dataset"
                     placeholder="Sort repositories"
                     class="w-full"
@@ -694,8 +699,11 @@
               </div>
 
               <!-- Show More button -->
-              <RouterLink :to="`/organizations/${orgname}/datasets`">
-                <el-button v-if="hasMoreRepos('dataset')" class="w-full">
+              <RouterLink
+                v-if="hasMoreRepos('dataset')"
+                :to="`/organizations/${orgname}/datasets`"
+              >
+                <el-button class="w-full">
                   Show all {{ getCount("dataset") }} datasets ->
                 </el-button>
               </RouterLink>
@@ -724,6 +732,7 @@
               <div class="flex items-center gap-3 ml-auto shrink-0">
                 <div class="w-56 sm:w-64 lg:w-72 shrink-0">
                   <el-select
+                    aria-label="Sort spaces"
                     v-model="selectedSorts.space"
                     placeholder="Sort repositories"
                     class="w-full"
@@ -818,8 +827,11 @@
               </div>
 
               <!-- Show More button -->
-              <RouterLink :to="`/organizations/${orgname}/spaces`">
-                <el-button v-if="hasMoreRepos('space')" class="w-full">
+              <RouterLink
+                v-if="hasMoreRepos('space')"
+                :to="`/organizations/${orgname}/spaces`"
+              >
+                <el-button class="w-full">
                   Show all {{ getCount("space") }} spaces ->
                 </el-button>
               </RouterLink>

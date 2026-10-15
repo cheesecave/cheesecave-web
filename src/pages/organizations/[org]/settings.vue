@@ -71,6 +71,7 @@
               <el-form-item label="Social Media">
                 <div class="space-y-2">
                   <el-input
+                    aria-label="Twitter/X username"
                     v-model="generalForm.social_media.twitter_x"
                     placeholder="Twitter/X username"
                   >
@@ -79,12 +80,14 @@
                     </template>
                   </el-input>
                   <el-input
+                    aria-label="Threads username"
                     v-model="generalForm.social_media.threads"
                     placeholder="Threads username"
                   >
                     <template #prepend>Threads</template>
                   </el-input>
                   <el-input
+                    aria-label="GitHub username"
                     v-model="generalForm.social_media.github"
                     placeholder="GitHub username"
                   >
@@ -93,6 +96,7 @@
                     </template>
                   </el-input>
                   <el-input
+                    aria-label="HuggingFace username"
                     v-model="generalForm.social_media.huggingface"
                     placeholder="HuggingFace username"
                   >
@@ -155,6 +159,7 @@
 
                 <div class="flex items-center gap-2">
                   <el-select
+                    :aria-label="`Role of ${member.user}`"
                     v-model="member.role"
                     size="small"
                     @change="updateMemberRole(member.user, member.role)"

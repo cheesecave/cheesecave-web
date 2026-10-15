@@ -16,6 +16,7 @@
     <!-- Search and Filters -->
     <div class="card mb-6">
       <el-input
+        aria-label="Search organizations"
         v-model="searchQuery"
         placeholder="Search organizations..."
         clearable

@@ -788,6 +788,21 @@ describe("home page", () => {
     );
   });
 
+  it("gives the signed-in home page an <h1> of its own, and a visitor's page the hero's", async () => {
+    signIn();
+    const workspace = mountPage();
+    await flushPromises();
+    expect(workspace.findAll("h1").map((h) => h.text())).toEqual([
+      "Your workspace",
+    ]);
+    workspace.unmount();
+
+    localStorage.clear();
+    const visitor = mountPage();
+    await flushPromises();
+    expect(visitor.findAll("h1")).toHaveLength(1);
+  });
+
   it("shows personal repositories and organization links in the authenticated workspace", async () => {
     signIn();
     const wrapper = mountPage();

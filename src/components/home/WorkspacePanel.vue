@@ -59,6 +59,7 @@ watch(
 
 <template>
   <section class="workspace" data-testid="workspace">
+    <h1 class="sr-only">Your workspace</h1>
     <WorkspaceSidebar
       v-model:view="workspaceView"
       v-model:filter="filter"

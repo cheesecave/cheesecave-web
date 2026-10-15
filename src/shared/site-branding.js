@@ -297,10 +297,38 @@ export function saveCachedBranding(value) {
   }
 }
 
+// The document title: "<page> · <site name>", with the type of a repository before the site's name
+// ("owner/name · Datasets at <site>"), or the page alone for a page inside a repository (`site: false`), as Hugging
+// Face writes them. The site name comes from the branding settings, the page from the route
+// (src/utils/page-title.js); whichever arrives last rewrites the title.
+export function formatDocumentTitle(
+  { title = "", section = "", site = true } = {},
+  siteTitle,
+) {
+  if (!site && title) return title;
+  const where = section ? `${section} at ${siteTitle}` : siteTitle;
+  return title ? `${title} · ${where}` : where;
+}
+
+let siteTitle = "";
+let page = {};
+
+function renderDocumentTitle() {
+  if (typeof document === "undefined") return;
+  if (!siteTitle && !(page.site === false && page.title)) return;
+  document.title = formatDocumentTitle(page, siteTitle);
+}
+
+export function setDocumentPageTitle(next) {
+  page = next;
+  renderDocumentTitle();
+}
+
 export function applyDocumentBranding(value, { admin = false } = {}) {
   const branding = normalizeBranding(value);
   if (!branding || typeof document === "undefined") return;
-  document.title = `${branding.site_name}${admin ? " Admin Portal" : ""}`;
+  siteTitle = `${branding.site_name}${admin ? " Admin Portal" : ""}`;
+  renderDocumentTitle();
   const base = admin ? "/admin" : "";
   for (const [rel, fallback] of [
     ["icon", `${base}/favicon.svg`],

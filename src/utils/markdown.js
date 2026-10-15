@@ -71,6 +71,19 @@ const md = new MarkdownIt({
 });
 
 /**
+ * Move every heading down `env.headingOffset` levels (at most h6): a page that has its own <h1>
+ * renders a README's `# Title` as an <h2>, so the page keeps one <h1>.
+ */
+md.core.ruler.push("heading_offset", (state) => {
+  const offset = state.env.headingOffset;
+  if (!offset) return;
+  for (const token of state.tokens) {
+    if (token.type === "heading_open" || token.type === "heading_close")
+      token.tag = `h${Math.min(6, Number(token.tag[1]) + offset)}`;
+  }
+});
+
+/**
  * Add support for GitHub-style task lists
  * Converts - [ ] and - [x] to checkboxes
  */
@@ -232,13 +245,17 @@ function isAbsoluteUrl(url) {
 export function renderMarkdown(markdown, options = {}) {
   if (!markdown) return "";
 
-  const { stripFrontmatter = false, repoContext = null } = options;
+  const {
+    stripFrontmatter = false,
+    repoContext = null,
+    headingOffset = 0,
+  } = options;
 
   try {
     // Strip YAML frontmatter if requested
     let content = stripFrontmatter ? stripYAMLFrontmatter(markdown) : markdown;
 
-    let rawHTML = md.render(content);
+    let rawHTML = md.render(content, { headingOffset });
 
     // Resolve relative image paths if repo context provided
     if (repoContext) {

@@ -72,6 +72,7 @@
               <el-form-item label="Social Media">
                 <div class="space-y-2">
                   <el-input
+                    aria-label="Twitter/X username"
                     v-model="profileForm.social_media.twitter_x"
                     placeholder="Twitter/X username"
                   >
@@ -80,12 +81,14 @@
                     </template>
                   </el-input>
                   <el-input
+                    aria-label="Threads username"
                     v-model="profileForm.social_media.threads"
                     placeholder="Threads username"
                   >
                     <template #prepend>Threads</template>
                   </el-input>
                   <el-input
+                    aria-label="GitHub username"
                     v-model="profileForm.social_media.github"
                     placeholder="GitHub username"
                   >
@@ -94,6 +97,7 @@
                     </template>
                   </el-input>
                   <el-input
+                    aria-label="HuggingFace username"
                     v-model="profileForm.social_media.huggingface"
                     placeholder="HuggingFace username"
                   >
@@ -245,6 +249,7 @@
             <h2 class="text-xl font-semibold mb-4">Create New Token</h2>
             <div class="flex gap-2">
               <el-input
+                aria-label="Token name"
                 v-model="newTokenName"
                 placeholder="Token name (e.g., my-laptop)"
               />
@@ -260,7 +265,12 @@
               Make sure to copy your token now. You won't be able to see it
               again!
             </p>
-            <el-input :value="newToken" readonly class="font-mono">
+            <el-input
+              aria-label="New token"
+              :value="newToken"
+              readonly
+              class="font-mono"
+            >
               <template #append>
                 <el-button @click="copyToken">
                   <div class="i-carbon-copy" />

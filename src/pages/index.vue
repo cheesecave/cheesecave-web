@@ -15,6 +15,7 @@
 
         <div class="w-full md:w-80 md:ml-auto md:flex-none">
           <el-select
+            aria-label="Sort repositories"
             v-model="selectedSort"
             placeholder="Sort repositories"
             class="w-full"

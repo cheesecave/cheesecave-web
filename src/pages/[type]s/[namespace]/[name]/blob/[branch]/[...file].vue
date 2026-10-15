@@ -285,7 +285,7 @@
           </div>
 
           <div v-if="markdownView === 'preview'">
-            <MarkdownViewer :content="fileContent" />
+            <MarkdownViewer :content="fileContent" :heading-offset="1" />
           </div>
           <pre
             v-else

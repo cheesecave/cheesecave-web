@@ -47,6 +47,12 @@
         <!-- Dark Mode Toggle -->
         <el-button
           @click="themeStore.toggle()"
+          :aria-label="
+            themeStore.isDark ? 'Switch to light theme' : 'Switch to dark theme'
+          "
+          :title="
+            themeStore.isDark ? 'Switch to light theme' : 'Switch to dark theme'
+          "
           circle
           text
           class="!text-gray-700 dark:!text-gray-300"
@@ -57,7 +63,12 @@
         <template v-if="isAuthenticated">
           <!-- Create New Dropdown -->
           <el-dropdown trigger="click">
-            <el-button type="primary" circle>
+            <el-button
+              type="primary"
+              circle
+              aria-label="Create new"
+              title="Create new"
+            >
               <div class="i-carbon-add text-xl" />
             </el-button>
             <template #dropdown>
@@ -122,6 +133,12 @@
         <!-- Dark Mode Toggle - Mobile -->
         <el-button
           @click="themeStore.toggle()"
+          :aria-label="
+            themeStore.isDark ? 'Switch to light theme' : 'Switch to dark theme'
+          "
+          :title="
+            themeStore.isDark ? 'Switch to light theme' : 'Switch to dark theme'
+          "
           circle
           text
           size="small"
@@ -133,6 +150,8 @@
         <!-- Hamburger Menu -->
         <el-button
           @click="mobileMenuOpen = !mobileMenuOpen"
+          :aria-label="mobileMenuOpen ? 'Close menu' : 'Open menu'"
+          :aria-expanded="mobileMenuOpen"
           circle
           text
           class="!text-gray-700 dark:!text-gray-300 !min-w-10 !min-h-10"

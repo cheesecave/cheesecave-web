@@ -229,6 +229,7 @@
               >Branch to revert on:</label
             >
             <el-select
+              aria-label="Branch"
               v-model="selectedBranch"
               placeholder="Select branch"
               class="w-full"
@@ -285,6 +286,7 @@
               >Branch to reset:</label
             >
             <el-select
+              aria-label="Branch"
               v-model="selectedBranch"
               placeholder="Select branch"
               class="w-full"
@@ -298,6 +300,7 @@
               >Commit Message (optional):</label
             >
             <el-input
+              aria-label="Reset commit message"
               v-model="resetMessage"
               placeholder="Reset to previous state"
               type="textarea"

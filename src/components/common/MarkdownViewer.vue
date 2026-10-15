@@ -49,6 +49,11 @@ const props = defineProps({
     type: String,
     default: "main",
   },
+  // Levels to move the headings down, for a page that has its own <h1>
+  headingOffset: {
+    type: Number,
+    default: 0,
+  },
 });
 
 const markdownContainer = ref(null);
@@ -56,6 +61,7 @@ const markdownContainer = ref(null);
 const renderedHTML = computed(() => {
   return renderMarkdown(props.content, {
     stripFrontmatter: props.stripFrontmatter,
+    headingOffset: props.headingOffset,
     repoContext:
       props.repoType && props.namespace && props.name
         ? {

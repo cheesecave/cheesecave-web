@@ -73,8 +73,13 @@ describe("RepoViewer shows what the API knows next to what the README says", () 
           ElTooltip: true,
           RouterLink: RouterLinkStub,
           MarkdownViewer: defineComponent({
-            props: ["content"],
-            setup: (props) => () => h("article", props.content),
+            props: ["content", "headingOffset"],
+            setup: (props) => () =>
+              h(
+                "article",
+                { "data-heading-offset": props.headingOffset },
+                props.content,
+              ),
           }),
           MetadataHeader: HeaderProbe,
           DetailedMetadataPanel: PanelProbe,
@@ -164,6 +169,15 @@ describe("RepoViewer shows what the API knows next to what the README says", () 
     expect(wrapper.text()).toContain("BF16");
     expect(wrapper.text()).toContain("LlamaForCausalLM");
     expect(card.exists()).toBe(true);
+  });
+
+  it("renders the README one heading level down, under the page's own <h1>", async () => {
+    const wrapper = mountViewer("model");
+    await settle(wrapper);
+
+    expect(wrapper.findAll("h1")).toHaveLength(1);
+    expect(wrapper.get("h1").text()).toContain("thing");
+    expect(wrapper.get("article").attributes("data-heading-offset")).toBe("1");
   });
 
   it("leaves the languages and the card's own tags out of the free tags it did not already show", async () => {

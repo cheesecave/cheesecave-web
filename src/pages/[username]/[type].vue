@@ -206,6 +206,7 @@
 
             <div class="flex gap-3">
               <el-select
+                aria-label="Sort models"
                 v-model="selectedSort"
                 placeholder="Sort by"
                 style="width: 200px"
@@ -219,6 +220,7 @@
               </el-select>
 
               <el-input
+                aria-label="Search models"
                 v-model="searchQuery"
                 placeholder="Search models..."
                 style="width: 300px"
@@ -323,6 +325,7 @@
 
             <div class="flex gap-3">
               <el-select
+                aria-label="Sort datasets"
                 v-model="selectedSort"
                 placeholder="Sort by"
                 style="width: 200px"
@@ -336,6 +339,7 @@
               </el-select>
 
               <el-input
+                aria-label="Search datasets"
                 v-model="searchQuery"
                 placeholder="Search datasets..."
                 style="width: 300px"
@@ -427,6 +431,7 @@
 
             <div class="flex gap-3">
               <el-select
+                aria-label="Sort spaces"
                 v-model="selectedSort"
                 placeholder="Sort by"
                 style="width: 200px"
@@ -440,6 +445,7 @@
               </el-select>
 
               <el-input
+                aria-label="Search spaces"
                 v-model="searchQuery"
                 placeholder="Search spaces..."
                 style="width: 300px"
