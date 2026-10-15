@@ -92,6 +92,7 @@ export default defineConfig({
         "src/utils/parquet.js",
         "src/utils/psd-preview.js",
         "src/utils/repo-list-pagination.js",
+        "src/utils/repo-page-fields.js",
         "src/utils/repoSortPreference.js",
         "src/utils/safetensors.js",
         "src/utils/tag-parser.js",
