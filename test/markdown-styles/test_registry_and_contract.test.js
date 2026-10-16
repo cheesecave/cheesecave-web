@@ -129,3 +129,40 @@ describe("the shared stylesheet", () => {
     expect(urls.filter((name) => !present.has(name))).toEqual([]);
   });
 });
+
+// Mistakes the real page showed and the rules above could not see (found on the real stack, not in a lab)
+describe("what a style must not do to the content around it", () => {
+  const css = (id) => readFileSync(join(DIR, "themes", `${id}.css`), "utf8");
+
+  it("never paints a background of its own over the card it sits in", () => {
+    // Tufte once set `background: #fffff8` on `.mdx`, a cream rectangle on every other card colour
+    for (const style of MARKDOWN_STYLES) {
+      expect(css(style.id), style.id).not.toMatch(
+        /(^|\})\s*\.mdx\.s-[a-z0-9-]+\s*\{[^}]*\bbackground:\s*#/,
+      );
+    }
+  });
+
+  it("does not wrap inline code in literal backticks", () => {
+    for (const style of MARKDOWN_STYLES)
+      expect(css(style.id), style.id).not.toMatch(
+        /code::(before|after)\s*\{[^}]*content:\s*"`"/,
+      );
+  });
+
+  it("rules a callout on one side only, so two callouts never stack into a double line", () => {
+    const tufte = css("tufte");
+    expect(tufte).toMatch(/\.markdown-alert\{[^}]*border-top:/);
+    expect(tufte).not.toMatch(/\.markdown-alert\{[^}]*border-bottom:/);
+  });
+
+  it("keeps long code lines from running under the copy button", () => {
+    const base = readFileSync(join(DIR, "base.css"), "utf8");
+    expect(base).toMatch(
+      /\.mdx:not\(\.bar\) \.code-block pre\{padding-right:3em\}/,
+    );
+    expect(base).toMatch(
+      /\.mdx\.lang \.code-block pre\{padding-right:6\.5em\}/,
+    );
+  });
+});

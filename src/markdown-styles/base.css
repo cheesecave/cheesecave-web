@@ -54,6 +54,8 @@
 /* code block: optional language bar and a copy button */
 .mdx .code-block{position:relative;background:var(--pre-bg);border:var(--pre-border);border-radius:var(--pre-r);overflow:hidden}
 .mdx .code-block pre{margin:0;padding:var(--pre-pad);overflow:auto;font-family:var(--mono);font-size:var(--pre-size);line-height:var(--pre-lh);color:var(--pre-fg);background:transparent}
+/* the copy button floats over the top right corner: keep long lines from running under it */
+.mdx:not(.bar) .code-block pre{padding-right:3em}.mdx.lang .code-block pre{padding-right:6.5em}
 .mdx .code-block pre code{font-family:inherit;font-size:inherit;background:transparent;padding:0;border:0;color:inherit;border-radius:0}
 .mdx .code-bar{position:absolute;top:8px;right:8px;display:flex;align-items:center;gap:8px;z-index:2}
 .mdx .code-lang{font:600 11px var(--font);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);opacity:.0}
