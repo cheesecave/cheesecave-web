@@ -121,3 +121,10 @@ describe("the sanitizer", () => {
     expect(html).toContain('id="user-content-title"');
   });
 });
+
+describe("an empty fenced block", () => {
+  it("still gets its wrapper, labelled text", () => {
+    const html = renderMarkdown("```\n```\n");
+    expect(html).toContain('class="code-block" data-lang="text"');
+  });
+});

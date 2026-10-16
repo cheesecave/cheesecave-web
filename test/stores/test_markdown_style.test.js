@@ -231,3 +231,27 @@ describe("a reader who signs out while the answer is on its way", () => {
     expect(store.userChoice).toBeNull();
   });
 });
+
+describe("when the browser or the account will not say", () => {
+  it("asks the server for nobody while signed out", async () => {
+    await setup().store.loadFromServer();
+    expect(api.get).not.toHaveBeenCalled();
+  });
+
+  it("follows the site when the browser refuses to read its copy", async () => {
+    const realGet = Storage.prototype.getItem;
+    // Only this store's copy is refused: the auth store reads the browser's storage too
+    const read = vi
+      .spyOn(Storage.prototype, "getItem")
+      .mockImplementation(function (key) {
+        if (key.startsWith("cheesecave:markdown-style")) {
+          throw new Error("storage is off");
+        }
+        return realGet.call(this, key);
+      });
+    const { store } = setup({ siteDefault: "mdn", username: "alice" });
+    await flush();
+    read.mockRestore();
+    expect(store.resolved).toBe("mdn");
+  });
+});

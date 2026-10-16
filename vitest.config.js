@@ -1,4 +1,3 @@
-import { protoAliases } from "./proto/aliases.js";
 import { fileURLToPath, URL } from "node:url";
 import { dirname, resolve } from "node:path";
 import { defineConfig } from "vitest/config";
@@ -37,7 +36,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
-      ...protoAliases,
       vue: resolve(uiNodeModules, "vue/dist/vue.runtime.esm-bundler.js"),
       pinia: resolve(uiNodeModules, "pinia/dist/pinia.mjs"),
       "vue-router/auto": resolve(
@@ -79,6 +77,11 @@ export default defineConfig({
         "src/App.vue",
         "src/stores/auth.js",
         "src/stores/theme.js",
+        "src/stores/markdownStyle.js",
+        "src/markdown-styles/registry.js",
+        "src/components/settings/MarkdownStylePicker.vue",
+        "src/components/common/MarkdownViewer.vue",
+        "src/utils/markdown.js",
         "src/utils/api.js",
         "src/utils/entity-avatar.js",
         "src/utils/page-title.js",

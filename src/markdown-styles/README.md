@@ -27,7 +27,7 @@ A style mostly sets CSS variables (`--font`, `--size`, `--fg`, `--link`, `--h1`.
 `--td-b`, the callout colours `--note --tip --important --warning --caution`, ...) and adds a few rules for what is
 its own (RTD's solid callout title bar, Tufte's ruled tables). The defaults are in `base.css`.
 
-Contrast is part of the job: the audit in the prototype checked every style, light and dark, against WCAG AA.
+Contrast is part of the job: the audit made while building them checked every style, light and dark, against WCAG AA.
 Callout titles take `--title`, a darkened (light) or lightened (dark) mix of the callout colour.
 
 ## Adding a style

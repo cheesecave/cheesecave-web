@@ -119,6 +119,23 @@ describe("the copy button of a code block", () => {
     expect(wrapper.find(".mermaid-wrapper .copy-code").exists()).toBe(false);
   });
 
+  it("adds nothing when the viewer is gone before the content has settled", async () => {
+    mountViewer();
+    wrapper.unmount();
+    await flushPromises();
+    expect(document.querySelector(".copy-code")).toBeNull();
+  });
+
+  it("copies nothing, without failing, for a copy button that sits outside any code block", async () => {
+    mountViewer("plain text");
+    await flushPromises();
+    const stray = document.createElement("button");
+    stray.className = "copy-code";
+    root().element.appendChild(stray);
+    await wrapper.get(".copy-code").trigger("click");
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("");
+  });
+
   it("copies the block's code, says so for a moment, then goes back", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout"] });
     mountViewer();

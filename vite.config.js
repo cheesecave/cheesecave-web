@@ -7,8 +7,6 @@ import AutoImport from "unplugin-auto-import/vite";
 import Components from "unplugin-vue-components/vite";
 import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
 import UnoCSS from "unocss/vite";
-import { protoAliases } from "./proto/aliases.js";
-import { devPreferences } from "./proto/dev-preferences.js";
 import { getFrontendBuildInfo } from "./scripts/frontend-build-info.mjs";
 
 export default defineConfig({
@@ -70,13 +68,11 @@ export default defineConfig({
     }),
 
     UnoCSS(),
-    devPreferences(),
   ],
 
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
-      ...protoAliases,
     },
   },
 
@@ -213,8 +209,6 @@ export default defineConfig({
 
   server: {
     port: 5173,
-    // PROTOTYPE: the scratch install of the new renderer plugins lives outside the project
-    fs: { allow: [".", "/tmp/mdlab"] },
     proxy: {
       // Mount the optional admin Vite dev server under /admin to expose the
       // admin portal at the same origin as the main UI. Admin builds with
