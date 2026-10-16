@@ -21,6 +21,10 @@ The zip preview vendors two decoders under `src/vendor/`, each file keeping its 
 
 It also depends on `@zip.js/zip.js` (BSD-3-Clause), `fzstd` (MIT), `lzma1` (Apache-2.0) and `xz-decompress` (MIT, bundling xz-embedded, public domain, and walloc, MIT), installed through `package.json`.
 
+## Fonts
+
+The README styles (`src/markdown-styles/`) self-host these web fonts in `public/fonts/`, unmodified, each under its own license: Inter, Source Sans 3, Lato, IBM Plex Mono and JetBrains Mono (SIL Open Font License 1.1); Roboto Mono and Roboto Slab (Apache-2.0); ET Book (MIT).
+
 ## Source and build information
 
 The complete application is assembled from [backend](https://github.com/cheesecave/cheesecave-backend), [website](https://github.com/cheesecave/cheesecave-web) and [Admin](https://github.com/cheesecave/cheesecave-admin). Their README files, lock files, build scripts and Docker/Compose files contain build and installation instructions. The repositories currently remain private; this does not constitute a public source offer to users without repository access. Before serving outside users or distributing builds, provide recipients access to the corresponding deployed source, including the relevant components and build configuration.

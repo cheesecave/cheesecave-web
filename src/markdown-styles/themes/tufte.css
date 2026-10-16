@@ -1,0 +1,20 @@
+/* Tufte CSS */
+.mdx.s-tufte{--font:ETBook,Palatino,"Palatino Linotype","Palatino LT STD","Book Antiqua",Georgia,serif;--mono:Consolas,"Liberation Mono",Menlo,Courier,monospace;--size:20px;--lh:1.5;--fg:#111;--muted:#555;--hfont:ETBook,Palatino,"Palatino Linotype",Georgia,serif;--hw:400;--hfg:#111;--link:#111;--link-deco:underline;
+  --h1:2.4em;--h2:1.65em;--h3:1.3em;--h4:1.1em;--hmt:1.6em;--hmb:.6em;--pmb:1em;--ic-bg:transparent;--ic-fg:#111;--ic-r:0;--ic-pad:0;--ic-size:.82em;
+  --pre-bg:transparent;--pre-fg:#111;--pre-r:0;--pre-pad:0;--pre-size:.8em;--pre-lh:1.4;--pre-border:none;--bq-bl:0;--bq-fg:#111;--bq-pad:0 0 0 1.5em;--bq-style:normal;
+  --th-bg:transparent;--td-b:0;--td-pad:.35em .9em;--zebra:transparent;--tsize:.85em;--hr:#ccc;--hr-h:1px;--lig:.15em;--note:#555;--tip:#555;--important:#555;--warning:#555;--caution:#555}
+.mdx.s-tufte h1,.mdx.s-tufte h2{padding-bottom:0}.mdx.s-tufte h1{margin-top:0;font-size:2.4em}
+.mdx.s-tufte h2,.mdx.s-tufte h3{font-style:italic}
+.mdx.s-tufte a{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.14em}
+.mdx.s-tufte .code-block{border-left:2px solid #ccc;border-radius:0;margin-left:0;background:transparent}.mdx.s-tufte .code-block pre{padding:.2em 0 .2em 1.2em}
+.mdx.s-tufte table{border-top:2px solid #111;border-bottom:2px solid #111}.mdx.s-tufte th{border-bottom:1px solid #111;font-weight:400;font-style:italic}
+.mdx.s-tufte blockquote{font-size:1.05em}
+.mdx.s-tufte .markdown-alert{border:0;border-top:1px solid #111;padding:.6em 0 0;background:transparent}
+.mdx.s-tufte .markdown-alert-title{font-style:italic;color:var(--fg);font-weight:400}.mdx.s-tufte .markdown-alert-title svg{display:none}
+.mdx.s-tufte .copy-code{background:transparent;border-color:#ccc}
+.mdx.s-tufte.lang .code-lang{opacity:.0}
+
+/* dark */
+.dark .mdx.s-tufte{--fg:#ddd;--muted:#999;--hfg:#eee;--link:#eee;--ic-fg:#ddd;--pre-fg:#ddd;--bq-fg:#ddd;--hr:#555;}
+
+.dark .mdx.s-tufte table{border-color:#ddd}.dark .mdx.s-tufte th{border-bottom-color:#ddd}.dark .mdx.s-tufte .code-block{border-left-color:#555}.dark .mdx.s-tufte .markdown-alert{border-color:#ddd}.dark .mdx.s-tufte .copy-code{background:transparent;border-color:#555}

@@ -25,7 +25,7 @@ describe("renderMarkdown heading levels", () => {
 
   it("closes each heading with the tag it opened with, and keeps the heading's text and id", () => {
     const html = renderMarkdown("# Card & more\n", { headingOffset: 1 });
-    expect(html).toMatch(/<h2[^>]*>Card &amp; more<\/h2>/);
+    expect(html).toMatch(/<h2[^>]*>(?:<a[^>]*>.*?<\/a>\s*)?Card &amp; more<\/h2>/);
     expect(html).not.toContain("</h1>");
   });
 });

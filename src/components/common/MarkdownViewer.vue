@@ -3,17 +3,27 @@
   <div
     ref="markdownContainer"
     class="markdown-body markdown-container"
+    :class="[styleClasses, { 'mdx-loading': !styleReady }]"
     v-html="renderedHTML"
+    @click="onClick"
   />
 </template>
 
 <script setup>
-import { renderMarkdown } from "@/utils/markdown";
+import { HEADING_ID_PREFIX, renderMarkdown } from "@/utils/markdown";
 import { useThemeStore } from "@/stores/theme";
 import mermaid from "mermaid";
 import Panzoom from "panzoom";
+import "katex/dist/katex.min.css";
+import "@/markdown-styles/base.css";
+import {
+  loadMarkdownStyle,
+  markdownStyleClasses,
+} from "@/markdown-styles/registry";
+import { useMarkdownStyleStore } from "@/stores/markdownStyle";
 
 const themeStore = useThemeStore();
+const styleStore = useMarkdownStyleStore();
 
 /**
  * @typedef {Object} Props
@@ -73,6 +83,77 @@ const renderedHTML = computed(() => {
         : null,
   });
 });
+
+// The style in force (the reader's own, else the site's): its stylesheet is loaded on demand, and the content
+// stays hidden until it is, so it never shows unstyled
+const styleClasses = computed(() => markdownStyleClasses(styleStore.resolved));
+const styleReady = ref(false);
+watch(
+  () => styleStore.resolved,
+  async (id) => {
+    styleReady.value = false;
+    try {
+      await loadMarkdownStyle(id);
+    } catch (error) {
+      console.error("Markdown style failed to load:", error);
+    }
+    if (id === styleStore.resolved) styleReady.value = true;
+  },
+  { immediate: true },
+);
+
+// A fenced code block arrives with its language label; the copy button is added here, after sanitizing, since
+// the sanitizer refuses <button> and inline handlers
+const COPY_ICON =
+  '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25z"/><path fill="currentColor" d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25z"/></svg>';
+function addCopyButtons() {
+  if (!markdownContainer.value) return;
+  for (const bar of markdownContainer.value.querySelectorAll(
+    ".code-block .code-bar",
+  )) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "copy-code";
+    button.setAttribute("aria-label", "Copy code");
+    button.innerHTML = COPY_ICON;
+    bar.appendChild(button);
+  }
+}
+async function onClick(event) {
+  const button = event.target.closest?.(".copy-code");
+  if (!button) return;
+  const code = button.closest(".code-block")?.querySelector("pre code");
+  try {
+    await navigator.clipboard.writeText(code?.textContent ?? "");
+    button.classList.add("copied");
+    button.setAttribute("aria-label", "Copied");
+    setTimeout(() => {
+      button.classList.remove("copied");
+      button.setAttribute("aria-label", "Copy code");
+    }, 1500);
+  } catch {
+    /* Clipboard access can be refused; nothing to undo. */
+  }
+}
+watch(renderedHTML, () => nextTick(addCopyButtons), { immediate: true });
+
+// `#images` should reach the heading whose id is `user-content-images`
+function scrollToHash() {
+  const id = decodeURIComponent(window.location.hash.slice(1));
+  if (!id || !markdownContainer.value) return;
+  const byId = new Map(
+    [...markdownContainer.value.querySelectorAll("[id]")].map((el) => [
+      el.id,
+      el,
+    ]),
+  );
+  (byId.get(id) ?? byId.get(HEADING_ID_PREFIX + id))?.scrollIntoView();
+}
+onMounted(() => {
+  window.addEventListener("hashchange", scrollToHash);
+  nextTick(scrollToHash);
+});
+onBeforeUnmount(() => window.removeEventListener("hashchange", scrollToHash));
 
 // Get theme from store (reactive)
 const isDark = computed(() => themeStore.isDark);
@@ -281,435 +362,3 @@ onMounted(() => {
   renderMermaidDiagrams();
 });
 </script>
-
-<style scoped>
-/* Strict containment for markdown content */
-.markdown-container {
-  /* Prevent overflow but don't break layout */
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-/* GitHub-like markdown styles */
-.markdown-body {
-  font-size: 14px;
-  line-height: 1.6;
-  word-wrap: break-word;
-}
-
-@media (min-width: 640px) {
-  .markdown-body {
-    font-size: 15px;
-  }
-}
-
-@media (min-width: 768px) {
-  .markdown-body {
-    font-size: 16px;
-  }
-}
-
-.markdown-body :deep(h1),
-.markdown-body :deep(h2),
-.markdown-body :deep(h3),
-.markdown-body :deep(h4),
-.markdown-body :deep(h5),
-.markdown-body :deep(h6) {
-  margin-top: 24px;
-  margin-bottom: 16px;
-  font-weight: 600;
-  line-height: 1.25;
-}
-
-.markdown-body :deep(h1) {
-  font-size: 1.6em;
-  border-bottom: 1px solid #eaecef;
-  padding-bottom: 0.3em;
-}
-
-@media (min-width: 768px) {
-  .markdown-body :deep(h1) {
-    font-size: 2em;
-  }
-}
-
-.markdown-body :deep(h2) {
-  font-size: 1.3em;
-  border-bottom: 1px solid #eaecef;
-  padding-bottom: 0.3em;
-}
-
-@media (min-width: 768px) {
-  .markdown-body :deep(h2) {
-    font-size: 1.5em;
-  }
-}
-
-.markdown-body :deep(h3) {
-  font-size: 1.15em;
-}
-
-@media (min-width: 768px) {
-  .markdown-body :deep(h3) {
-    font-size: 1.25em;
-  }
-}
-
-.markdown-body :deep(p) {
-  margin-top: 0;
-  margin-bottom: 16px;
-}
-
-.markdown-body :deep(code) {
-  padding: 0.2em 0.4em;
-  margin: 0;
-  font-size: 80%;
-  background-color: rgba(175, 184, 193, 0.2);
-  border-radius: 6px;
-  font-family: ui-monospace, monospace;
-}
-
-@media (min-width: 768px) {
-  .markdown-body :deep(code) {
-    font-size: 85%;
-  }
-}
-
-.markdown-body :deep(pre) {
-  padding: 12px;
-  overflow: auto;
-  font-size: 80%;
-  line-height: 1.45;
-  background-color: #f6f8fa;
-  border-radius: 6px;
-  margin-bottom: 16px;
-}
-
-@media (min-width: 768px) {
-  .markdown-body :deep(pre) {
-    padding: 16px;
-    font-size: 85%;
-  }
-}
-
-.markdown-body :deep(pre code) {
-  display: inline;
-  max-width: auto;
-  padding: 0;
-  margin: 0;
-  overflow: visible;
-  line-height: inherit;
-  word-wrap: normal;
-  background-color: transparent;
-  border: 0;
-}
-
-.markdown-body :deep(a) {
-  color: #0969da;
-  text-decoration: none;
-}
-
-.markdown-body :deep(a:hover) {
-  text-decoration: underline;
-}
-
-.markdown-body :deep(ul),
-.markdown-body :deep(ol) {
-  padding-left: 2em;
-  margin-bottom: 16px;
-  list-style: revert;
-}
-
-.markdown-body :deep(li) {
-  margin-bottom: 0.25em;
-}
-
-.markdown-body :deep(blockquote) {
-  padding: 0 1em;
-  color: #57606a;
-  border-left: 0.25em solid #d0d7de;
-  margin-bottom: 16px;
-}
-
-.markdown-body :deep(table) {
-  border-collapse: collapse;
-  width: 100%;
-  margin-bottom: 16px;
-}
-
-.markdown-body :deep(table th),
-.markdown-body :deep(table td) {
-  padding: 6px 13px;
-  border: 1px solid #d0d7de;
-}
-
-.markdown-body :deep(table th) {
-  font-weight: 600;
-  background-color: #f6f8fa;
-}
-
-.markdown-body :deep(img) {
-  max-width: 100%;
-  height: auto;
-}
-
-.markdown-body :deep(hr) {
-  height: 0.25em;
-  padding: 0;
-  margin: 24px 0;
-  background-color: #d0d7de;
-  border: 0;
-}
-
-/* Ensure all custom content stays within bounds */
-.markdown-body :deep(*) {
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-/* Allow radio inputs for galleries but keep them functional */
-.markdown-body :deep(input[type="radio"]) {
-  /* Radio inputs can be visible or hidden based on custom styles */
-  pointer-events: auto;
-}
-
-/* Style task list checkboxes */
-.markdown-body :deep(input[type="checkbox"].task-list-checkbox) {
-  margin-right: 0.5em;
-  vertical-align: middle;
-  pointer-events: none; /* Disabled checkboxes */
-}
-
-/* Style list items containing task list checkboxes */
-.markdown-body :deep(li:has(> input[type="checkbox"].task-list-checkbox)) {
-  list-style-type: none;
-}
-
-/* For browsers that don't support :has(), use a fallback */
-.markdown-body :deep(ul li input[type="checkbox"].task-list-checkbox) {
-  margin-left: -1.5em;
-}
-
-/* Ensure custom containers don't overflow */
-.markdown-body :deep(div),
-.markdown-body :deep(section),
-.markdown-body :deep(article) {
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-/* Fix for gallery containers that use position: relative */
-.markdown-body :deep(.gallery-container),
-.markdown-body :deep([class*="gallery"]) {
-  max-width: 100%;
-  overflow: hidden;
-}
-
-/* Ensure slides and content areas stay contained */
-.markdown-body :deep(.content-area),
-.markdown-body :deep(.slide) {
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-/* Dark mode support for markdown elements */
-.markdown-body :deep(h1),
-.markdown-body :deep(h2) {
-  border-bottom-color: #eaecef;
-}
-
-@media (prefers-color-scheme: dark) {
-  .markdown-body :deep(h1),
-  .markdown-body :deep(h2) {
-    border-bottom-color: rgba(255, 255, 255, 0.1);
-  }
-
-  .markdown-body :deep(pre) {
-    background-color: rgba(0, 0, 0, 0.2);
-  }
-
-  .markdown-body :deep(code) {
-    background-color: rgba(255, 255, 255, 0.1);
-  }
-
-  .markdown-body :deep(table th) {
-    background-color: rgba(0, 0, 0, 0.2);
-  }
-
-  .markdown-body :deep(table th),
-  .markdown-body :deep(table td) {
-    border-color: rgba(255, 255, 255, 0.1);
-  }
-
-  .markdown-body :deep(blockquote) {
-    color: #8b949e;
-    border-left-color: rgba(255, 255, 255, 0.2);
-  }
-}
-
-/* Handle dark mode class from theme store */
-.dark .markdown-body :deep(h1),
-.dark .markdown-body :deep(h2) {
-  border-bottom-color: rgba(255, 255, 255, 0.1);
-}
-
-.dark .markdown-body :deep(pre) {
-  background-color: rgba(0, 0, 0, 0.3);
-}
-
-.dark .markdown-body :deep(code) {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.dark .markdown-body :deep(table th) {
-  background-color: rgba(0, 0, 0, 0.3);
-}
-
-.dark .markdown-body :deep(table th),
-.dark .markdown-body :deep(table td) {
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-.dark .markdown-body :deep(blockquote) {
-  color: #8b949e;
-  border-left-color: rgba(255, 255, 255, 0.2);
-}
-
-.dark .markdown-body :deep(a) {
-  color: #58a6ff;
-}
-
-/* Mermaid wrapper with controls - light mode default */
-.markdown-body :deep(.mermaid-wrapper) {
-  position: relative;
-  margin: 24px 0;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 16px;
-  background-color: #ffffff !important;
-  overflow: hidden;
-}
-
-/* Dark mode wrapper */
-.dark .markdown-body :deep(.mermaid-wrapper) {
-  border-color: #374151 !important;
-  background-color: #1f2937 !important;
-}
-
-/* Ensure proper background in SVG */
-.markdown-body :deep(.mermaid-wrapper svg) {
-  background: transparent !important;
-}
-
-/* Fullscreen mode - full width */
-.markdown-body :deep(.mermaid-wrapper:fullscreen) {
-  background-color: white !important;
-  display: flex;
-  flex-direction: column;
-  width: 100vw !important;
-  height: 100vh !important;
-  padding: 20px !important;
-  align-items: center;
-  justify-content: center;
-}
-
-.dark .markdown-body :deep(.mermaid-wrapper:fullscreen) {
-  background-color: #111827 !important;
-}
-
-/* Zoom controls - light mode */
-.markdown-body :deep(.mermaid-controls) {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  display: flex;
-  gap: 4px;
-  z-index: 10;
-  background-color: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  padding: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-/* Dark mode controls */
-.dark .markdown-body :deep(.mermaid-controls) {
-  background-color: rgba(31, 41, 55, 0.95) !important;
-  border-color: #4b5563 !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-}
-
-/* Zoom buttons - light mode */
-.markdown-body :deep(.mermaid-zoom-btn) {
-  width: 32px;
-  height: 32px;
-  border: none;
-  background-color: transparent;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  color: #4b5563 !important;
-  transition: all 0.2s;
-}
-
-.markdown-body :deep(.mermaid-zoom-btn:hover) {
-  background-color: rgba(59, 130, 246, 0.15) !important;
-  color: #3b82f6 !important;
-}
-
-/* Dark mode buttons */
-.dark .markdown-body :deep(.mermaid-zoom-btn) {
-  color: #d1d5db !important;
-}
-
-.dark .markdown-body :deep(.mermaid-zoom-btn:hover) {
-  background-color: rgba(59, 130, 246, 0.3) !important;
-  color: #60a5fa !important;
-}
-
-.markdown-body :deep(.mermaid-zoom-btn div) {
-  width: 20px;
-  height: 20px;
-}
-
-/* Mermaid diagram container */
-.markdown-body :deep(.mermaid-diagram) {
-  text-align: center;
-  background: transparent;
-  overflow: visible;
-  min-height: 200px;
-  max-height: 600px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  cursor: grab;
-}
-
-.markdown-body :deep(.mermaid-diagram:active) {
-  cursor: grabbing;
-}
-
-.markdown-body :deep(.mermaid-diagram svg) {
-  max-width: 100%;
-  max-height: 600px;
-  width: auto;
-  height: auto;
-}
-
-/* Fullscreen: remove limits and expand */
-.markdown-body :deep(.mermaid-wrapper:fullscreen .mermaid-diagram) {
-  max-height: none !important;
-  max-width: none !important;
-  width: 100% !important;
-  height: 100% !important;
-  flex: 1;
-}
-
-/* Mermaid error styling */
-.markdown-body :deep(.mermaid-error) {
-  margin: 16px 0;
-}
-</style>

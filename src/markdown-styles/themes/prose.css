@@ -1,0 +1,17 @@
+/* Tailwind Typography (prose) */
+.mdx.s-prose{--font:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;--size:16px;--lh:1.75;--fg:#374151;--muted:#6b7280;--hfg:#111827;--hw:700;--link:#111827;--link-deco:underline;--link-w:500;
+  --h1:2.25em;--h2:1.5em;--h3:1.25em;--h4:1em;--hmt:2em;--hmb:1em;--pmb:1.25em;--ic-bg:transparent;--ic-fg:#111827;--ic-r:0;--ic-pad:0;--ic-size:.875em;--ic-w:600;
+  --pre-bg:#1f2937;--pre-fg:#e5e7eb;--pre-r:.375rem;--pre-pad:.857em 1.143em;--pre-size:.875em;--pre-lh:1.714;--pre-border:none;--bq-bl:.25rem solid #e5e7eb;--bq-fg:#111827;--bq-pad:0 0 0 1em;--bq-style:italic;
+  --th-bg:transparent;--th-fg:#111827;--td-b:0;--td-pad:.57em .71em;--zebra:transparent;--tsize:.875em;--hr:#e5e7eb;--hr-h:1px;--lig:.5em;--note:#2563eb;--tip:#059669;--important:#7c3aed;--warning:#d97706;--caution:#dc2626}
+.mdx.s-prose h1{font-weight:800;line-height:1.11}.mdx.s-prose h1,.mdx.s-prose h2{padding-bottom:0}.mdx.s-prose h1{margin-top:0;margin-bottom:.9em}
+.mdx.s-prose blockquote{font-weight:500;quotes:"\201C" "\201D" "\2018" "\2019"}
+.mdx.s-prose blockquote p:first-of-type::before{content:open-quote}.mdx.s-prose blockquote p:last-of-type::after{content:close-quote}
+.mdx.s-prose th{border-bottom:1px solid #d1d5db;padding-bottom:.57em}.mdx.s-prose td{border-bottom:1px solid #e5e7eb}
+.mdx.s-prose .markdown-alert{border:1px solid color-mix(in srgb,var(--c) 30%,transparent);background:color-mix(in srgb,var(--c) 6%,transparent);border-radius:.5rem;padding:1rem 1.25rem;font-style:normal}
+.mdx.s-prose .markdown-alert p::before,.mdx.s-prose .markdown-alert p::after{content:none}
+.mdx.s-prose .copy-code{background:#374151;border-color:#4b5563;color:#d1d5db}.mdx.s-prose .code-lang{color:#9ca3af}
+.mdx.s-prose .hljs-keyword,.mdx.s-prose .hljs-built_in,.mdx.s-prose .hljs-literal{color:#c4b5fd}.mdx.s-prose .hljs-string,.mdx.s-prose .hljs-attr{color:#86efac}.mdx.s-prose .hljs-number,.mdx.s-prose .hljs-title,.mdx.s-prose .hljs-variable{color:#fdba74}.mdx.s-prose .hljs-comment{color:#9ca3af}.mdx.s-prose .hljs-function .hljs-title,.mdx.s-prose .hljs-title.function_{color:#93c5fd}
+
+/* dark */
+.dark .mdx.s-prose{--fg:#d1d5db;--muted:#9ca3af;--hfg:#fff;--link:#fff;--ic-fg:#fff;--pre-bg:rgba(0,0,0,.45);--pre-fg:#e5e7eb;--bq-bl:.25rem solid #374151;--bq-fg:#f9fafb;--th-fg:#fff;--hr:#374151;--note:#60a5fa;--tip:#34d399;--important:#a78bfa;--warning:#fbbf24;--caution:#f87171}
+.dark .mdx.s-prose th{border-bottom-color:#4b5563}.dark .mdx.s-prose td{border-bottom-color:#374151}

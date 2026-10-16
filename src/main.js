@@ -60,6 +60,7 @@ if (import.meta.hot) import.meta.hot.dispose(disposeAppearance);
 
 // Initialize auth before mounting
 import { useAuthStore } from "./stores/auth";
+import { useMarkdownStyleStore } from "./stores/markdownStyle";
 const authStore = useAuthStore();
 
 const disposeErrorHandling = installErrorHandling(app, authStore);
@@ -68,5 +69,7 @@ if (import.meta.hot) import.meta.hot.dispose(disposeErrorHandling);
 
 // Restore auth state, then mount app. Branding refresh remains independent.
 authStore.init().finally(() => {
+  // The reader's README style starts loading now, in parallel with whatever the first page fetches
+  useMarkdownStyleStore();
   app.mount("#app");
 });

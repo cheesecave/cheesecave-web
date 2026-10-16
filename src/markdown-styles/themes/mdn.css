@@ -1,0 +1,13 @@
+/* MDN Web Docs */
+.mdx.s-mdn{--font:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"JetBrains Mono","Roboto Mono",ui-monospace,monospace;--size:16px;--lh:1.75;--fg:#1b1b1b;--muted:#4e4e4e;--hfg:#000;--hw:400;--link:#044c9f;--link-deco:underline;
+  --h1:2.5em;--h2:2em;--h3:1.5em;--h4:1.25em;--hmt:1.3em;--hmb:.55em;--pmb:1em;--ic-bg:#edeef0;--ic-fg:#000;--ic-r:4px;--ic-pad:2px 4px;--ic-size:.85em;--pre-bg:#f9f9fb;--pre-fg:#1b1b1b;--pre-border:1px solid #c3c7cb;--pre-r:8px;--pre-pad:16px;--pre-size:.85em;--pre-lh:1.6;
+  --bq-bl:0;--bq-bg:#f2f2f4;--bq-fg:#1b1b1b;--bq-pad:.8em 1.2em;--th-bg:transparent;--td-b:0;--td-pad:8px 12px;--zebra:transparent;--hr:#c3c7cb;--hr-h:1px;--lig:.2em;--note:#044c9f;--tip:#007936;--important:#7a2fc2;--warning:#bd6b00;--caution:#d30038}
+.mdx.s-mdn h1,.mdx.s-mdn h2{padding-bottom:0}.mdx.s-mdn h1{margin-top:0}
+.mdx.s-mdn th,.mdx.s-mdn td{border-bottom:1px solid #c3c7cb}.mdx.s-mdn th{font-weight:600}
+.mdx.s-mdn blockquote{border-radius:8px;border:1px solid #e5e5ea}
+.mdx.s-mdn .markdown-alert{border:1px solid color-mix(in srgb,var(--c) 40%,transparent);border-left:8px solid var(--c);background:color-mix(in srgb,var(--c) 7%,transparent);border-radius:8px;padding:.9em 1.2em}
+.mdx.s-mdn.lang .code-lang{opacity:.0}
+
+/* dark */
+.dark .mdx.s-mdn{--fg:#f2f2f2;--muted:#cdcdcd;--hfg:#fff;--link:#8cb4ff;--ic-bg:#343434;--ic-fg:#fff;--pre-bg:#1b1b1b;--pre-fg:#f2f2f2;--pre-border:1px solid #4e4e4e;--bq-bg:#2b2b2b;--bq-fg:#f2f2f2;--hr:#4e4e4e;--note:#8cb4ff;--tip:#3dd68c;--important:#c8abfa;--warning:#ffb55a;--caution:#ff7a8f}
+.dark .mdx.s-mdn th,.dark .mdx.s-mdn td{border-bottom-color:#4e4e4e}.dark .mdx.s-mdn blockquote{border-color:#4e4e4e}

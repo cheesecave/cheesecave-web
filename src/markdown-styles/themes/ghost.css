@@ -1,0 +1,16 @@
+/* Ghost (article, serif) */
+.mdx.s-ghost{--font:Georgia,"Times New Roman",serif;--mono:"Roboto Mono",Consolas,Menlo,monospace;--size:19px;--lh:1.7;--fg:#15171a;--muted:#5a707a;--hfont:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Helvetica,Arial,sans-serif;--hw:700;--hfg:#15171a;--hls:-.012em;--link:#15171a;--link-deco:underline;
+  --h1:2em;--h2:1.55em;--h3:1.25em;--h4:1.05em;--hmt:1.9em;--hmb:.5em;--pmb:1.2em;--ic-bg:#f2f4f5;--ic-fg:#15171a;--ic-r:3px;--ic-pad:.12em .35em;--ic-size:.78em;
+  --pre-bg:#15171a;--pre-fg:#e8eaed;--pre-r:5px;--pre-pad:1.1em 1.3em;--pre-size:.72em;--pre-lh:1.65;--bq-bl:4px solid #15171a;--bq-fg:#15171a;--bq-pad:0 0 0 1.2em;--bq-style:italic;
+  --th-bg:transparent;--td-b:0;--td-pad:.6em .8em;--zebra:transparent;--tsize:.8em;--hr:#e5eff5;--hr-h:1px;--lig:.3em;--note:#3eb0ef;--tip:#30cf43;--important:#a36cff;--warning:#ffb41f;--caution:#f05656}
+.mdx.s-ghost h1,.mdx.s-ghost h2{padding-bottom:0}.mdx.s-ghost h1{margin-top:0}.mdx.s-ghost a{text-decoration-color:#ff0095;text-underline-offset:.15em}
+.mdx.s-ghost th{border-bottom:2px solid #15171a;font-family:var(--hfont)}.mdx.s-ghost td{border-bottom:1px solid #e5eff5;font-family:var(--hfont)}.mdx.s-ghost table{font-family:var(--hfont)}
+.mdx.s-ghost hr{height:1px;margin:2.4em auto;width:60%}
+.mdx.s-ghost .markdown-alert{font-family:var(--hfont);font-size:.82em;border:0;border-radius:6px;background:color-mix(in srgb,var(--c) 12%,transparent);padding:1em 1.3em}
+.mdx.s-ghost .copy-code{background:#2a2d31;border-color:#3a3d42;color:#c7cbd0}.mdx.s-ghost .code-lang{color:#9aa3ab}
+.mdx.s-ghost .hljs-keyword,.mdx.s-ghost .hljs-built_in,.mdx.s-ghost .hljs-literal{color:#ff7ab8}.mdx.s-ghost .hljs-string,.mdx.s-ghost .hljs-attr{color:#a5e075}.mdx.s-ghost .hljs-number,.mdx.s-ghost .hljs-variable{color:#ffcb6b}.mdx.s-ghost .hljs-comment{color:#7a8590}.mdx.s-ghost .hljs-title{color:#82aaff}
+.mdx.s-ghost.lang .code-lang{opacity:.0}
+
+/* dark */
+.dark .mdx.s-ghost{--fg:#e6e8eb;--muted:#9aa4ad;--hfg:#fff;--link:#fff;--ic-bg:#2a2d31;--ic-fg:#fff;--bq-bl:4px solid #e6e8eb;--bq-fg:#e6e8eb;--hr:#3a3f45}
+.dark .mdx.s-ghost th{border-bottom-color:#e6e8eb}.dark .mdx.s-ghost td{border-bottom-color:#3a3f45}
