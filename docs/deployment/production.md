@@ -55,24 +55,24 @@ server {
 
 **Update base URL:**
 ```yaml
-KOHAKU_HUB_BASE_URL: https://hub.yourdomain.com
+CHEESE_CAVE_BASE_URL: https://hub.yourdomain.com
 ```
 
 ## External S3
 
 **Cloudflare R2:**
 ```yaml
-KOHAKU_HUB_S3_ENDPOINT: https://account.r2.cloudflarestorage.com
-KOHAKU_HUB_S3_PUBLIC_ENDPOINT: https://pub.r2.dev
-KOHAKU_HUB_S3_REGION: auto
-KOHAKU_HUB_S3_SIGNATURE_VERSION: s3v4
+CHEESE_CAVE_S3_ENDPOINT: https://account.r2.cloudflarestorage.com
+CHEESE_CAVE_S3_PUBLIC_ENDPOINT: https://pub.r2.dev
+CHEESE_CAVE_S3_REGION: auto
+CHEESE_CAVE_S3_SIGNATURE_VERSION: s3v4
 ```
 
-**An R2 bucket that holds other data too, or an API token scoped to one bucket:** put the bucket in the endpoint's path. `KOHAKU_HUB_S3_BUCKET` then names a key prefix inside it, and LakeFS must use the same endpoint:
+**An R2 bucket that holds other data too, or an API token scoped to one bucket:** put the bucket in the endpoint's path. `CHEESE_CAVE_S3_BUCKET` then names a key prefix inside it, and LakeFS must use the same endpoint:
 ```yaml
-KOHAKU_HUB_S3_ENDPOINT: https://account.r2.cloudflarestorage.com/my-bucket
-KOHAKU_HUB_S3_PUBLIC_ENDPOINT: https://account.r2.cloudflarestorage.com/my-bucket  # same bucket
-KOHAKU_HUB_S3_BUCKET: hub-storage            # objects live under my-bucket/hub-storage/
+CHEESE_CAVE_S3_ENDPOINT: https://account.r2.cloudflarestorage.com/my-bucket
+CHEESE_CAVE_S3_PUBLIC_ENDPOINT: https://account.r2.cloudflarestorage.com/my-bucket  # same bucket
+CHEESE_CAVE_S3_BUCKET: hub-storage            # objects live under my-bucket/hub-storage/
 LAKEFS_BLOCKSTORE_S3_ENDPOINT: https://account.r2.cloudflarestorage.com/my-bucket
 LAKEFS_BLOCKSTORE_S3_DISCOVER_BUCKET_REGION: "false"  # its region probe of hub-storage can only fail
 ```
@@ -80,9 +80,9 @@ KohakuHub reaches the bucket at the endpoint's root, so copies, listings and bul
 
 **AWS S3:**
 ```yaml
-KOHAKU_HUB_S3_ENDPOINT: https://s3.amazonaws.com
-KOHAKU_HUB_S3_REGION: us-east-1
-KOHAKU_HUB_S3_FORCE_PATH_STYLE: false
+CHEESE_CAVE_S3_ENDPOINT: https://s3.amazonaws.com
+CHEESE_CAVE_S3_REGION: us-east-1
+CHEESE_CAVE_S3_FORCE_PATH_STYLE: false
 ```
 
 ## Security

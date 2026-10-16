@@ -75,8 +75,8 @@ To have `GET /api/version` report which code the deployment runs (its `build.git
 
 ```bash
 docker-compose build \
-  --build-arg KOHAKU_HUB_GIT_SHA=$(git rev-parse HEAD) \
-  --build-arg KOHAKU_HUB_BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  --build-arg CHEESE_CAVE_GIT_SHA=$(git rev-parse HEAD) \
+  --build-arg CHEESE_CAVE_BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 docker-compose up -d
 ```
 
@@ -100,8 +100,8 @@ openssl rand -base64 48
 
 Update the following variables in your `docker-compose.yml` with the generated secrets:
 
-- `KOHAKU_HUB_SESSION_SECRET`
-- `KOHAKU_HUB_ADMIN_SECRET_TOKEN`
+- `CHEESE_CAVE_SESSION_SECRET`
+- `CHEESE_CAVE_ADMIN_SECRET_TOKEN`
 - `LAKEFS_AUTH_ENCRYPT_SECRET_KEY`
 
 ## Services
@@ -127,12 +127,12 @@ hands each task to exactly one of them (`FOR UPDATE SKIP LOCKED`), so you do
 not need to copy the service. Pick the number at startup:
 
 ```bash
-KOHAKU_HUB_WORKER_REPLICAS=3 docker compose up -d
+CHEESE_CAVE_WORKER_REPLICAS=3 docker compose up -d
 # or
 docker compose up -d --scale khub-worker=3
 ```
 
-`KOHAKU_HUB_WORKER_REPLICAS` can also go in the `.env` file next to
+`CHEESE_CAVE_WORKER_REPLICAS` can also go in the `.env` file next to
 `docker-compose.yml`. It defaults to 1. Run `up -d` again with another number
 to add or remove replicas. A replica that is stopped hands its running tasks
 back to the queue, and another replica continues them.
@@ -146,7 +146,7 @@ Things to keep in mind:
   Workers** in the admin panel lists them by hostname (the container id) with
   their status and load, and the page header shows how many are online.
 - **Total parallelism.** Tasks running at once add up to replicas ×
-  `KOHAKU_HUB_WORKER_CONCURRENCY` (4 by default).
+  `CHEESE_CAVE_WORKER_CONCURRENCY` (4 by default).
 - **Database connections.** Each replica holds its own PostgreSQL connection,
   so check `max_connections` before running many.
 - **SQLite.** On a SQLite deployment, run one replica: SQLite writes are

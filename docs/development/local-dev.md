@@ -126,7 +126,7 @@ What this script does:
 - initializes LakeFS on first run
 - writes LakeFS credentials to `hub-meta/dev/lakefs/credentials.env`
 - runs database migrations
-- auto-seeds fixed demo users/orgs/repos on a fresh local environment when `KOHAKU_HUB_DEV_AUTO_SEED=true`
+- auto-seeds fixed demo users/orgs/repos on a fresh local environment when `CHEESE_CAVE_DEV_AUTO_SEED=true`
 - starts `uvicorn` with `--reload` on `127.0.0.1:48888`
 
 Swagger docs will be available at `http://127.0.0.1:48888/docs`.
@@ -180,15 +180,15 @@ Access:
 
 The Vite configs already proxy API traffic to the backend at `127.0.0.1:48888`.
 
-## Why `KOHAKU_HUB_INTERNAL_BASE_URL` Exists
+## Why `CHEESE_CAVE_INTERNAL_BASE_URL` Exists
 
 For local development, the backend should generate public links that point to the main UI dev server (`5173`), but its own internal follow-up requests should still hit the backend directly (`48888`).
 
 Set in `.env.dev`:
 
 ```bash
-KOHAKU_HUB_BASE_URL=http://127.0.0.1:5173
-KOHAKU_HUB_INTERNAL_BASE_URL=http://127.0.0.1:48888
+CHEESE_CAVE_BASE_URL=http://127.0.0.1:5173
+CHEESE_CAVE_INTERNAL_BASE_URL=http://127.0.0.1:48888
 ```
 
 This keeps:
@@ -219,7 +219,7 @@ Admin UI login does not use a username/password. Open `http://127.0.0.1:5174` an
 Default local token:
 
 ```bash
-KOHAKU_HUB_ADMIN_SECRET_TOKEN=dev-admin-token-change-me
+CHEESE_CAVE_ADMIN_SECRET_TOKEN=dev-admin-token-change-me
 ```
 
 ## Common Commands
@@ -294,13 +294,13 @@ The test code reads environment variables only. It does not load `.env` directly
 
 ### An S3 endpoint with the bucket in its path
 
-Production can keep its objects inside another bucket: `KOHAKU_HUB_S3_ENDPOINT` ends with that bucket (`.../my-bucket`), and `KOHAKU_HUB_S3_BUCKET` is a key prefix inside it. For this layout, use MinIO with one bucket, a key allowed only on it, and LakeFS on the same endpoint. `test/kohakuhub/test_s3_bucket_in_endpoint_stack.py`, skipped otherwise, checks what is really stored. To run it locally, start such a MinIO and LakeFS, then point the test environment at them:
+Production can keep its objects inside another bucket: `CHEESE_CAVE_S3_ENDPOINT` ends with that bucket (`.../my-bucket`), and `CHEESE_CAVE_S3_BUCKET` is a key prefix inside it. For this layout, use MinIO with one bucket, a key allowed only on it, and LakeFS on the same endpoint. `test/kohakuhub/test_s3_bucket_in_endpoint_stack.py`, skipped otherwise, checks what is really stored. To run it locally, start such a MinIO and LakeFS, then point the test environment at them:
 
 ```bash
-export KOHAKU_HUB_S3_ENDPOINT=http://127.0.0.1:<minio-port>/realbucket
-export KOHAKU_HUB_S3_PUBLIC_ENDPOINT=$KOHAKU_HUB_S3_ENDPOINT
-export KOHAKU_HUB_S3_ACCESS_KEY=<key allowed on realbucket> KOHAKU_HUB_S3_SECRET_KEY=<its secret>
-export KOHAKU_HUB_LAKEFS_ENDPOINT=http://127.0.0.1:<lakefs-port>
+export CHEESE_CAVE_S3_ENDPOINT=http://127.0.0.1:<minio-port>/realbucket
+export CHEESE_CAVE_S3_PUBLIC_ENDPOINT=$CHEESE_CAVE_S3_ENDPOINT
+export CHEESE_CAVE_S3_ACCESS_KEY=<key allowed on realbucket> CHEESE_CAVE_S3_SECRET_KEY=<its secret>
+export CHEESE_CAVE_LAKEFS_ENDPOINT=http://127.0.0.1:<lakefs-port>
 make test
 ```
 
@@ -347,4 +347,4 @@ docker logs kohakuhub-dev-postgres
 cat .env.dev
 ```
 
-Make sure `KOHAKU_HUB_DATABASE_URL` matches `DEV_POSTGRES_*`.
+Make sure `CHEESE_CAVE_DATABASE_URL` matches `DEV_POSTGRES_*`.
