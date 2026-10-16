@@ -1,3 +1,4 @@
+import { protoAliases } from "./proto/aliases.js";
 import { fileURLToPath, URL } from "node:url";
 import { dirname, resolve } from "node:path";
 import { defineConfig } from "vitest/config";
@@ -36,6 +37,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      ...protoAliases,
       vue: resolve(uiNodeModules, "vue/dist/vue.runtime.esm-bundler.js"),
       pinia: resolve(uiNodeModules, "pinia/dist/pinia.mjs"),
       "vue-router/auto": resolve(

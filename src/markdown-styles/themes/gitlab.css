@@ -1,0 +1,11 @@
+/* GitLab */
+.mdx.s-gitlab{--font:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;--mono:"JetBrains Mono","Roboto Mono",ui-monospace,monospace;--size:14px;--lh:1.6;--fg:#3a383f;--muted:#626168;--hfg:#18171d;--hls:-.01em;--link:#27599f;
+  --h1:1.7em;--h2:1.5em;--h3:1.25em;--h4:1.05em;--hmt:1.6em;--hmb:.7em;--h1bb:0;--h2bb:0;--pmb:1em;--ic-bg:#ececef;--ic-fg:#18171d;--ic-r:4px;--ic-pad:2px 4px;--ic-size:.9em;
+  --pre-bg:#fff;--pre-border:1px solid #dcdcde;--pre-r:4px;--pre-pad:12px;--pre-size:.95em;--pre-lh:1.6;--bq-bl:3px solid #dcdcde;--bq-fg:#626168;--bq-pad:.2em 1em;--th-bg:#fbfafd;--td-b:1px solid #dcdcde;--td-pad:8px 12px;--zebra:transparent;--hr:#dcdcde;--hr-h:1px;
+  --note:#1f75cb;--tip:#108548;--important:#6666c4;--warning:#ab6100;--caution:#dd2b0e}
+.mdx.s-gitlab h1{padding-bottom:.3em;border-bottom:1px solid #ececef}.mdx.s-gitlab h2{padding-bottom:.3em;border-bottom:1px solid #ececef}
+.mdx.s-gitlab .markdown-alert{background:#fbfafd;border:1px solid #dcdcde;border-left:4px solid var(--c);border-radius:4px}
+
+/* dark */
+.dark .mdx.s-gitlab{--fg:#dcdcde;--muted:#a4a3a8;--hfg:#fbfafd;--link:#89b8ff;--ic-bg:#404040;--ic-fg:#fbfafd;--pre-bg:#1f1e24;--pre-fg:#dcdcde;--pre-border:1px solid #4f4f53;--bq-bl:3px solid #4f4f53;--bq-fg:#a4a3a8;--th-bg:#2b2b2e;--td-b:1px solid #4f4f53;--hr:#4f4f53;--bar-bg:rgba(255,255,255,.04)}
+.dark .mdx.s-gitlab h1,.dark .mdx.s-gitlab h2{border-bottom-color:#404040}.dark .mdx.s-gitlab .markdown-alert{background:#2b2b2e;border-color:#4f4f53}

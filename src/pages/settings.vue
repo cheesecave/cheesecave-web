@@ -148,6 +148,14 @@
       </el-tab-pane>
 
       <!-- External Tokens -->
+      <!-- Appearance -->
+      <el-tab-pane label="Appearance" name="appearance">
+        <div class="card">
+          <h2 class="text-xl font-semibold mb-4">README style</h2>
+          <MarkdownStylePicker />
+        </div>
+      </el-tab-pane>
+
       <el-tab-pane label="External Tokens" name="external-tokens">
         <div class="max-w-2xl">
           <div class="card mb-4">
@@ -320,6 +328,7 @@
 import { notifyError } from "@/errors";
 import { storeToRefs } from "pinia";
 import { useAuthStore } from "@/stores/auth";
+import MarkdownStylePicker from "@/components/settings/MarkdownStylePicker.vue";
 import { useRouter } from "vue-router";
 import { authAPI, settingsAPI } from "@/utils/api";
 import { copyToClipboard } from "@/utils/clipboard";

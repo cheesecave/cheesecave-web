@@ -6,7 +6,6 @@ import workspaceSource from "../../src/components/home/WorkspacePanel.vue?raw";
 import sidebarSource from "../../src/components/home/workspace/WorkspaceSidebar.vue?raw";
 import feedSource from "../../src/components/home/workspace/WorkspaceFeed.vue?raw";
 import trendingSource from "../../src/components/home/workspace/WorkspaceTrending.vue?raw";
-import markdownSource from "../../src/components/common/MarkdownViewer.vue?raw";
 import previewSource from "../../src/components/home/RepositoryPreviewColumn.vue?raw";
 
 // Resolve the same Vue compiler used by this app without the runtime Vue alias.
@@ -62,7 +61,6 @@ describe("home component scoped dark styles", () => {
     ["workspace sidebar", sidebarSource],
     ["workspace feed", feedSource],
     ["workspace trending", trendingSource],
-    ["markdown viewer", markdownSource],
     ["visitor discovery", previewSource],
   ])(
     "keeps every %s dark rule attached to a scoped descendant",
@@ -124,37 +122,4 @@ describe("home component scoped dark styles", () => {
       );
     },
   );
-
-  it("styles dark markdown content without changing the document root's background, border or quote color", () => {
-    document.documentElement.classList.add("dark");
-    const properties = [
-      "backgroundColor",
-      "borderBottomColor",
-      "borderLeftColor",
-      "color",
-    ];
-    const snapshotRoot = () => {
-      const computed = getComputedStyle(document.documentElement);
-      return properties.map((property) => computed[property]);
-    };
-    const before = snapshotRoot();
-    const styles = renderStyled(
-      markdownSource,
-      `<section class="markdown-body" ${scope}><h1>Heading</h1><pre>Code block</pre><code>Inline code</code><table><thead><tr><th>Column</th></tr></thead><tbody><tr><td>Cell</td></tr></tbody></table><blockquote>Quote</blockquote><a href="/docs">Docs</a></section><section class="markdown-body outside-scope"><pre>Unrelated</pre></section>`,
-    );
-    expect(styles("h1").borderBottomColor).toBe("rgba(255, 255, 255, 0.1)");
-    expect(styles("pre").backgroundColor).toBe("rgba(0, 0, 0, 0.3)");
-    expect(styles("code").backgroundColor).toBe("rgba(255, 255, 255, 0.1)");
-    expect(styles("th").backgroundColor).toBe("rgba(0, 0, 0, 0.3)");
-    expect(styles("td").borderLeftColor).toBe("rgba(255, 255, 255, 0.1)");
-    expect(styles("blockquote").color).toBe("rgb(139, 148, 158)");
-    expect(styles("blockquote").borderLeftColor).toBe(
-      "rgba(255, 255, 255, 0.2)",
-    );
-    expect(styles("a").color).toBe("rgb(88, 166, 255)");
-    expect(styles(".outside-scope pre").backgroundColor).toBe(
-      "rgba(0, 0, 0, 0)",
-    );
-    expect(snapshotRoot()).toEqual(before);
-  });
 });

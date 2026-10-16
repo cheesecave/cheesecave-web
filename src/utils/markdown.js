@@ -1,5 +1,9 @@
 // src/kohaku-hub-ui/src/utils/markdown.js
 import MarkdownIt from "markdown-it";
+import footnote from "markdown-it-footnote";
+import anchor from "markdown-it-anchor";
+import alerts from "markdown-it-github-alerts";
+import { katex } from "@mdit/plugin-katex";
 import DOMPurify from "isomorphic-dompurify";
 import hljs from "highlight.js/lib/core";
 
@@ -69,6 +73,45 @@ const md = new MarkdownIt({
     return md.utils.escapeHtml(code);
   },
 });
+
+/**
+ * Footnotes, callouts (`> [!NOTE]`), math (KaTeX), heading anchors and a wrapper for fenced code. Every style in
+ * src/markdown-styles covers this markup; see base.css for the contract.
+ */
+export const HEADING_ID_PREFIX = "user-content-";
+const LINK_ICON =
+  '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M7.775 3.275a.75.75 0 0 0 1.06 1.06l1.25-1.25a2 2 0 1 1 2.83 2.83l-2.5 2.5a2 2 0 0 1-2.83 0 .75.75 0 0 0-1.06 1.06 3.5 3.5 0 0 0 4.95 0l2.5-2.5a3.5 3.5 0 0 0-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 0 1 0-2.83l2.5-2.5a2 2 0 0 1 2.83 0 .75.75 0 0 0 1.06-1.06 3.5 3.5 0 0 0-4.95 0l-2.5 2.5a3.5 3.5 0 0 0 4.95 4.95l1.25-1.25a.75.75 0 0 0-1.06-1.06l-1.25 1.25a2 2 0 0 1-2.83 0z"/></svg>';
+md.use(footnote)
+  .use(alerts)
+  .use(anchor, {
+    // The sanitizer drops an id that is also a property of `document` (title, images, forms, location...), which
+    // would break the link to such a heading. GitHub's way: prefix every id, and MarkdownViewer maps `#images`
+    // to `#user-content-images`, so a link written without the prefix still works.
+    slugify: (text) =>
+      `${HEADING_ID_PREFIX}${encodeURIComponent(String(text).trim().toLowerCase().replace(/\s+/g, "-"))}`,
+    permalink: anchor.permalink.linkInsideHeader({
+      placement: "before",
+      class: "heading-anchor",
+      symbol: LINK_ICON,
+      ariaHidden: false,
+      renderAttrs: () => ({ "aria-label": "Link to this section" }),
+    }),
+  })
+  .use(katex, { throwOnError: false });
+
+// A fenced block gets its language above it; the copy button is added by MarkdownViewer (the sanitizer below
+// refuses <button>). Mermaid blocks stay as they are: the viewer turns them into diagrams.
+const defaultFence = md.renderer.rules.fence;
+md.renderer.rules.fence = (tokens, idx, options, env, self) => {
+  const token = tokens[idx];
+  const lang = (token.info || "").trim().split(/\s+/)[0];
+  if (lang === "mermaid") return defaultFence(tokens, idx, options, env, self);
+  const escape = md.utils.escapeHtml;
+  const body =
+    options.highlight(token.content, lang, "") || escape(token.content);
+  const label = escape(lang || "text");
+  return `<div class="code-block" data-lang="${label}"><div class="code-bar"><span class="code-lang">${label}</span></div><pre><code class="hljs${lang ? ` language-${escape(lang)}` : ""}">${body}</code></pre></div>\n`;
+};
 
 /**
  * Move every heading down `env.headingOffset` levels (at most h6): a page that has its own <h1>

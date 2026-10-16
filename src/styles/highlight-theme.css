@@ -8,7 +8,7 @@
 
 .hljs-comment,
 .hljs-quote {
-  color: #6a737d;
+  color: #5a636d;
   font-style: italic;
 }
 
@@ -63,7 +63,7 @@
 
 .hljs-built_in,
 .hljs-builtin-name {
-  color: #e36209;
+  color: #a8480a;
 }
 
 .hljs-meta {

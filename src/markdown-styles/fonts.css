@@ -1,0 +1,12 @@
+@font-face{font-family:"Inter";font-style:normal;font-weight:400 700;font-display:swap;src:url("/fonts/inter-400-700.woff2") format("woff2")}
+@font-face{font-family:"Source Sans 3";font-style:normal;font-weight:400 700;font-display:swap;src:url("/fonts/source-sans-3-400-700.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:400;font-display:swap;src:url("/fonts/ibm-plex-mono-400.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:500;font-display:swap;src:url("/fonts/ibm-plex-mono-500.woff2") format("woff2")}
+@font-face{font-family:"Roboto Slab";font-style:normal;font-weight:700;font-display:swap;src:url("/fonts/roboto-slab-700.woff2") format("woff2")}
+@font-face{font-family:"Lato";font-style:normal;font-weight:400;font-display:swap;src:url("/fonts/lato-400.woff2") format("woff2")}
+@font-face{font-family:"Lato";font-style:normal;font-weight:700;font-display:swap;src:url("/fonts/lato-700.woff2") format("woff2")}
+@font-face{font-family:"JetBrains Mono";font-style:normal;font-weight:400 700;font-display:swap;src:url("/fonts/jetbrains-mono-400-700.woff2") format("woff2")}
+@font-face{font-family:"Roboto Mono";font-style:normal;font-weight:400 500;font-display:swap;src:url("/fonts/roboto-mono-400-500.woff2") format("woff2")}
+@font-face{font-family:"ETBook";font-style:normal;font-weight:400;font-display:swap;src:url("/fonts/et-book-roman.woff") format("woff")}
+@font-face{font-family:"ETBook";font-style:italic;font-weight:400;font-display:swap;src:url("/fonts/et-book-italic.woff") format("woff")}
+@font-face{font-family:"ETBook";font-style:normal;font-weight:700;font-display:swap;src:url("/fonts/et-book-bold.woff") format("woff")}

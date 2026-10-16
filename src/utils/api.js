@@ -1271,3 +1271,12 @@ export const statsAPI = {
   getTrending: (repoType = "model", days = 7, limit = 20) =>
     api.get("/api/trending", { params: { repo_type: repoType, days, limit } }),
 };
+
+// Per-user preferences kept on the server, so a choice follows the account to every browser.
+// GET returns the whole object; PUT merges the fields it is given (a null value clears one).
+export const preferencesAPI = {
+  get: (username) =>
+    api.get(`/api/users/${encodeURIComponent(username)}/preferences`),
+  update: (username, preferences) =>
+    api.put(`/api/users/${encodeURIComponent(username)}/preferences`, preferences),
+};

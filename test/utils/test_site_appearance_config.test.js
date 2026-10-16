@@ -29,6 +29,28 @@ describe("site appearance configuration", () => {
     });
   });
 
+  it("carries the README style the site offers by default, as an id this build need not know", () => {
+    expect(DEFAULT_THEME.markdown_style).toBe("github");
+    expect(normalizeTheme({}).markdown_style).toBe("github");
+    expect(normalizeTheme({ markdown_style: "vitepress" }).markdown_style).toBe(
+      "vitepress",
+    );
+    // a newer server may name a style this build lacks: kept, and the style store falls back for it
+    expect(
+      normalizeTheme({ markdown_style: "from-the-future" }).markdown_style,
+    ).toBe("from-the-future");
+    for (const bad of [
+      "",
+      "Has Spaces",
+      "UPPER",
+      "x".repeat(33),
+      null,
+      7,
+      "a/b",
+    ])
+      expect(normalizeTheme({ markdown_style: bad }), String(bad)).toBeNull();
+  });
+
   it("preserves hidden link groups and build information", () => {
     expect(normalizeFooter({ groups: [], show_build_info: false })).toEqual({
       ...DEFAULT_FOOTER,
