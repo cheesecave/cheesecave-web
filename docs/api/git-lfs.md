@@ -140,7 +140,7 @@ Git LFS (Large File Storage) protocol for handling large files efficiently with 
 5. `POST` to `actions.verify.href` to confirm
 
 **Chunk Size:**
-- Default: 50MB (configurable via `KOHAKU_HUB_LFS_MULTIPART_CHUNK_SIZE_BYTES`)
+- Default: 50MB (configurable via `CHEESE_CAVE_LFS_MULTIPART_CHUNK_SIZE_BYTES`)
 - Minimum: 5MB (S3 requirement, except last part)
 - Maximum parts: 10,000 (S3 limit)
 
@@ -339,7 +339,7 @@ Files use LFS if they meet **either** condition:
 2. **Suffix:** File extension matches `lfs_suffix_rules`
 
 **Configuration Levels:**
-- **Server default:** `KOHAKU_HUB_LFS_THRESHOLD_BYTES=5000000` (5MB)
+- **Server default:** `CHEESE_CAVE_LFS_THRESHOLD_BYTES=5000000` (5MB)
 - **Repository override:** Per-repo custom threshold and suffix rules
 - **Server suffix defaults:** 32 built-in suffixes always use LFS
 
@@ -579,10 +579,10 @@ else:
 **Configuration:**
 ```bash
 # Increase multipart threshold (default 100MB)
-KOHAKU_HUB_LFS_MULTIPART_THRESHOLD_BYTES=209715200  # 200MB
+CHEESE_CAVE_LFS_MULTIPART_THRESHOLD_BYTES=209715200  # 200MB
 
 # Increase chunk size (default 50MB)
-KOHAKU_HUB_LFS_MULTIPART_CHUNK_SIZE_BYTES=104857600  # 100MB
+CHEESE_CAVE_LFS_MULTIPART_CHUNK_SIZE_BYTES=104857600  # 100MB
 ```
 
 ---

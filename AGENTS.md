@@ -26,7 +26,8 @@ It is a fork of KohakuHub; keep the attribution in `NOTICE.md`, `LICENSE`, `LICE
   tooling, generated declarations and resources. See
   [CONTRIBUTING.md](CONTRIBUTING.md#test-and-coverage-scope).
 - **Compatibility.** Keep the URL shapes the backend serves (`/api/...`, `/{type}s/{namespace}/{name}`)
-  and the `KOHAKU_HUB_*` names stable. User-visible product text is CheeseCave; KohakuHub
+  and the setting names stable: they are `CHEESE_CAVE_<NAME>`, and the older `KOHAKU_HUB_<NAME>` is
+  still accepted as a fallback. User-visible product text is CheeseCave; KohakuHub
   appears only as attribution.
 - **Documentation.** Keep English as the source of repository documents. Where a Chinese
   companion exists (`*.zh-CN.md`), update both in the same change.

@@ -40,8 +40,8 @@ See [scripts/README.md](../scripts/README.md#docker-compose-generator) for detai
    - Change MinIO credentials (MINIO_ROOT_USER, MINIO_ROOT_PASSWORD)
    - Change PostgreSQL password (POSTGRES_PASSWORD)
    - Change LakeFS secret key (LAKEFS_AUTH_ENCRYPT_SECRET_KEY)
-   - Change session secret (KOHAKU_HUB_SESSION_SECRET)
-   - Change admin token (KOHAKU_HUB_ADMIN_SECRET_TOKEN)
+   - Change session secret (CHEESE_CAVE_SESSION_SECRET)
+   - Change admin token (CHEESE_CAVE_ADMIN_SECRET_TOKEN)
    - Update BASE_URL if deploying to a domain
 
 #### Build and Start
@@ -307,8 +307,8 @@ services:
 3. **Set BASE_URL to your domain**
    ```yaml
    environment:
-     - KOHAKU_HUB_BASE_URL=https://your-domain.com
-     - KOHAKU_HUB_S3_PUBLIC_ENDPOINT=https://s3.your-domain.com
+     - CHEESE_CAVE_BASE_URL=https://your-domain.com
+     - CHEESE_CAVE_S3_PUBLIC_ENDPOINT=https://s3.your-domain.com
    ```
 
 ## Common Mistakes
@@ -351,10 +351,10 @@ export HF_ENDPOINT=http://localhost:28080
 
 **Problem:** Frontend trying to access wrong port
 
-**Solution:** Ensure `KOHAKU_HUB_BASE_URL` is set correctly:
+**Solution:** Ensure `CHEESE_CAVE_BASE_URL` is set correctly:
 ```yaml
 environment:
-  - KOHAKU_HUB_BASE_URL=http://localhost:28080
+  - CHEESE_CAVE_BASE_URL=http://localhost:28080
 ```
 
 ### "API calls returning HTML instead of JSON"
