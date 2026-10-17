@@ -3,7 +3,8 @@
    for the light or the dark palette in force. This layer re-points the colour tokens of every style at them:
    - neutrals (table header, zebra, code block, inline code, rules, borders) are the card's own colour mixed with the
      card's text colour, so a warm card gets warm greys and a white card gets neutral ones, and dark mode follows;
-   - links use --site-link (kept readable on the card by the site's own palette code);
+   - links and muted text use --site-md-link / --site-md-muted: the site's palette code makes them clear 4.5:1 on the
+     most contrasty of those tinted surfaces, not only on the plain card;
    - callout colours (blue/green/purple/amber/red) are semantic and stay; their tints are mixed over the card.
    The style keeps everything that is its identity: fonts, sizes, radii, which borders exist, callout shape.
    Specificity is raised on purpose (.adapt twice) so it wins over a style whatever order the stylesheets load in. */
@@ -13,8 +14,8 @@
   --n2:color-mix(in srgb,var(--st) 6%,var(--sc));
   --n3:color-mix(in srgb,var(--st) 11%,var(--sc));
   --bd:var(--site-border,color-mix(in srgb,var(--st) 18%,var(--sc)));
-  --fg:var(--st); --hfg:var(--st); --muted:var(--site-muted,color-mix(in srgb,var(--st) 62%,var(--sc)));
-  --link:var(--site-link,#0969da);
+  --fg:var(--st); --hfg:var(--st); --muted:var(--site-md-muted,var(--site-muted,color-mix(in srgb,var(--st) 62%,var(--sc))));
+  --link:var(--site-md-link,var(--site-link,#0969da));
   --ic-bg:var(--n3); --th-bg:var(--n2); --zebra:var(--n2); --pre-bg:var(--n2); --pre-fg:var(--st);
   --bq-fg:var(--muted); --hr:var(--bd); --bar-bg:var(--n2);
 }

@@ -26,6 +26,8 @@ export function applySiteTheme(theme, isDark) {
     "site-primary-hover": palette.primaryHover,
     "site-primary-active": palette.primaryActive,
     "site-link": palette.link,
+    "site-md-link": palette.markdownLink,
+    "site-md-muted": palette.markdownMuted,
     "site-page-link": palette.pageLink,
     "site-illustration-bg": palette.illustrationBg,
     "site-illustration-ring": palette.illustrationRing,

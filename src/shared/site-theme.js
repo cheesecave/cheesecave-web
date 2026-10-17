@@ -69,6 +69,9 @@ export function createThemePalette({ primary, background, card }) {
   const buttonText = softText(primary);
   const hoverTarget = luminance(buttonText) > 0.5 ? "#2c332b" : "#eef0e7";
   const illustrationBg = mixColor(card, primary, 0.1);
+  // README surfaces (table header, zebra, code) are the card tinted with its own text colour; the 11% tint is the
+  // most contrasty of them for text, so a link or muted text that clears it clears all of them
+  const markdownTint = mixColor(card, cardText, 0.11);
   return {
     text,
     cardText,
@@ -77,6 +80,8 @@ export function createThemePalette({ primary, background, card }) {
     pageLink: readableSoftColor(primary, background),
     muted: readableSoftColor(mixColor(cardText, card, 0.3), card),
     pageMuted: readableSoftColor(mixColor(text, background, 0.3), background),
+    markdownLink: readableSoftColor(primary, markdownTint),
+    markdownMuted: readableSoftColor(mixColor(cardText, card, 0.3), markdownTint),
     border: mixColor(cardText, card, 0.82),
     hoverSurface: mixColor(card, cardText, 0.06),
     primaryHover: mixColor(primary, hoverTarget, 0.12),
