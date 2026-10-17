@@ -80,7 +80,9 @@ export const normalizeMarkdownStyle = (
 // Some styles show the language of a code block above it ("bar") or in the corner ("lang"): a class on the container
 const MODIFIERS = { gitlab: "bar", mdn: "bar", vitepress: "lang" };
 export const markdownStyleClasses = (id) =>
-  ["mdx", `s-${id}`, MODIFIERS[id]].filter(Boolean);
+  ["mdx", "adapt", `s-${id}`, MODIFIERS[id]].filter(Boolean);
+
+import "./adapt.css";
 
 // One lazy loader per stylesheet: the bundler splits each into its own chunk, so a reader pays for one style
 const loaders = import.meta.glob("./themes/*.css");

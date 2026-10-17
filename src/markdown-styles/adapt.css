@@ -1,0 +1,43 @@
+/* PROTOTYPE: README colours follow the site's colours (what the admin sets in Site > Theme).
+   applySiteTheme() already writes --site-card, --site-card-text, --site-muted, --site-border and --site-link on <html>,
+   for the light or the dark palette in force. This layer re-points the colour tokens of every style at them:
+   - neutrals (table header, zebra, code block, inline code, rules, borders) are the card's own colour mixed with the
+     card's text colour, so a warm card gets warm greys and a white card gets neutral ones, and dark mode follows;
+   - links use --site-link (kept readable on the card by the site's own palette code);
+   - callout colours (blue/green/purple/amber/red) are semantic and stay; their tints are mixed over the card.
+   The style keeps everything that is its identity: fonts, sizes, radii, which borders exist, callout shape.
+   Specificity is raised on purpose (.adapt twice) so it wins over a style whatever order the stylesheets load in. */
+.mdx.adapt.adapt[class*="s-"]{
+  --sc:var(--site-card,#fff); --st:var(--site-card-text,#1f2328);
+  --n1:color-mix(in srgb,var(--st) 3%,var(--sc));
+  --n2:color-mix(in srgb,var(--st) 6%,var(--sc));
+  --n3:color-mix(in srgb,var(--st) 11%,var(--sc));
+  --bd:var(--site-border,color-mix(in srgb,var(--st) 18%,var(--sc)));
+  --fg:var(--st); --hfg:var(--st); --muted:var(--site-muted,color-mix(in srgb,var(--st) 62%,var(--sc)));
+  --link:var(--site-link,#0969da);
+  --ic-bg:var(--n3); --th-bg:var(--n2); --zebra:var(--n2); --pre-bg:var(--n2); --pre-fg:var(--st);
+  --bq-fg:var(--muted); --hr:var(--bd); --bar-bg:var(--n2);
+}
+.mdx.adapt.adapt[class*="s-"] :is(th,td){border-color:var(--bd)}
+.mdx.adapt.adapt[class*="s-"] :is(h1,h2){border-bottom-color:var(--bd);border-top-color:var(--bd)}
+.mdx.adapt.adapt[class*="s-"] blockquote{border-left-color:var(--bd)}
+.mdx.adapt.adapt[class*="s-"] .code-block{border-color:var(--bd)}
+.mdx.adapt.adapt[class*="s-"] .code-bar{border-bottom-color:var(--bd)}
+.mdx.adapt.adapt:not(.bar)[class*="s-"] .copy-code{border-color:var(--bd)}
+.mdx.adapt.adapt[class*="s-"] details{border-color:var(--bd)}
+
+/* styles whose identity is ink-coloured rules (Tufte): the rules take the text colour, not the soft border colour */
+.mdx.adapt.adapt.s-tufte table{border-top-color:var(--st);border-bottom-color:var(--st)}
+.mdx.adapt.adapt.s-tufte th{border-bottom-color:var(--st)}
+.mdx.adapt.adapt.s-tufte .markdown-alert{border-top-color:var(--st)}
+.mdx.adapt.adapt.s-tufte .code-block{border-left-color:var(--bd)}
+.mdx.adapt.adapt.s-tufte .copy-code{background:transparent}
+
+/* GitLab's callout is a white card with a border, written as literals */
+.mdx.adapt.adapt.s-gitlab .markdown-alert{background:var(--n1);border-color:var(--bd);border-left-color:var(--c)}
+
+/* styles with a deliberately inverted (dark on light) code block: the dark is the card's ink, not a blue-grey */
+.mdx.adapt.adapt.s-prose,.mdx.adapt.adapt.s-ghost{--pre-bg:color-mix(in srgb,var(--st) 90%,#000);--pre-fg:var(--sc)}
+.mdx.adapt.adapt.s-prose .copy-code,.mdx.adapt.adapt.s-ghost .copy-code{background:color-mix(in srgb,var(--sc) 14%,transparent);border-color:color-mix(in srgb,var(--sc) 30%,transparent);color:var(--sc)}
+.dark .mdx.adapt.adapt.s-prose,.dark .mdx.adapt.adapt.s-ghost{--pre-bg:color-mix(in srgb,var(--sc) 55%,#000);--pre-fg:var(--st)}
+.dark .mdx.adapt.adapt.s-prose .copy-code,.dark .mdx.adapt.adapt.s-ghost .copy-code{color:var(--st);border-color:color-mix(in srgb,var(--st) 30%,transparent)}
