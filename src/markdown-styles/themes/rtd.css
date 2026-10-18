@@ -8,3 +8,6 @@
 .mdx.s-rtd .markdown-alert-title{background:color-mix(in srgb,var(--c) 52%,#000);color:#fff;padding:.4em .9em;margin:0 0 .8em;font-weight:700}
 .mdx.s-rtd .markdown-alert-title svg{fill:#fff}.mdx.s-rtd .markdown-alert > :not(.markdown-alert-title){padding:0 .9em}
 .mdx.s-rtd.lang .code-lang{opacity:0}
+
+/* dark: a lighter red for the inline code */
+.dark .mdx.s-rtd{--ic-fg:color-mix(in srgb,#ff7b6d 75%,var(--st))}

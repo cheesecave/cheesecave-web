@@ -204,6 +204,14 @@ describe("the shared stylesheet", () => {
     ).toEqual([]);
   });
 
+  it("mixes the callout title with the README's own text colour, not with black or white", () => {
+    // black or white made some titles 4.2:1 on ordinary dark palettes; the text colour is readable on the card in any mode
+    expect(base).toMatch(
+      /--title:color-mix\(in srgb,var\(--c\) calc\(\d+% \* var\(--site-md-tint,1\)\),var\(--fg\)\)/,
+    );
+    expect(base).not.toMatch(/\.dark \.mdx \.markdown-alert\{--title/);
+  });
+
   it("declares each font file it points at, and the file exists", () => {
     const fonts = readFileSync(join(DIR, "fonts.css"), "utf8");
     const urls = [...fonts.matchAll(/url\("\/fonts\/([^"]+)"\)/g)].map(

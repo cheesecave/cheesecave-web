@@ -111,8 +111,9 @@
 .mdx .markdown-alert{--c:var(--note);border-left:.25em solid var(--c);padding:.5em 1em;border-radius:0;background:transparent;color:inherit}
 .mdx .markdown-alert-note{--c:var(--note)} .mdx .markdown-alert-tip{--c:var(--tip)} .mdx .markdown-alert-important{--c:var(--important)} .mdx .markdown-alert-warning{--c:var(--warning)} .mdx .markdown-alert-caution{--c:var(--caution)}
 .mdx .markdown-alert > :last-child{margin-bottom:0}
-.mdx .markdown-alert{--title:color-mix(in srgb,var(--c) 56%,#000)}
-.dark .mdx .markdown-alert{--title:color-mix(in srgb,var(--c) 66%,#fff)}
+/* the title is the hue mixed with the README's own text colour, which is readable on the card whatever the mode; on the
+   mid-tone cards where the greys are weakened (--site-md-tint below 1) the hue is weakened with them, down to plain text */
+.mdx .markdown-alert{--title:color-mix(in srgb,var(--c) calc(35% * var(--site-md-tint,1)),var(--fg))}
 .mdx .markdown-alert-title{display:flex;align-items:center;gap:.5em;margin:0 0 .5em;color:var(--title);font-weight:600;line-height:1.3}
 .mdx .markdown-alert-title svg{fill:var(--title);width:1em;height:1em;flex:none}
 
