@@ -64,6 +64,48 @@ describe("the registry", () => {
   });
 });
 
+// The tokens a style may still set in the dark: callout colours (lighter hues on a dark card), the red of RTD's inline
+// code, and the code block colours of the two styles whose code block is inverted. Greys, text and links come from
+// the site's colours, which already switch with the mode.
+const DARK_TOKENS_ALLOWED = new Set([
+  "--note",
+  "--tip",
+  "--important",
+  "--warning",
+  "--caution",
+  "--ic-fg",
+  "--pre-bg",
+  "--pre-fg",
+]);
+const spread = (hex) => {
+  const full = hex.length === 3 ? [...hex].map((c) => c + c).join("") : hex;
+  const channels = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16));
+  return Math.max(...channels) - Math.min(...channels);
+};
+// near-grey hex or rgb() literals other than the extremes used as mixing targets and as text on coloured bars
+function neutralLiterals(css) {
+  const found = [];
+  for (const [, hex] of css.matchAll(/#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b/g))
+    if (
+      spread(hex) <= 32 &&
+      !["fff", "ffffff", "000", "000000"].includes(hex.toLowerCase())
+    )
+      found.push(`#${hex}`);
+  for (const [whole, r, g, b] of css.matchAll(
+    /rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)/g,
+  ))
+    if (Math.max(r, g, b) - Math.min(r, g, b) <= 32) found.push(whole);
+  return found;
+}
+const darkTokens = (css, id) =>
+  [
+    ...css.matchAll(
+      new RegExp(`\\.dark \\.mdx\\.s-${id}[^{]*\\{([^}]*)\\}`, "g"),
+    ),
+  ].flatMap(([, body]) =>
+    [...body.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]),
+  );
+
 describe.each(files)("the %s stylesheet", (id) => {
   let rules;
   beforeAll(() => {
@@ -88,9 +130,16 @@ describe.each(files)("the %s stylesheet", (id) => {
     expect(rules.filter((rule) => !rule.selectorText)).toEqual([]);
   });
 
-  it("says how it looks in the dark, unless it takes the neutral dark tokens", () => {
-    const text = readFileSync(join(DIR, "themes", `${id}.css`), "utf8");
-    expect(text.includes(`.dark .mdx.s-${id}`) || id === "github").toBe(true);
+  // The page's colours are the site's (Admin > Site > Theme): a style may say how its shapes look, not which greys.
+  const text = () => readFileSync(join(DIR, "themes", `${id}.css`), "utf8");
+
+  it("has no grey or white-or-black overlay of its own, only the site's derived neutrals", () => {
+    expect(neutralLiterals(text()), id).toEqual([]);
+  });
+
+  it("changes nothing in the dark that the site's colours already change", () => {
+    const set = darkTokens(text(), id);
+    expect(set.filter((token) => !DARK_TOKENS_ALLOWED.has(token))).toEqual([]);
   });
 });
 
@@ -117,6 +166,42 @@ describe("the shared stylesheet", () => {
     ]) {
       expect(base, selector).toContain(selector);
     }
+  });
+
+  it("derives its neutrals from the site's colours, with a fallback where color-mix is unsupported", () => {
+    const tokens = base.slice(
+      0,
+      base.indexOf("kept from the previous MarkdownViewer"),
+    );
+    for (const name of ["--n1:", "--n2:", "--n3:", "--line:"])
+      expect(tokens, name).toContain(name);
+    // the site's variables, each with a value to fall back to where the site has not set it
+    for (const site of [
+      "--site-card",
+      "--site-card-text",
+      "--site-border",
+      "--site-md-text",
+      "--site-md-link",
+      "--site-md-muted",
+      "--site-md-link-deco",
+      "--site-md-tint",
+    ])
+      expect(tokens, site).toContain(`var(${site},`);
+    expect(tokens).toContain(
+      "@supports (color: color-mix(in srgb, red, blue))",
+    );
+    // outside @supports the tints are plain translucent greys that read as a tint on any card
+    expect(tokens.indexOf("rgba(128")).toBeLessThan(
+      tokens.indexOf("@supports"),
+    );
+    expect(
+      neutralLiterals(
+        tokens.replace(/rgba\(128,\s*128,\s*128[^)]*\)/g, ""),
+      ).filter(
+        (l) =>
+          !["#1f2328", "#161b22", "#e6edf3", "#59636e", "#9198a1"].includes(l),
+      ),
+    ).toEqual([]);
   });
 
   it("declares each font file it points at, and the file exists", () => {

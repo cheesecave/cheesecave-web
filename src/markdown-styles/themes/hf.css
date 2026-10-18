@@ -1,14 +1,13 @@
 /* Hugging Face */
-.mdx.s-hf{--font:"Source Sans 3","Source Sans Pro",-apple-system,"Segoe UI",sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;--size:16.8px;--lh:1.75;--fg:#4b5563;--muted:#6b7280;--hfg:#374151;--hw:600;--link:#111827;--link-deco:underline;
-  --h1:1.4em;--h2:1.2em;--h3:1.1em;--h4:1em;--hmt:1.8em;--hmb:.9em;--pmb:1.1em;--ic-bg:rgba(243,244,246,.9);--ic-fg:#1f2937;--ic-r:4px;--ic-pad:.1em .25em;--ic-size:.85em;
-  --pre-bg:#f9fafb;--pre-border:1px solid #f3f4f6;--pre-r:6px;--pre-pad:12px 16px;--pre-size:.85em;--pre-lh:1.7;--pre-fg:#1f2937;
-  --bq-bl:4px solid #e5e7eb;--bq-fg:#111827;--bq-pad:.4em 0 .4em 1em;--th-bg:transparent;--td-b:0;--td-pad:8px;--zebra:transparent;--tsize:.875em;--hr:#e5e7eb;--hr-h:1px;--lig:.45em;
+.mdx.s-hf{--font:"Source Sans 3","Source Sans Pro",-apple-system,"Segoe UI",sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;--size:16.8px;--lh:1.75;--hw:600;--link-deco:underline;
+  --h1:1.4em;--h2:1.2em;--h3:1.1em;--h4:1em;--hmt:1.8em;--hmb:.9em;--pmb:1.1em;--ic-r:4px;--ic-pad:.1em .25em;--ic-size:.85em;
+  --pre-bg:var(--n1);--pre-border:1px solid var(--n2);--pre-r:6px;--pre-pad:12px 16px;--pre-size:.85em;--pre-lh:1.7;
+  --bq-bl:4px solid var(--line);--bq-pad:.4em 0 .4em 1em;--th-bg:transparent;--td-b:0;--td-pad:8px;--zebra:transparent;--tsize:.875em;--hr-h:1px;--lig:.45em;
   --note:#2563eb;--tip:#059669;--important:#7c3aed;--warning:#d97706;--caution:#dc2626}
 .mdx.s-hf h1,.mdx.s-hf h2,.mdx.s-hf h3{padding-bottom:0}
-.mdx.s-hf th,.mdx.s-hf td{border-bottom:1px solid #f3f4f6}.mdx.s-hf th{color:#111827}
+.mdx.s-hf th,.mdx.s-hf td{border-bottom:1px solid var(--n2)}
 .mdx.s-hf .markdown-alert{border:0;border-left:4px solid var(--c);background:color-mix(in srgb,var(--c) 7%,transparent);padding:.8em 1.1em;border-radius:0 8px 8px 0}
 .mdx.s-hf.lang .code-lang{opacity:.0}
 
-/* dark */
-.dark .mdx.s-hf{--fg:#d1d5db;--muted:#9ca3af;--hfg:#f3f4f6;--link:#f9fafb;--ic-bg:rgba(55,65,81,.7);--ic-fg:#e5e7eb;--pre-bg:#111827;--pre-fg:#e5e7eb;--pre-border:1px solid #1f2937;--bq-bl:4px solid #374151;--bq-fg:#f3f4f6;--hr:#374151;--note:#60a5fa;--tip:#34d399;--important:#a78bfa;--warning:#fbbf24;--caution:#f87171}
-.dark .mdx.s-hf th,.dark .mdx.s-hf td{border-bottom-color:#1f2937}.dark .mdx.s-hf th{color:#f3f4f6}
+/* dark: lighter callout hues */
+.dark .mdx.s-hf{--note:#60a5fa;--tip:#34d399;--important:#a78bfa;--warning:#fbbf24;--caution:#f87171}

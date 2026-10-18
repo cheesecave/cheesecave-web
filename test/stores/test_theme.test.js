@@ -6,6 +6,8 @@ import {
   contrastRatio,
   contrastText,
   createThemePalette,
+  markdownLinkDecoration,
+  markdownTintScale,
 } from "../../src/shared/site-theme.js";
 
 let pinia;
@@ -119,6 +121,51 @@ describe("theme store", () => {
     store.setTheme(true);
     expect(styles.getPropertyValue("--site-primary")).toBe("#000000");
     expect(styles.getPropertyValue("--site-primary-text")).toBe("#eef0e7");
+  });
+  it.each(["light", "dark"])(
+    "hands the README its text, link, muted text, link decoration and tint for the %s palette",
+    (mode) => {
+      const store = useThemeStore();
+      store.setTheme(mode === "dark");
+      const colors = {
+        primary: DEFAULT_THEME[`primary_${mode}`],
+        background: DEFAULT_THEME[`background_${mode}`],
+        card: DEFAULT_THEME[`card_${mode}`],
+      };
+      const palette = createThemePalette(colors);
+      const styles = document.documentElement.style;
+      expect(styles.getPropertyValue("--site-md-text")).toBe(
+        palette.markdownText,
+      );
+      expect(styles.getPropertyValue("--site-md-link")).toBe(
+        palette.markdownLink,
+      );
+      expect(styles.getPropertyValue("--site-md-muted")).toBe(
+        palette.markdownMuted,
+      );
+      expect(styles.getPropertyValue("--site-md-link-deco")).toBe(
+        markdownLinkDecoration(palette),
+      );
+      expect(styles.getPropertyValue("--site-md-tint")).toBe(
+        String(markdownTintScale(colors.card, palette.cardText)),
+      );
+    },
+  );
+  it("underlines README links when the brand colour cannot be told from the text", () => {
+    const store = useThemeStore();
+    store.setSiteTheme({
+      ...DEFAULT_THEME,
+      primary_light: "#111111",
+      background_light: "#ffffff",
+      card_light: "#ffffff",
+    });
+    expect(
+      document.documentElement.style.getPropertyValue("--site-md-link-deco"),
+    ).toBe("underline");
+    store.setSiteTheme(DEFAULT_THEME);
+    expect(
+      document.documentElement.style.getPropertyValue("--site-md-link-deco"),
+    ).toBe("none");
   });
   it.each(["light", "dark"])(
     "applies the bundled warm %s palette to UI, controls and illustrations",

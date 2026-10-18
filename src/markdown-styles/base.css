@@ -4,17 +4,37 @@
    Common structure first (all five extras: heading anchors, code copy button, callouts, footnotes, math),
    then one block of variables and touches per style. Scoped to .mdx so it can sit on top of the page. */
 
+/* The colours are the site's (Admin > Site > Theme), not the style's: applySiteTheme() writes them on <html> for the mode
+   in force. --sc is the card the README sits on and --st its text colour. The greys are that card tinted with its own text
+   colour (3%, 6%, 11%), so a warm card gets warm greys, a white card neutral ones, a dark card dark ones. Where color-mix()
+   is not supported they are translucent greys, which also read as a tint on any card. Every var() carries the value the
+   README had before, for a page that has no site colours. */
+.mdx{
+  --sc:var(--site-card,#fff); --st:var(--site-card-text,#1f2328);
+  --n1:rgba(128,128,128,.07); --n2:rgba(128,128,128,.11); --n3:rgba(128,128,128,.17);
+  --line:var(--site-border,rgba(128,128,128,.32));
+}
+@supports (color: color-mix(in srgb, red, blue)){
+  .mdx{
+    --n1:color-mix(in srgb,var(--st) calc(3% * var(--site-md-tint,1)),var(--sc));
+    --n2:color-mix(in srgb,var(--st) calc(6% * var(--site-md-tint,1)),var(--sc));
+    --n3:color-mix(in srgb,var(--st) calc(11% * var(--site-md-tint,1)),var(--sc));
+  }
+}
+.dark .mdx{--sc:var(--site-card,#161b22); --st:var(--site-card-text,#e6edf3)}
+
 .mdx{
   --font:system-ui,sans-serif; --mono:ui-monospace,SFMono-Regular,Menlo,monospace; --size:16px; --lh:1.6;
-  --fg:#1f2328; --muted:#59636e; --link:#0969da; --link-deco:none; --link-w:400;
+  --fg:var(--site-md-text,var(--st)); --muted:var(--site-md-muted,#59636e); --link:var(--site-md-link,#0969da);
+  --link-deco:var(--site-md-link-deco,none); --link-w:400;
   --hfont:var(--font); --hw:600; --hfg:var(--fg); --hls:0;
   --h1:2em; --h2:1.5em; --h3:1.25em; --h4:1em; --hmt:1.5em; --hmb:.6em; --h1bb:none; --h2bb:none; --h2bt:none; --h2pt:0;
   --pmb:1em; --lig:.3em;
-  --ic-bg:rgba(129,139,152,.12); --ic-fg:inherit; --ic-r:6px; --ic-pad:.2em .4em; --ic-size:.85em; --ic-border:none; --ic-w:400;
-  --pre-bg:#f6f8fa; --pre-fg:#1f2328; --pre-border:none; --pre-r:6px; --pre-pad:16px; --pre-size:.85em; --pre-lh:1.45;
-  --bq-bl:.25em solid #d1d9e0; --bq-bg:transparent; --bq-fg:var(--muted); --bq-pad:0 1em; --bq-style:normal;
-  --th-bg:#f6f8fa; --th-fg:inherit; --td-b:1px solid #d1d9e0; --td-pad:6px 13px; --zebra:#f6f8fa; --tsize:1em;
-  --hr:#d1d9e0; --hr-h:.25em;
+  --ic-bg:var(--n3); --ic-fg:inherit; --ic-r:6px; --ic-pad:.2em .4em; --ic-size:.85em; --ic-border:none; --ic-w:400;
+  --pre-bg:var(--n2); --pre-fg:var(--fg); --pre-border:none; --pre-r:6px; --pre-pad:16px; --pre-size:.85em; --pre-lh:1.45;
+  --bq-bl:.25em solid var(--line); --bq-bg:transparent; --bq-fg:var(--muted); --bq-pad:0 1em; --bq-style:normal;
+  --th-bg:var(--n2); --th-fg:inherit; --td-b:1px solid var(--line); --td-pad:6px 13px; --zebra:var(--n2); --tsize:1em;
+  --hr:var(--line); --hr-h:.25em; --bar-bg:var(--n2);
   --note:#0969da; --tip:#1a7f37; --important:#8250df; --warning:#9a6700; --caution:#d1242f;
   font-family:var(--font); font-size:var(--size); line-height:var(--lh); color:var(--fg); word-wrap:break-word;
   position:relative; overflow-x:auto; text-align:left;
@@ -61,7 +81,7 @@
 .mdx .code-lang{font:600 11px var(--font);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);opacity:.0}
 .mdx .copy-code{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid var(--hr);border-radius:6px;background:var(--pre-bg);color:var(--muted);cursor:pointer;opacity:.9;padding:0}
 .mdx .copy-code svg{width:14px;height:14px}
-.mdx.bar .code-bar{position:static;justify-content:space-between;padding:6px 8px 6px 14px;border-bottom:var(--pre-border);background:var(--bar-bg,rgba(0,0,0,.035))}
+.mdx.bar .code-bar{position:static;justify-content:space-between;padding:6px 8px 6px 14px;border-bottom:var(--pre-border);background:var(--bar-bg)}
 .mdx.bar .code-lang{opacity:1}
 .mdx.bar .copy-code{border-color:transparent;background:transparent}
 .mdx.lang .code-lang{opacity:.9}
@@ -96,11 +116,9 @@
 .mdx .markdown-alert-title{display:flex;align-items:center;gap:.5em;margin:0 0 .5em;color:var(--title);font-weight:600;line-height:1.3}
 .mdx .markdown-alert-title svg{fill:var(--title);width:1em;height:1em;flex:none}
 
-/* Dark: neutral tokens; a style overrides what makes it itself. The card keeps the site colours, so no background here. */
-.dark .mdx{--fg:#e6edf3;--muted:#9198a1;--link:#58a6ff;--hfg:#f0f6fc;--ic-bg:rgba(110,118,129,.4);--ic-fg:inherit;
-  --pre-bg:#161b22;--pre-fg:#e6edf3;--pre-border:none;--bq-bl:.25em solid #3d444d;--bq-bg:transparent;--bq-fg:#9198a1;
-  --th-bg:#161b22;--th-fg:inherit;--td-b:1px solid #3d444d;--zebra:#161b22;--hr:#3d444d;--bar-bg:rgba(255,255,255,.04);
-  --note:#4493f8;--tip:#3fb950;--important:#ab7df8;--warning:#d29922;--caution:#f85149}
+/* Dark: the greys, text and links switch with the site's colours; fallbacks for a page without them, and the callout hues */
+.dark .mdx{--muted:var(--site-md-muted,#9198a1); --link:var(--site-md-link,#58a6ff);
+  --note:#4493f8; --tip:#3fb950; --important:#ab7df8; --warning:#d29922; --caution:#f85149}
 .dark .mdx mark{background:#7d6b00;color:#fff}
 
 /* ---- kept from the previous MarkdownViewer: containment of embedded HTML, galleries, Mermaid ---- */
