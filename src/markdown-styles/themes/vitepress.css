@@ -1,13 +1,13 @@
 /* VitePress */
-.mdx.s-vitepress{--font:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;--size:16px;--lh:1.75;--fg:#3c3c43;--muted:#67676c;--hfg:#3c3c43;--hls:-.02em;--link:#3451b2;--link-deco:underline;--link-w:500;
-  --h1:2em;--h2:1.5em;--h3:1.25em;--h4:1em;--hmt:2em;--hmb:.8em;--pmb:1em;--h2bt:1px solid #c2c2c4;--h2pt:1.4em;
-  --ic-bg:rgba(142,150,170,.14);--ic-fg:#3451b2;--ic-r:4px;--ic-pad:3px 6px;--ic-size:.875em;--pre-bg:#f6f6f7;--pre-fg:#3c3c43;--pre-r:8px;--pre-pad:20px 24px;--pre-size:.875em;--pre-lh:1.7;
-  --bq-bl:2px solid #c2c2c4;--bq-fg:#67676c;--bq-pad:0 0 0 16px;--th-bg:#f6f6f7;--td-b:1px solid #e2e2e3;--td-pad:8px 16px;--zebra:#f6f6f7;--tsize:.875em;--hr:#e2e2e3;--hr-h:1px;--lig:.5em;
+.mdx.s-vitepress{--font:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;--size:16px;--lh:1.75;--hls:-.02em;--link-deco:underline;--link-w:500;
+  --h1:2em;--h2:1.5em;--h3:1.25em;--h4:1em;--hmt:2em;--hmb:.8em;--pmb:1em;--h2bt:1px solid var(--line);--h2pt:1.4em;
+  --ic-fg:var(--link);--ic-r:4px;--ic-pad:3px 6px;--ic-size:.875em;--pre-r:8px;--pre-pad:20px 24px;--pre-size:.875em;--pre-lh:1.7;
+  --bq-bl:2px solid var(--line);--bq-pad:0 0 0 16px;--td-b:1px solid var(--line);--td-pad:8px 16px;--tsize:.875em;--hr-h:1px;--lig:.5em;
   --note:#3451b2;--tip:#18794e;--important:#8e5cd9;--warning:#915930;--caution:#b8272c}
 .mdx.s-vitepress h1,.mdx.s-vitepress h2{padding-bottom:0}.mdx.s-vitepress h2{margin-top:2em;margin-bottom:.8em}
 .mdx.s-vitepress.lang .code-lang{opacity:.7}
 .mdx.s-vitepress .markdown-alert{border:1px solid transparent;border-radius:8px;padding:16px 16px 10px;background:color-mix(in srgb,var(--c) 10%,transparent);border-left:1px solid transparent}
 .mdx.s-vitepress .markdown-alert-title{text-transform:none}
 
-/* dark */
-.dark .mdx.s-vitepress{--fg:#dfdfd6;--muted:#98989f;--hfg:#dfdfd6;--link:#a8b1ff;--ic-bg:rgba(101,117,133,.16);--ic-fg:#a8b1ff;--pre-bg:#202127;--pre-fg:#dfdfd6;--bq-bl:2px solid #3c3f44;--bq-fg:#98989f;--th-bg:#202127;--td-b:1px solid #2e2e32;--zebra:#202127;--h2bt:1px solid #3c3f44;--hr:#2e2e32;--note:#a8b1ff;--tip:#3dd68c;--important:#c8abfa;--warning:#f9b44e;--caution:#f66f81}
+/* dark: lighter callout hues */
+.dark .mdx.s-vitepress{--note:#a8b1ff;--tip:#3dd68c;--important:#c8abfa;--warning:#f9b44e;--caution:#f66f81}

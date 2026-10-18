@@ -1,5 +1,7 @@
 import {
   createThemePalette,
+  markdownLinkDecoration,
+  markdownTintScale,
   mixColor,
   readableColor,
 } from "../shared/site-theme.js";
@@ -26,6 +28,13 @@ export function applySiteTheme(theme, isDark) {
     "site-primary-hover": palette.primaryHover,
     "site-primary-active": palette.primaryActive,
     "site-link": palette.link,
+    // what the README styles read: text, link and muted text that clear 4.5:1 on the card and on its tints, whether
+    // a link needs an underline, and how strongly the card may be tinted (see markdown-styles/base.css)
+    "site-md-text": palette.markdownText,
+    "site-md-link": palette.markdownLink,
+    "site-md-muted": palette.markdownMuted,
+    "site-md-link-deco": markdownLinkDecoration(palette),
+    "site-md-tint": String(markdownTintScale(card, cardText)),
     "site-page-link": palette.pageLink,
     "site-illustration-bg": palette.illustrationBg,
     "site-illustration-ring": palette.illustrationRing,

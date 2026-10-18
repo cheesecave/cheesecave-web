@@ -78,6 +78,8 @@ export default defineConfig({
         "src/stores/auth.js",
         "src/stores/theme.js",
         "src/stores/markdownStyle.js",
+        "src/shared/site-theme.js",
+        "src/utils/site-theme.js",
         "src/markdown-styles/registry.js",
         "src/components/settings/MarkdownStylePicker.vue",
         "src/components/common/MarkdownViewer.vue",
