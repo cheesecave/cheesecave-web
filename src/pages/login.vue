@@ -43,6 +43,13 @@
       </el-form>
 
       <div
+        class="mt-4 text-center text-sm text-gray-600 dark:text-gray-400"
+        data-testid="forgot-password"
+      >
+        Forgot your password? Ask your administrator for a reset link.
+      </div>
+
+      <div
         v-if="!siteConfig?.invitation_only"
         class="mt-4 text-center text-sm text-gray-600 dark:text-gray-400"
       >

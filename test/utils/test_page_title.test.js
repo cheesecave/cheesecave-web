@@ -33,6 +33,7 @@ describe("the title of each page", () => {
     ["/new", "New repository · Site"],
     ["/login", "Log in · Site"],
     ["/register", "Create account · Site"],
+    ["/reset-password", "Reset password · Site"],
     ["/settings", "Settings · Site"],
     ["/about", "About · Site"],
     ["/get-started", "Get started · Site"],

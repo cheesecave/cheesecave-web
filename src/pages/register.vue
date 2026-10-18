@@ -103,6 +103,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import axios from "axios";
+import { passwordProblem } from "@/utils/password-policy";
 
 const route = useRoute();
 const router = useRouter();
@@ -132,10 +133,11 @@ const rules = {
     { type: "email", message: "Please enter valid email", trigger: "blur" },
   ],
   password: [
-    { required: true, message: "Please enter password", trigger: "blur" },
     {
-      min: 6,
-      message: "Password must be at least 6 characters",
+      validator: (_rule, value, callback) => {
+        const problem = passwordProblem(value);
+        callback(problem ? new Error(problem) : undefined);
+      },
       trigger: "blur",
     },
   ],

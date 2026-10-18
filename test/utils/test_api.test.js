@@ -18,6 +18,21 @@ describe("frontend API client", () => {
     vi.restoreAllMocks();
   });
 
+  it("changes and resets passwords through the auth endpoints", async () => {
+    const { apiClient, authAPI } = await loadModules();
+    const postSpy = vi.spyOn(apiClient, "post").mockResolvedValue({ data: {} });
+
+    await authAPI.changePassword({ current_password: "old", new_password: "new" });
+    await authAPI.checkPasswordReset("tok");
+    await authAPI.resetPassword({ token: "tok", new_password: "new" });
+
+    expect(postSpy.mock.calls).toEqual([
+      ["/api/auth/change-password", { current_password: "old", new_password: "new" }],
+      ["/api/auth/password-reset/check", { token: "tok" }],
+      ["/api/auth/password-reset", { token: "tok", new_password: "new" }],
+    ]);
+  });
+
   it("applies request and response interceptors using stored tokens", async () => {
     localStorage.setItem("hf_token", "local-token");
     localStorage.setItem(

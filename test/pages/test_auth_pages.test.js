@@ -542,4 +542,33 @@ describe("auth pages", () => {
     expect(pushSpy).not.toHaveBeenCalledWith("/");
     expect(pushSpy).not.toHaveBeenCalledWith("/login");
   });
+
+  it("tells a person who forgot the password to ask the administrator for a link", async () => {
+    const router = await createTestRouter("/login");
+    const wrapper = mountPage(LoginPage, router);
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="forgot-password"]').text()).toContain(
+      "Forgot your password? Ask your administrator for a reset link.",
+    );
+  });
+
+  it("asks for the password the server accepts when someone registers", async () => {
+    const router = await createTestRouter("/register");
+    const wrapper = mountPage(RegisterPage, router);
+    await flushPromises();
+    const rule = wrapper
+      .findComponent({ name: "ElForm" })
+      .props("rules")
+      .password.find((entry) => entry.validator);
+    const check = async (value) => {
+      let result;
+      await rule.validator({}, value, (error) => (result = error));
+      return result?.message ?? null;
+    };
+
+    expect(await check("sixsix")).toBe("Password must be at least 8 characters");
+    expect(await check("a".repeat(73))).toMatch(/at most 72 bytes/);
+    expect(await check("long-enough-1")).toBeNull();
+  });
 });
