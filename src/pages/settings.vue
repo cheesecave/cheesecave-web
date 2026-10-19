@@ -148,6 +148,14 @@
       </el-tab-pane>
 
       <!-- External Tokens -->
+      <!-- Security -->
+      <el-tab-pane label="Security" name="security">
+        <div class="card">
+          <h2 class="text-xl font-semibold mb-4">Change password</h2>
+          <ChangePasswordForm />
+        </div>
+      </el-tab-pane>
+
       <!-- Appearance -->
       <el-tab-pane label="Appearance" name="appearance">
         <div class="card">
@@ -329,6 +337,7 @@ import { notifyError } from "@/errors";
 import { storeToRefs } from "pinia";
 import { useAuthStore } from "@/stores/auth";
 import MarkdownStylePicker from "@/components/settings/MarkdownStylePicker.vue";
+import ChangePasswordForm from "@/components/settings/ChangePasswordForm.vue";
 import { useRouter } from "vue-router";
 import { authAPI, settingsAPI } from "@/utils/api";
 import { copyToClipboard } from "@/utils/clipboard";

@@ -93,13 +93,22 @@ export const useAuthStore = defineStore("auth", {
       try {
         await authAPI.logout();
       } finally {
-        this.user = null;
-        this.userInfo = null;
-        this.token = null;
-        this.sessionExpired = false;
-        localStorage.removeItem("hf_token");
-        clearRepoSortPreference();
+        this.forgetSession();
       }
+    },
+
+    /**
+     * Stop treating the browser as signed in, without asking the server: its sessions are already gone (a password was
+     * reset with a link)
+     */
+    forgetSession() {
+      this.user = null;
+      this.userInfo = null;
+      this.userOrganizations = [];
+      this.token = null;
+      this.sessionExpired = false;
+      localStorage.removeItem("hf_token");
+      clearRepoSortPreference();
     },
 
     /**

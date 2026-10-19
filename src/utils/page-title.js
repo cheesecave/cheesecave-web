@@ -16,6 +16,7 @@ const STATIC = {
   "/new": "New repository",
   "/login": "Log in",
   "/register": "Create account",
+  "/reset-password": "Reset password",
   "/settings": "Settings",
   "/about": "About",
   "/get-started": "Get started",

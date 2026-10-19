@@ -146,6 +146,25 @@ describe("auth store", () => {
     ]);
   });
 
+  it("forgets the sign-in without asking the server (its sessions are already gone)", async () => {
+    const store = await createStore();
+    store.user = { username: "owner" };
+    store.userInfo = { name: "owner" };
+    store.userOrganizations = [{ name: "acme-labs" }];
+    store.token = "stale";
+    store.sessionExpired = true;
+
+    store.forgetSession();
+
+    expect(store.user).toBeNull();
+    expect(store.userInfo).toBeNull();
+    expect(store.userOrganizations).toEqual([]);
+    expect(store.token).toBeNull();
+    expect(store.sessionExpired).toBe(false);
+    expect(store.isAuthenticated).toBe(false);
+    expect(requests.logout).toBe(0);
+  });
+
   it("fetches a user directly and rejects anonymous namespace writes", async () => {
     const store = await createStore();
 

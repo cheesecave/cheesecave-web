@@ -224,6 +224,12 @@ export const authAPI = {
   listTokens: () => api.get("/api/auth/tokens"),
   revokeToken: (id) => api.delete(`/api/auth/tokens/${id}`),
 
+  // Passwords: change one while signed in; or set a new one with the one-time link an administrator made
+  changePassword: (data) => api.post("/api/auth/change-password", data),
+  checkPasswordReset: (token) =>
+    api.post("/api/auth/password-reset/check", { token }),
+  resetPassword: (data) => api.post("/api/auth/password-reset", data),
+
   // External fallback tokens
   getAvailableSources: () => api.get("/api/fallback-sources/available"),
   listExternalTokens: (username) =>
