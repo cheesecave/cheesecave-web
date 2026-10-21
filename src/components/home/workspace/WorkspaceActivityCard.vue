@@ -18,6 +18,18 @@ const actorPath = computed(() =>
     ? buildEntityProfilePath(actor.value.username, actor.value.is_org)
     : null,
 );
+// A creation says where it happened when that is an organization: the person made it there.
+// With nobody to name, the organization is all that is known, so it is named as the place and not
+// drawn as the one who acted.
+const createdIn = computed(() =>
+  props.item.kind === "repo_created" && props.item.namespace?.is_org
+    ? props.item.namespace
+    : null,
+);
+// Read only where the organization is named (the template guards it)
+const createdInPath = computed(() =>
+  buildEntityProfilePath(createdIn.value.username, true),
+);
 const action = computed(
   () =>
     ({ like: "liked", repo_created: "created", commit: "updated" })[
@@ -62,9 +74,24 @@ const time = computed(() => {
         <RouterLink v-if="actor" :to="actorPath" class="activity-actor-link">{{
           actorName
         }}</RouterLink>
+        <span v-else-if="createdIn" class="activity-unknown"
+          >A member of
+          <RouterLink :to="createdInPath" class="activity-namespace-link">{{
+            createdIn.username
+          }}</RouterLink></span
+        >
         <span v-else class="activity-unknown">{{ actorName }}</span>
         {{ " " }}
         <span class="activity-action">{{ action }} a {{ repositoryType }}</span>
+        <template v-if="actor && createdIn">
+          {{ " " }}
+          <span class="activity-action"
+            >in
+            <RouterLink :to="createdInPath" class="activity-namespace-link">{{
+              createdIn.username
+            }}</RouterLink></span
+          >
+        </template>
       </div>
       <time :datetime="time.iso" :title="time.label">{{
         time.relative || time.label
@@ -105,7 +132,8 @@ const time = computed(() => {
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
-.activity-actor-link {
+.activity-actor-link,
+.activity-namespace-link {
   color: var(--ws-link);
   font-weight: 600;
 }
