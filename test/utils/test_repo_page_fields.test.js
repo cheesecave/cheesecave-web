@@ -13,6 +13,7 @@ describe("the fields the repository page asks for", () => {
       "likes",
       "tags",
       "storage",
+      "createdBy",
     ]);
   });
 
@@ -26,6 +27,7 @@ describe("the fields the repository page asks for", () => {
       "likes",
       "tags",
       "storage",
+      "createdBy",
       "pipeline_tag",
       "library_name",
       "config",
@@ -37,6 +39,7 @@ describe("the fields the repository page asks for", () => {
     expect(repoPageFields("space")).toEqual([
       ...CORE_REPO_FIELDS,
       "storage",
+      "createdBy",
       "sdk",
     ]);
     expect(repoPageFields("space")).not.toContain("downloads");
@@ -53,6 +56,12 @@ describe("the fields the repository page asks for", () => {
       expect(repoPageFields("space")).not.toContain(field);
     }
     expect(repoPageFields("model")).not.toContain("sdk");
+  });
+
+  it("asks for the creator on every kind of repository, but not in the fields every backend knows", () => {
+    for (const kind of ["model", "dataset", "space"])
+      expect(repoPageFields(kind)).toContain("createdBy");
+    expect(CORE_REPO_FIELDS).not.toContain("createdBy");
   });
 
   it("never asks for the file list", () => {

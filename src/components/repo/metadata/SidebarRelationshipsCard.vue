@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from "vue";
+import { buildEntityProfilePath } from "@/utils/entity-avatar";
 
 const props = defineProps({
   namespace: {
@@ -18,7 +19,19 @@ const props = defineProps({
     type: String,
     required: true,
   },
+  // The person who created the repository, as the backend names them; nothing when it cannot say
+  createdBy: {
+    type: Object,
+    default: null,
+  },
 });
+
+const creator = computed(() =>
+  props.createdBy?.username ? props.createdBy : null,
+);
+const creatorLink = computed(() =>
+  buildEntityProfilePath(creator.value.username, creator.value.is_org),
+);
 
 const INITIAL_SHOW = 2;
 const baseModelsExpanded = ref(false);
@@ -93,6 +106,25 @@ const hasContent = computed(() => {
           <span
             class="text-blue-600 dark:text-blue-400 hover:underline truncate"
             >{{ namespace }}</span
+          >
+        </RouterLink>
+      </div>
+
+      <!-- Created By: the person, where the author above is the namespace -->
+      <div v-if="creator">
+        <div class="text-xs text-gray-600 dark:text-gray-400 mb-1">
+          Created By:
+        </div>
+        <RouterLink
+          :to="creatorLink"
+          class="flex items-center gap-2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+        >
+          <div
+            class="i-carbon-user-avatar text-base text-gray-400 dark:text-gray-500 flex-shrink-0"
+          />
+          <span
+            class="text-blue-600 dark:text-blue-400 hover:underline truncate"
+            >{{ creator.username }}</span
           >
         </RouterLink>
       </div>

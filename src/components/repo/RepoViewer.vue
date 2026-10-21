@@ -760,6 +760,7 @@
           :namespace-link="namespaceLink"
           :metadata="readmeMetadata"
           :repo-type="repoType"
+          :created-by="repoInfo?.createdBy"
         />
 
         <!-- What the files of a model say: its size, tensor types, architecture -->

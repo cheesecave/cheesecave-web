@@ -20,8 +20,10 @@ const EXTRA_FIELDS = {
   space: ["sdk"],
 };
 
+// `storage` and `createdBy` are Cheesecave's own (the quota and the person who created the repository). An
+// older backend refuses them with a 400, and the page then asks again with CORE_REPO_FIELDS.
 export function repoPageFields(repoType) {
-  const fields = [...CORE_REPO_FIELDS, "storage"];
+  const fields = [...CORE_REPO_FIELDS, "storage", "createdBy"];
   if (repoType !== "space") fields.splice(4, 0, "downloads");
   return [...fields, ...(EXTRA_FIELDS[repoType] || [])];
 }

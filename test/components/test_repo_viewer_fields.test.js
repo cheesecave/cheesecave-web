@@ -20,6 +20,16 @@ import RepoViewer from "@/components/repo/RepoViewer.vue";
 
 const CORE = ["sha", "lastModified", "createdAt", "private", "likes", "tags"];
 
+// Shows what the page hands the Relationships card
+const SidebarRelationshipsCardProbe = defineComponent({
+  props: ["createdBy", "namespace"],
+  setup: (props) => () =>
+    h("aside", {
+      "data-testid": "relationships",
+      "data-created-by": props.createdBy ? props.createdBy.username : "",
+    }),
+});
+
 function mountViewer(repoType) {
   return mount(RepoViewer, {
     props: {
@@ -42,7 +52,7 @@ function mountViewer(repoType) {
         MetadataHeader: true,
         DetailedMetadataPanel: true,
         ReferencedDatasetsCard: true,
-        SidebarRelationshipsCard: true,
+        SidebarRelationshipsCard: SidebarRelationshipsCardProbe,
       },
     },
   });
@@ -96,12 +106,15 @@ describe("RepoViewer asks repo info for the fields of its kind", () => {
     expect(infos[0]).not.toContain("downloads");
   });
 
-  it.each(["model", "dataset"])("still asks a %s for downloads", async (kind) => {
-    mountViewer(kind);
-    await flushPromises();
+  it.each(["model", "dataset"])(
+    "still asks a %s for downloads",
+    async (kind) => {
+      mountViewer(kind);
+      await flushPromises();
 
-    expect(infos[0]).toContain("downloads");
-  });
+      expect(infos[0]).toContain("downloads");
+    },
+  );
 
   it("says nothing about downloads on a Space page and shows them on a model page", async () => {
     const space = mountViewer("space");
@@ -144,5 +157,48 @@ describe("RepoViewer asks repo info for the fields of its kind", () => {
     await flushPromises();
 
     expect(infos).toHaveLength(1);
+  });
+
+  it("hands the creator the backend names to the Relationships card", async () => {
+    answers = [
+      jsonResponse({
+        ...cloneFixture(uiApiFixtures.repo.info),
+        id: "acme/thing",
+        createdBy: { username: "alice", full_name: null, is_org: false },
+      }),
+    ];
+
+    const wrapper = mountViewer("model");
+    await flushPromises();
+
+    expect(infos[0]).toContain("createdBy");
+    expect(
+      wrapper
+        .get('[data-testid="relationships"]')
+        .attributes("data-created-by"),
+    ).toBe("alice");
+  });
+
+  it("hands the card no creator when the backend names none or does not know the field", async () => {
+    const wrapper = mountViewer("model");
+    await flushPromises();
+    expect(
+      wrapper
+        .get('[data-testid="relationships"]')
+        .attributes("data-created-by"),
+    ).toBe("");
+
+    answers = [
+      jsonResponse({ error: "Invalid option" }, { status: 400 }),
+      jsonResponse({
+        ...cloneFixture(uiApiFixtures.repo.info),
+        id: "acme/thing",
+      }),
+    ];
+    const older = mountViewer("model");
+    await flushPromises();
+    expect(
+      older.get('[data-testid="relationships"]').attributes("data-created-by"),
+    ).toBe("");
   });
 });

@@ -139,6 +139,7 @@ export default defineConfig({
         "src/components/repo/metadata/MetadataHeader.vue",
         "src/components/repo/metadata/ModelInfoCard.vue",
         "src/components/repo/metadata/LicenseCard.vue",
+        "src/components/repo/metadata/SidebarRelationshipsCard.vue",
         "src/components/home/workspace/WorkspaceActivityCard.vue",
         "src/pages/index.vue",
         "src/pages/\\[...all\\].vue",
