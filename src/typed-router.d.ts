@@ -19,6 +19,7 @@ declare module 'vue-router/auto-routes' {
    */
   export interface RouteNamedMap {
     '/': RouteRecordInfo<'/', '/', Record<never, never>, Record<never, never>>,
+    '/[...all]': RouteRecordInfo<'/[...all]', '/:all(.*)', { all: ParamValue<true> }, { all: ParamValue<false> }>,
     '/[type]s/[namespace]/[name]/': RouteRecordInfo<'/[type]s/[namespace]/[name]/', '/:type()s/:namespace/:name', { type: ParamValue<true>, namespace: ParamValue<true>, name: ParamValue<true> }, { type: ParamValue<false>, namespace: ParamValue<false>, name: ParamValue<false> }>,
     '/[type]s/[namespace]/[name]/blob/[branch]/[...file]': RouteRecordInfo<'/[type]s/[namespace]/[name]/blob/[branch]/[...file]', '/:type()s/:namespace/:name/blob/:branch/:file(.*)', { type: ParamValue<true>, namespace: ParamValue<true>, name: ParamValue<true>, branch: ParamValue<true>, file: ParamValue<true> }, { type: ParamValue<false>, namespace: ParamValue<false>, name: ParamValue<false>, branch: ParamValue<false>, file: ParamValue<false> }>,
     '/[type]s/[namespace]/[name]/commit/[commit_id]': RouteRecordInfo<'/[type]s/[namespace]/[name]/commit/[commit_id]', '/:type()s/:namespace/:name/commit/:commit_id', { type: ParamValue<true>, namespace: ParamValue<true>, name: ParamValue<true>, commit_id: ParamValue<true> }, { type: ParamValue<false>, namespace: ParamValue<false>, name: ParamValue<false>, commit_id: ParamValue<false> }>,
@@ -69,6 +70,10 @@ declare module 'vue-router/auto-routes' {
   export interface _RouteFileInfoMap {
     'src/pages/index.vue': {
       routes: '/'
+      views: never
+    }
+    'src/pages/[...all].vue': {
+      routes: '/[...all]'
       views: never
     }
     'src/pages/[type]s/[namespace]/[name]/index.vue': {
