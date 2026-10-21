@@ -140,8 +140,9 @@ describe("workspace activity", () => {
     expect(cards[0].text()).toContain("<script>alert(1)</script>");
     expect(wrapper.find("script").exists()).toBe(false);
     expect(cards[1].text().replace(/\s+/g, " ")).toContain(
-      "Unknown user created a Model",
+      "A member of research-lab created a Model",
     );
+    expect(cards[1].text()).not.toContain("Unknown user");
     expect(cards[1].text()).not.toContain("fake-creator");
     expect(cards[2].get(".activity-actor-link").text()).toBe("Contributors");
     expect(cards[2].text()).toContain("liked a Model");
@@ -292,7 +293,7 @@ describe("workspace activity", () => {
       expect(
         wrapper.get(".activity-card").text().replace(/\s+/g, " "),
       ).toContain(
-        `Unknown user created a ${{ model: "Model", dataset: "Dataset", space: "Space" }[type]}`,
+        `A member of research-lab created a ${{ model: "Model", dataset: "Dataset", space: "Space" }[type]}`,
       );
       await button(wrapper, "All").trigger("click");
       await flushPromises();

@@ -121,7 +121,7 @@ describe("workspace sections", () => {
       "/builder",
       "/api/users/builder/avatar",
       "BU",
-      "builder created a Space",
+      "builder created a Space in different-owner",
     ],
   ])(
     "renders the provided %s actor, type and avatar independently of the repository owner",
@@ -136,7 +136,10 @@ describe("workspace sections", () => {
       });
       const heading = wrapper.get(".activity-heading");
       expect(heading.text().replace(/\s+/g, " ")).toContain(text);
-      expect(heading.text()).not.toContain("different-owner");
+      // Only a creation says where it happened; a commit or a like is not about a place
+      expect(heading.text().includes("different-owner")).toBe(
+        kind === "repo_created",
+      );
       expect(heading.get(".activity-actor-link").attributes("href")).toBe(path);
       expect(heading.get(".activity-avatar-link").attributes("href")).toBe(
         path,
@@ -148,18 +151,71 @@ describe("workspace sections", () => {
     },
   );
 
-  it("keeps a missing creation actor unknown rather than attributing creation to the repository namespace", () => {
+  it("names the organization when nobody can say who created a repository in it", () => {
     const wrapper = render(WorkspaceActivityCard, {
       item: activity({ kind: "repo_created", actor: null, commit: null }),
     });
     const heading = wrapper.get(".activity-heading");
     expect(heading.text().replace(/\s+/g, " ")).toContain(
-      "Unknown user created a Model",
+      "A member of different-owner created a Model",
     );
-    expect(heading.text()).not.toContain("different-owner");
-    expect(heading.find("a").exists()).toBe(false);
+    expect(heading.text()).not.toContain("Unknown user");
+    expect(heading.find(".activity-actor-link").exists()).toBe(false);
+    // The organization is named as the place, never drawn as the person who acted
+    expect(heading.get(".activity-namespace-link").attributes("href")).toBe(
+      "/organizations/different-owner",
+    );
+    expect(heading.find(".activity-avatar-link").element.tagName).toBe("SPAN");
     expect(heading.getComponent({ name: "ElAvatar" }).props("src")).toBeFalsy();
     expect(heading.find(".i-carbon-user-avatar").exists()).toBe(true);
+  });
+
+  it("still says unknown user when there is no actor and no organization to name", () => {
+    const wrapper = render(WorkspaceActivityCard, {
+      item: activity({
+        kind: "repo_created",
+        actor: null,
+        commit: null,
+        namespace: { username: "loner", is_org: false },
+      }),
+    });
+    const heading = wrapper.get(".activity-heading");
+    expect(heading.text().replace(/\s+/g, " ")).toContain(
+      "Unknown user created a Model",
+    );
+    expect(heading.find("a").exists()).toBe(false);
+  });
+
+  it("names the person and the organization they created it in, linking both", () => {
+    const wrapper = render(WorkspaceActivityCard, {
+      item: activity({ kind: "repo_created", commit: null }),
+    });
+    const heading = wrapper.get(".activity-heading");
+    expect(heading.text().replace(/\s+/g, " ")).toContain(
+      "Alice created a Model in different-owner",
+    );
+    expect(heading.get(".activity-actor-link").attributes("href")).toBe(
+      "/alice",
+    );
+    expect(heading.get(".activity-namespace-link").attributes("href")).toBe(
+      "/organizations/different-owner",
+    );
+  });
+
+  it("names no place for something created in the person's own namespace", () => {
+    const wrapper = render(WorkspaceActivityCard, {
+      item: activity({
+        kind: "repo_created",
+        commit: null,
+        namespace: { username: "alice", is_org: false },
+      }),
+    });
+    const heading = wrapper.get(".activity-heading");
+    expect(heading.text().replace(/\s+/g, " ").trim()).toContain(
+      "Alice created a Model",
+    );
+    expect(heading.text()).not.toContain(" in ");
+    expect(heading.find(".activity-namespace-link").exists()).toBe(false);
   });
 
   it("shares RepositoryCard with discovery and keeps encoded repository and commit links separate", () => {
