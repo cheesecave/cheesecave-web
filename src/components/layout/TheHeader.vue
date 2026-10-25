@@ -77,12 +77,17 @@
                   v-for="item in HEADER_CREATION_ITEMS"
                   :key="item.id"
                   :divided="item.divided"
-                  @click="selectMenuItem(item)"
+                  class="header-menu-item"
+                  @click="followMenuLink"
                 >
-                  <div class="flex items-center gap-2">
+                  <RouterLink
+                    :to="item.to"
+                    class="header-menu-link"
+                    tabindex="-1"
+                  >
                     <div :class="item.icon" />
                     <span>{{ item.label }}</span>
-                  </div>
+                  </RouterLink>
                 </el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -103,25 +108,39 @@
             </div>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item
-                  v-for="item in accountItems"
-                  :key="item.id"
-                  :divided="item.divided"
-                  @click="selectMenuItem(item)"
-                >
-                  <div :class="item.icon" class="inline-block mr-2" />
-                  {{ item.label }}
-                </el-dropdown-item>
+                <template v-for="item in accountItems" :key="item.id">
+                  <el-dropdown-item
+                    v-if="item.action"
+                    :divided="item.divided"
+                    @click="logoutFromMenu()"
+                  >
+                    <div :class="item.icon" class="inline-block mr-2" />
+                    {{ item.label }}
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    v-else
+                    :divided="item.divided"
+                    class="header-menu-item"
+                    @click="followMenuLink"
+                  >
+                    <RouterLink
+                      :to="item.to"
+                      class="header-menu-link"
+                      tabindex="-1"
+                    >
+                      <div :class="item.icon" />
+                      {{ item.label }}
+                    </RouterLink>
+                  </el-dropdown-item>
+                </template>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
         </template>
 
         <template v-else>
-          <el-button @click="$router.push('/login')" plain> Login </el-button>
-          <el-button type="primary" @click="$router.push('/register')">
-            Sign Up
-          </el-button>
+          <LinkButton to="/login" plain> Login </LinkButton>
+          <LinkButton to="/register" type="primary"> Sign Up </LinkButton>
         </template>
       </div>
 
@@ -202,17 +221,18 @@
             <div class="px-4 text-xs text-gray-500 dark:text-gray-400 mb-2">
               CREATE NEW
             </div>
-            <div
+            <RouterLink
               v-for="item in HEADER_CREATION_ITEMS"
               :key="item.id"
-              @click="selectMenuItem(item, true)"
-              class="px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
+              :to="item.to"
+              @click="mobileMenuOpen = false"
+              class="block px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
             >
               <div class="flex items-center gap-2">
                 <div :class="item.icon" />
                 {{ item.label }}
               </div>
-            </div>
+            </RouterLink>
           </div>
 
           <!-- Divider -->
@@ -236,52 +256,60 @@
                 {{ username }}
               </div>
             </div>
-            <div
-              v-for="item in accountItems"
-              :key="item.id"
-              @click="selectMenuItem(item, true)"
-              class="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
-              :class="
-                item.danger
-                  ? 'text-red-600 dark:text-red-400'
-                  : 'text-gray-700 dark:text-gray-300'
-              "
-            >
-              <div class="flex items-center gap-2">
-                <div :class="item.icon" />
-                {{ item.label }}
+            <template v-for="item in accountItems" :key="item.id">
+              <div
+                v-if="item.action"
+                @click="logoutFromMenu(true)"
+                class="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
+                :class="
+                  item.danger
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-gray-700 dark:text-gray-300'
+                "
+              >
+                <div class="flex items-center gap-2">
+                  <div :class="item.icon" />
+                  {{ item.label }}
+                </div>
               </div>
-            </div>
+              <RouterLink
+                v-else
+                :to="item.to"
+                @click="mobileMenuOpen = false"
+                class="block px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
+              >
+                <div class="flex items-center gap-2">
+                  <div :class="item.icon" />
+                  {{ item.label }}
+                </div>
+              </RouterLink>
+            </template>
           </div>
         </template>
 
         <!-- Not authenticated -->
         <template v-else>
           <div class="flex flex-col gap-1 px-4">
-            <el-button
-              @click="
-                $router.push('/login');
-                mobileMenuOpen = false;
-              "
+            <LinkButton
+              to="/login"
+              @click="mobileMenuOpen = false"
               size="large"
               class="w-full"
               plain
             >
               Login
-            </el-button>
+            </LinkButton>
             <div class="w-0 h-0 p-0 m-0"></div>
             <!-- Avoid el-button+el-button spacing -->
-            <el-button
+            <LinkButton
+              to="/register"
               type="primary"
-              @click="
-                $router.push('/register');
-                mobileMenuOpen = false;
-              "
+              @click="mobileMenuOpen = false"
               size="large"
               class="w-full"
             >
               Sign Up
-            </el-button>
+            </LinkButton>
           </div>
         </template>
       </div>
@@ -298,6 +326,7 @@ import { useSiteBrandingStore } from "@/stores/siteBranding";
 import { computed, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import EntityAvatar from "@/components/common/EntityAvatar.vue";
+import LinkButton from "@/components/common/LinkButton.vue";
 import {
   HEADER_NAVIGATION_ITEMS,
   HEADER_CREATION_ITEMS,
@@ -324,10 +353,16 @@ const router = useRouter();
 const mobileMenuOpen = ref(false);
 const accountItems = computed(() => getHeaderAccountItems(username.value));
 
-function selectMenuItem(item, closeMobile = false) {
+// Logout is the one menu entry that is an action; every other entry is a link
+function logoutFromMenu(closeMobile = false) {
   if (closeMobile) mobileMenuOpen.value = false;
-  if (item.action === "logout") return handleLogout();
-  return router.push(item.to);
+  return handleLogout();
+}
+
+// A mouse click lands on the link inside the item and follows it. Enter and Space reach the
+// item itself, as a "click" carrying the key event: follow the link for them.
+function followMenuLink(event) {
+  if (event.type === "keydown") event.target.querySelector("a[href]")?.click();
 }
 
 async function handleLogout() {
@@ -356,5 +391,21 @@ async function handleLogout() {
   :deep(.el-button) {
     min-height: 44px;
   }
+}
+</style>
+
+<style>
+/* A menu entry that is a link: the link fills the whole item, so the whole row is clickable */
+.el-dropdown-menu__item.header-menu-item {
+  padding: 0;
+}
+.header-menu-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 16px;
+  color: inherit;
+  text-decoration: none;
 }
 </style>
