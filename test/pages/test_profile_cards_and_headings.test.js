@@ -173,6 +173,30 @@ describe.each(PAGES)("%s", (_name, component, mode, params) => {
     expect(names[0]).not.toMatch(/text-(green|purple)-|keep-type-color/);
   });
 
+  it("makes each card one link to its own repository, whatever the type, with no click handler behind it", async () => {
+    mocks.listAllRepos.mockImplementation(async (type) => ({
+      data: [repo(type, "open", false)],
+      incomplete: [],
+    }));
+    await mountPage(component, mode, params);
+
+    const cards = wrapper
+      .findAll(".card")
+      .filter((card) => card.find("h3 a").exists());
+    expect(cards.length).toBeGreaterThan(0);
+    for (const card of cards) {
+      const link = card.get("h3 a");
+      // the id carries the type: bob/open-model must open /models/bob/open-model
+      const [, type] = link.text().match(/^bob\/open-(\w+)$/);
+      expect(link.attributes("href")).toBe(`/${type}s/bob/open-${type}`);
+      expect(link.classes()).toContain("stretched-link");
+      expect(card.classes()).toContain("relative");
+      expect(card.classes()).not.toContain("cursor-pointer");
+      await card.trigger("click");
+    }
+    expect(mocks.router.push).not.toHaveBeenCalled();
+  });
+
   it("has exactly one <h1>", async () => {
     mocks.listAllRepos.mockImplementation(async (type) => ({
       data: [repo(type, "open", false)],

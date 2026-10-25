@@ -4,8 +4,7 @@
     <div
       v-for="repo in repos"
       :key="repo.id"
-      class="card hover:shadow-md transition-shadow cursor-pointer"
-      @click="goToRepo(repo)"
+      class="card relative hover:shadow-md transition-shadow"
     >
       <div class="flex flex-col sm:flex-row items-start justify-between gap-3">
         <div class="flex-1 w-full">
@@ -14,8 +13,7 @@
             <h3 class="text-base sm:text-lg font-semibold">
               <RouterLink
                 :to="getRepoPath(repo)"
-                class="block text-blue-600 dark:text-blue-400 hover:underline break-all"
-                @click.stop
+                class="stretched-link block text-blue-600 dark:text-blue-400 hover:underline break-all"
               >
                 {{ repo.id }}
               </RouterLink>
@@ -93,8 +91,6 @@ const props = defineProps({
   },
 });
 
-const router = useRouter();
-
 function getIconClass(type) {
   const icons = {
     model: "i-carbon-model text-blue-500",
@@ -111,9 +107,5 @@ function formatDate(date) {
 function getRepoPath(repo) {
   const [namespace, name] = repo.id.split("/");
   return `/${props.type}s/${namespace}/${name}`;
-}
-
-function goToRepo(repo) {
-  router.push(getRepoPath(repo));
 }
 </script>
