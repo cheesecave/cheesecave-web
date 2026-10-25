@@ -175,7 +175,7 @@ describe("RepoViewer shows what the API knows next to what the README says", () 
     const wrapper = mountViewer("model");
     await settle(wrapper);
 
-    const tabs = wrapper.findAll(".repo-tabs button");
+    const tabs = wrapper.findAll(".repo-tabs a");
     expect(tabs).toHaveLength(4);
     for (const tab of tabs) {
       expect(tab.classes()).toEqual(
