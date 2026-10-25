@@ -69,13 +69,16 @@
             <div
               v-for="member in members"
               :key="member.user"
-              class="flex items-center gap-2 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-              @click="goToUser(member.user)"
+              class="relative flex items-center gap-2 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
               <div class="i-carbon-user-avatar text-2xl text-gray-400" />
               <div class="flex-1 min-w-0">
                 <div class="text-sm font-medium truncate">
-                  {{ member.user }}
+                  <RouterLink
+                    :to="`/${member.user}`"
+                    class="stretched-link !text-inherit"
+                    >{{ member.user }}</RouterLink
+                  >
                 </div>
                 <div class="text-xs text-gray-500">
                   {{ member.role }}
@@ -360,10 +363,6 @@ const tagType = computed(() => {
 
 function formatDate(date) {
   return formatRelativeTime(date, "never");
-}
-
-function goToUser(username) {
-  router.push(`/${username}`);
 }
 
 async function checkOrgExists() {

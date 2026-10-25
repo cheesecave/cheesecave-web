@@ -3,14 +3,14 @@
   <div class="container-main">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-3xl font-bold">Organizations</h1>
-      <el-button
+      <LinkButton
         v-if="authStore.isAuthenticated"
         type="primary"
-        @click="router.push('/organizations/new')"
+        to="/organizations/new"
       >
         <div class="i-carbon-add mr-2" />
         Create Organization
-      </el-button>
+      </LinkButton>
     </div>
 
     <!-- Search and Filters -->
@@ -38,8 +38,7 @@
         <div
           v-for="org in filteredOrganizations"
           :key="org.name"
-          class="card hover:shadow-lg transition-shadow cursor-pointer"
-          @click="goToOrganization(org.name)"
+          class="card relative hover:shadow-lg transition-shadow"
         >
           <div class="flex items-start gap-3 mb-3">
             <EntityAvatar
@@ -53,8 +52,7 @@
               <h3 class="text-lg font-semibold truncate">
                 <RouterLink
                   :to="getOrganizationPath(org.name)"
-                  class="block text-blue-600 dark:text-blue-400 hover:underline"
-                  @click.stop
+                  class="stretched-link block text-blue-600 dark:text-blue-400 hover:underline"
                 >
                   {{ org.name }}
                 </RouterLink>
@@ -101,13 +99,13 @@
       <p class="text-gray-500 dark:text-gray-400 mb-4">
         {{ searchQuery ? "No organizations found" : "No organizations yet" }}
       </p>
-      <el-button
+      <LinkButton
         v-if="authStore.isAuthenticated && !searchQuery"
         type="primary"
-        @click="router.push('/organizations/new')"
+        to="/organizations/new"
       >
         Create Your First Organization
-      </el-button>
+      </LinkButton>
     </div>
   </div>
 </template>
@@ -115,12 +113,11 @@
 <script setup>
 import { notifyError } from "@/errors";
 import EntityAvatar from "@/components/common/EntityAvatar.vue";
-import { useRouter } from "vue-router";
+import LinkButton from "@/components/common/LinkButton.vue";
 import { useAuthStore } from "@/stores/auth";
 import { orgAPI } from "@/utils/api";
 import { ElMessage } from "element-plus";
 
-const router = useRouter();
 const authStore = useAuthStore();
 
 const loading = ref(true);
@@ -154,10 +151,6 @@ function getRoleType(role) {
 
 function getOrganizationPath(orgName) {
   return `/organizations/${orgName}`;
-}
-
-function goToOrganization(orgName) {
-  router.push(getOrganizationPath(orgName));
 }
 
 async function loadOrganizations() {

@@ -281,14 +281,14 @@
 
             <!-- View Details Button (only for users with write permission) -->
             <div v-if="quotaInfo.can_see_private" class="mt-4">
-              <el-button
+              <LinkButton
                 size="small"
-                @click="$router.push(`/${username}/storage`)"
+                :to="`/${username}/storage`"
                 class="w-full"
               >
                 <div class="i-carbon-chart-bar inline-block mr-1" />
                 View Details
-              </el-button>
+              </LinkButton>
             </div>
           </div>
 
@@ -597,6 +597,7 @@
 
 <script setup>
 import { repoAPI, orgAPI, settingsAPI } from "@/utils/api";
+import LinkButton from "@/components/common/LinkButton.vue";
 import ProfileRepoCard from "@/components/profile/ProfileRepoCard.vue";
 import EntityAvatar from "@/components/common/EntityAvatar.vue";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";

@@ -35,14 +35,14 @@
         v-if="isAdmin && !isExternalOrg"
         class="flex items-center justify-end mb-4"
       >
-        <el-button
+        <LinkButton
           type="primary"
           size="small"
-          @click="$router.push(`/organizations/${orgname}/settings`)"
+          :to="`/organizations/${orgname}/settings`"
         >
           <div class="i-carbon-settings mr-1" />
           Organization Settings
-        </el-button>
+        </LinkButton>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
@@ -238,8 +238,7 @@
               <div
                 v-for="member in members"
                 :key="member.user"
-                class="flex items-center gap-2 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                @click="goToUser(member.user)"
+                class="relative flex items-center gap-2 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <EntityAvatar
                   :username="member.user"
@@ -249,7 +248,11 @@
                 />
                 <div class="flex-1 min-w-0">
                   <div class="text-sm font-medium truncate">
-                    {{ member.user }}
+                    <RouterLink
+                      :to="`/${member.user}`"
+                      class="stretched-link !text-inherit"
+                      >{{ member.user }}</RouterLink
+                    >
                   </div>
                   <div class="text-xs text-gray-500">
                     {{ member.role }}
@@ -346,14 +349,14 @@
 
             <!-- View Details Button (only for members with write permission) -->
             <div v-if="quotaInfo.can_see_private" class="mt-4">
-              <el-button
+              <LinkButton
                 size="small"
-                @click="$router.push(`/organizations/${orgname}/storage`)"
+                :to="`/organizations/${orgname}/storage`"
                 class="w-full"
               >
                 <div class="i-carbon-chart-bar inline-block mr-1" />
                 View Details
-              </el-button>
+              </LinkButton>
             </div>
           </div>
 
@@ -659,6 +662,7 @@
 
 <script setup>
 import { repoAPI, orgAPI, settingsAPI } from "@/utils/api";
+import LinkButton from "@/components/common/LinkButton.vue";
 import ProfileRepoCard from "@/components/profile/ProfileRepoCard.vue";
 import { useAuthStore } from "@/stores/auth";
 import EntityAvatar from "@/components/common/EntityAvatar.vue";
@@ -783,10 +787,6 @@ function getQuotaStatus(percentage) {
   if (percentage >= 90) return "exception";
   if (percentage >= 75) return "warning";
   return "success";
-}
-
-function goToUser(username) {
-  router.push(`/${username}`);
 }
 
 async function loadOrgInfo() {
