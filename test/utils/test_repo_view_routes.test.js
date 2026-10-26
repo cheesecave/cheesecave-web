@@ -101,6 +101,7 @@ describe("repository view route normalization", () => {
       ["/datasets/mai_lin/demo/tree/main/catalog/part", "files"],
       ["/datasets/mai_lin/demo/commits/main", "commits"],
       ["/datasets/mai_lin/demo?tab=metadata", "metadata"],
+      ["/datasets/mai_lin/demo?tab=metrics", "metrics"],
       // the dataset viewer is gone: an old link falls back to the card
       ["/datasets/mai_lin/demo?tab=viewer", "card"],
       ["/datasets/mai_lin/demo", "card"],

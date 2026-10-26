@@ -57,7 +57,11 @@
       @cancel-auto-retry="repoInfoResource.cancelAutoRetry"
     />
 
-    <div v-else class="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
+    <div
+      v-else
+      class="grid grid-cols-1 gap-6"
+      :class="activeTab === 'metrics' ? '' : 'lg:grid-cols-[1fr_300px]'"
+    >
       <!-- Main Content -->
       <main class="min-w-0">
         <!-- Repo Header -->
@@ -283,6 +287,15 @@
             </div>
           </div>
         </div>
+
+        <!-- Metrics Tab -->
+        <MetricsPanel
+          v-if="activeTab === 'metrics'"
+          :repo-type="repoType"
+          :namespace="namespace"
+          :name="name"
+          :branch="currentBranch"
+        />
 
         <!-- Metadata Tab -->
         <div v-if="activeTab === 'metadata'">
@@ -715,7 +728,7 @@
       </main>
 
       <!-- Sidebar (Compact) -->
-      <aside class="space-y-4 lg:sticky lg:top-4 lg:self-start">
+      <aside v-if="activeTab !== 'metrics'" class="space-y-4 lg:sticky lg:top-4 lg:self-start">
         <!-- Relationships (Author + Base Model + Datasets from YAML) -->
         <SidebarRelationshipsCard
           :namespace="namespace"
@@ -969,6 +982,7 @@ import SidebarRelationshipsCard from "@/components/repo/metadata/SidebarRelation
 import ErrorState from "@/components/common/ErrorState.vue";
 import FilePreviewDialog from "@/components/repo/preview/FilePreviewDialog.vue";
 import TarBrowserDialog from "@/components/repo/preview/TarBrowserDialog.vue";
+import MetricsPanel from "@/components/repo/metrics/MetricsPanel.vue";
 import {
   buildResolveUrl,
   canPreviewFile,
@@ -1382,6 +1396,8 @@ function tabTarget(tab) {
       return `${page}/commits/${currentBranch.value}`;
     case "metadata":
       return `${page}?tab=metadata`;
+    case "metrics":
+      return `${page}?tab=metrics`;
     default:
       return page;
   }
@@ -1390,6 +1406,10 @@ function tabTarget(tab) {
 function navigateToTab(tab) {
   router.push(tabTarget(tab));
 }
+
+const hasMetricsLogs = computed(
+  () => repoInfo.value?.tags?.includes("tensorboard") || activeTab.value === "metrics",
+);
 
 const cardTabLabel = computed(
   () =>
@@ -1407,6 +1427,8 @@ const repoTabs = computed(() => [
       : "",
   },
   { key: "metadata", label: "Metadata" },
+  // like the Hub's TensorBoard tab: only where the repository says it holds event files
+  ...(hasMetricsLogs.value ? [{ key: "metrics", label: "Metrics" }] : []),
 ]);
 
 const tabClass = (active) => [
