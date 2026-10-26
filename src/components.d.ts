@@ -74,7 +74,6 @@ declare module 'vue' {
     RelationshipsCard: typeof import('./components/repo/metadata/RelationshipsCard.vue')['default']
     RepoDiscoveryCard: typeof import('./components/discovery/RepoDiscoveryCard.vue')['default']
     RepoFilterPanel: typeof import('./components/discovery/RepoFilterPanel.vue')['default']
-    RepoList: typeof import('./components/repo/RepoList.vue')['default']
     RepoListPage: typeof import('./components/pages/RepoListPage.vue')['default']
     RepositoryCard: typeof import('./components/repo/RepositoryCard.vue')['default']
     RepositoryPreviewColumn: typeof import('./components/home/RepositoryPreviewColumn.vue')['default']

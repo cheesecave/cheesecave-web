@@ -17,6 +17,7 @@ import {
   readDiscoveryQuery,
   discoveryParams,
   discoveryQuery,
+  toggleFacet,
 } from "@/utils/repo-discovery";
 
 // Owns request lifetime and URL state independently of the page layout.
@@ -74,17 +75,25 @@ export function useRepositoryDiscovery(type) {
     router.replace({ query: discoveryQuery(state.value, route.query) });
   }
   function toggleFilter({ key, value }) {
-    const values = selectedFilters.value[key] || [];
-    const next = {
-      ...selectedFilters.value,
-      [key]: values.includes(value)
-        ? values.filter((item) => item !== value)
-        : [...values, value].sort(),
-    };
-    if (!next[key].length) delete next[key];
-    selectedFilters.value = next;
+    selectedFilters.value = toggleFacet(selectedFilters.value, key, value);
     currentPage.value = 1;
     syncLocation();
+  }
+  // Where a page link or a filter chip leads, so it can be a real link
+  function pageTarget(page) {
+    return { query: discoveryQuery({ ...state.value, page }, route.query) };
+  }
+  function filterTarget(key, value) {
+    return {
+      query: discoveryQuery(
+        {
+          ...state.value,
+          selected: toggleFacet(selectedFilters.value, key, value),
+          page: 1,
+        },
+        route.query,
+      ),
+    };
   }
   function clearFilters() {
     selectedFilters.value = {};
@@ -104,10 +113,6 @@ export function useRepositoryDiscovery(type) {
       repoType: repoType.value,
       value: sortBy.value,
     });
-    syncLocation();
-  }
-  function changePage(page) {
-    currentPage.value = page;
     syncLocation();
   }
   watch(searchQuery, (value) => {
@@ -265,7 +270,8 @@ export function useRepositoryDiscovery(type) {
     clearFilters,
     resetSearch,
     changeSort,
-    changePage,
+    pageTarget,
+    filterTarget,
     loadRepos,
   };
 }
