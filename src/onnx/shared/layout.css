@@ -1,0 +1,1201 @@
+/* Shared Space layout contract: breakpoints use the form surface width, not
+   the browser viewport. The author canvas and visitor view render the same
+   saved column rules at the same content width. */
+:is(.cc-runtime-view, ._fc-m-drag) {
+  container-type: inline-size;
+  container-name: cc-space;
+  font-family: inherit;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-form-item__content {
+  min-width: 0;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-row > .el-col {
+  min-width: 0;
+}
+.cc-runtime-view > .el-form > .el-row,
+._fc-designer ._fc-m-drag ._fd-drag-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  row-gap: 12px;
+}
+.cc-runtime-view > .el-form > .el-row > .el-col,
+._fc-m-drag ._fd-draggable-drag > .cc-design-column {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+:is(.cc-runtime-view, ._fc-m-drag) :is(.cc-heading, .cc-text) {
+  width: 100%;
+  flex-basis: 100%;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .fc-form-row > .el-tabs {
+  width: 100%;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .cc-card > .el-card__body,
+.cc-runtime-view .el-tab-pane {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  row-gap: 12px;
+}
+/* Explicit grids occupy their container instead of shrinking to child text.
+   Keep one gutter layer on actual columns, with equal outer edge spacing. */
+.cc-runtime-view .el-row:not(.fc-form-row),
+._fc-m-drag ._fd-drag-tool > .el-row {
+  width: 100%;
+  flex: 0 0 100%;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+.cc-image-actions,
+.cc-status-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cc-image-actions .el-button + .el-button,
+.cc-status-actions .el-button + .el-button {
+  margin-left: 0;
+}
+.cc-ordinary-button {
+  max-width: 100%;
+}
+
+/* Design chrome is an overlay and contributes no content spacing. */
+._fc-designer ._fc-m-drag {
+  padding: 0;
+  overflow: auto;
+}
+._fc-designer ._fc-m-drag ._fd-draggable-drag._fd-drag-box {
+  padding: 0 0 100px;
+  overflow: visible;
+}
+._fc-m-drag ._fd-drag-box {
+  height: auto;
+  min-height: 0;
+}
+._fc-m-drag ._fd-drag-box.drag-holder {
+  min-height: 90px;
+}
+._fc-m-drag ._fd-drag-box > ._fd-drag-item {
+  margin: 0;
+}
+._fc-m-drag ._fd-drag-item.cc-design-block {
+  width: 100%;
+  flex: 0 0 100%;
+}
+._fc-m-drag ._fd-drag-tool {
+  display: flow-root;
+  padding: 0;
+  min-height: 0;
+  overflow: visible;
+  word-break: normal;
+}
+._fc-m-drag ._fd-drag-tool ._fd-drag-tool {
+  height: auto;
+  margin: 0;
+}
+._fc-m-drag ._fd-drag-tool + ._fd-drag-tool {
+  margin-top: 0;
+}
+._fc-m-drag ._fd-drag-item > ._fd-drag-tool > .el-col {
+  flex: 0 0 100% !important;
+  max-width: 100% !important;
+  width: 100%;
+  margin-left: 0 !important;
+  padding-left: 0;
+  padding-right: 0;
+}
+._fc-m-drag ._fd-drag-tool:not(.active) {
+  outline-color: transparent;
+}
+._fc-m-drag ._fd-drag-tool:not(.active):hover {
+  outline-color: var(--el-color-primary-light-5);
+}
+._fc-m-drag ._fd-drag-tool.active {
+  outline-color: var(--el-color-primary);
+}
+._fc-m-drag ._fd-drag-btn {
+  background: var(--el-color-primary);
+}
+
+/* Override Element Plus viewport classes only inside Space surfaces. */
+:is(.cc-runtime-view, ._fc-m-drag) .el-col {
+  --cc-col-span: 24;
+  --cc-col-offset: 0;
+  --cc-col-display: block;
+  display: var(--cc-col-display);
+  flex: 0 0 calc(var(--cc-col-span) / 24 * 100%);
+  max-width: calc(var(--cc-col-span) / 24 * 100%);
+  margin-left: calc(var(--cc-col-offset) / 24 * 100%);
+  min-width: 0;
+}
+
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-0 {
+  --cc-col-span: 0;
+  --cc-col-display: none;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-0 {
+  --cc-col-offset: 0;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-1 {
+  --cc-col-span: 1;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-1 {
+  --cc-col-offset: 1;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-2 {
+  --cc-col-span: 2;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-2 {
+  --cc-col-offset: 2;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-3 {
+  --cc-col-span: 3;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-3 {
+  --cc-col-offset: 3;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-4 {
+  --cc-col-span: 4;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-4 {
+  --cc-col-offset: 4;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-5 {
+  --cc-col-span: 5;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-5 {
+  --cc-col-offset: 5;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-6 {
+  --cc-col-span: 6;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-6 {
+  --cc-col-offset: 6;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-7 {
+  --cc-col-span: 7;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-7 {
+  --cc-col-offset: 7;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-8 {
+  --cc-col-span: 8;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-8 {
+  --cc-col-offset: 8;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-9 {
+  --cc-col-span: 9;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-9 {
+  --cc-col-offset: 9;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-10 {
+  --cc-col-span: 10;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-10 {
+  --cc-col-offset: 10;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-11 {
+  --cc-col-span: 11;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-11 {
+  --cc-col-offset: 11;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-12 {
+  --cc-col-span: 12;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-12 {
+  --cc-col-offset: 12;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-13 {
+  --cc-col-span: 13;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-13 {
+  --cc-col-offset: 13;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-14 {
+  --cc-col-span: 14;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-14 {
+  --cc-col-offset: 14;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-15 {
+  --cc-col-span: 15;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-15 {
+  --cc-col-offset: 15;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-16 {
+  --cc-col-span: 16;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-16 {
+  --cc-col-offset: 16;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-17 {
+  --cc-col-span: 17;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-17 {
+  --cc-col-offset: 17;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-18 {
+  --cc-col-span: 18;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-18 {
+  --cc-col-offset: 18;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-19 {
+  --cc-col-span: 19;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-19 {
+  --cc-col-offset: 19;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-20 {
+  --cc-col-span: 20;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-20 {
+  --cc-col-offset: 20;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-21 {
+  --cc-col-span: 21;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-21 {
+  --cc-col-offset: 21;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-22 {
+  --cc-col-span: 22;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-22 {
+  --cc-col-offset: 22;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-23 {
+  --cc-col-span: 23;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-23 {
+  --cc-col-offset: 23;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-24 {
+  --cc-col-span: 24;
+  --cc-col-display: block;
+}
+:is(.cc-runtime-view, ._fc-m-drag) .el-col-offset-24 {
+  --cc-col-offset: 24;
+}
+@container cc-space (width < 768px) {
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-0 {
+    --cc-col-span: 0;
+    --cc-col-display: none;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-0 {
+    --cc-col-offset: 0;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-1 {
+    --cc-col-span: 1;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-1 {
+    --cc-col-offset: 1;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-2 {
+    --cc-col-span: 2;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-2 {
+    --cc-col-offset: 2;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-3 {
+    --cc-col-span: 3;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-3 {
+    --cc-col-offset: 3;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-4 {
+    --cc-col-span: 4;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-4 {
+    --cc-col-offset: 4;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-5 {
+    --cc-col-span: 5;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-5 {
+    --cc-col-offset: 5;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-6 {
+    --cc-col-span: 6;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-6 {
+    --cc-col-offset: 6;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-7 {
+    --cc-col-span: 7;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-7 {
+    --cc-col-offset: 7;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-8 {
+    --cc-col-span: 8;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-8 {
+    --cc-col-offset: 8;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-9 {
+    --cc-col-span: 9;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-9 {
+    --cc-col-offset: 9;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-10 {
+    --cc-col-span: 10;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-10 {
+    --cc-col-offset: 10;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-11 {
+    --cc-col-span: 11;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-11 {
+    --cc-col-offset: 11;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-12 {
+    --cc-col-span: 12;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-12 {
+    --cc-col-offset: 12;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-13 {
+    --cc-col-span: 13;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-13 {
+    --cc-col-offset: 13;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-14 {
+    --cc-col-span: 14;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-14 {
+    --cc-col-offset: 14;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-15 {
+    --cc-col-span: 15;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-15 {
+    --cc-col-offset: 15;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-16 {
+    --cc-col-span: 16;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-16 {
+    --cc-col-offset: 16;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-17 {
+    --cc-col-span: 17;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-17 {
+    --cc-col-offset: 17;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-18 {
+    --cc-col-span: 18;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-18 {
+    --cc-col-offset: 18;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-19 {
+    --cc-col-span: 19;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-19 {
+    --cc-col-offset: 19;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-20 {
+    --cc-col-span: 20;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-20 {
+    --cc-col-offset: 20;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-21 {
+    --cc-col-span: 21;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-21 {
+    --cc-col-offset: 21;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-22 {
+    --cc-col-span: 22;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-22 {
+    --cc-col-offset: 22;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-23 {
+    --cc-col-span: 23;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-23 {
+    --cc-col-offset: 23;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-24 {
+    --cc-col-span: 24;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xs-offset-24 {
+    --cc-col-offset: 24;
+  }
+}
+@container cc-space (width >= 768px) {
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-0 {
+    --cc-col-span: 0;
+    --cc-col-display: none;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-0 {
+    --cc-col-offset: 0;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-1 {
+    --cc-col-span: 1;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-1 {
+    --cc-col-offset: 1;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-2 {
+    --cc-col-span: 2;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-2 {
+    --cc-col-offset: 2;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-3 {
+    --cc-col-span: 3;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-3 {
+    --cc-col-offset: 3;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-4 {
+    --cc-col-span: 4;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-4 {
+    --cc-col-offset: 4;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-5 {
+    --cc-col-span: 5;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-5 {
+    --cc-col-offset: 5;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-6 {
+    --cc-col-span: 6;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-6 {
+    --cc-col-offset: 6;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-7 {
+    --cc-col-span: 7;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-7 {
+    --cc-col-offset: 7;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-8 {
+    --cc-col-span: 8;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-8 {
+    --cc-col-offset: 8;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-9 {
+    --cc-col-span: 9;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-9 {
+    --cc-col-offset: 9;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-10 {
+    --cc-col-span: 10;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-10 {
+    --cc-col-offset: 10;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-11 {
+    --cc-col-span: 11;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-11 {
+    --cc-col-offset: 11;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-12 {
+    --cc-col-span: 12;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-12 {
+    --cc-col-offset: 12;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-13 {
+    --cc-col-span: 13;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-13 {
+    --cc-col-offset: 13;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-14 {
+    --cc-col-span: 14;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-14 {
+    --cc-col-offset: 14;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-15 {
+    --cc-col-span: 15;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-15 {
+    --cc-col-offset: 15;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-16 {
+    --cc-col-span: 16;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-16 {
+    --cc-col-offset: 16;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-17 {
+    --cc-col-span: 17;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-17 {
+    --cc-col-offset: 17;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-18 {
+    --cc-col-span: 18;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-18 {
+    --cc-col-offset: 18;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-19 {
+    --cc-col-span: 19;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-19 {
+    --cc-col-offset: 19;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-20 {
+    --cc-col-span: 20;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-20 {
+    --cc-col-offset: 20;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-21 {
+    --cc-col-span: 21;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-21 {
+    --cc-col-offset: 21;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-22 {
+    --cc-col-span: 22;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-22 {
+    --cc-col-offset: 22;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-23 {
+    --cc-col-span: 23;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-23 {
+    --cc-col-offset: 23;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-24 {
+    --cc-col-span: 24;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-sm-offset-24 {
+    --cc-col-offset: 24;
+  }
+}
+@container cc-space (width >= 992px) {
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-0 {
+    --cc-col-span: 0;
+    --cc-col-display: none;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-0 {
+    --cc-col-offset: 0;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-1 {
+    --cc-col-span: 1;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-1 {
+    --cc-col-offset: 1;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-2 {
+    --cc-col-span: 2;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-2 {
+    --cc-col-offset: 2;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-3 {
+    --cc-col-span: 3;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-3 {
+    --cc-col-offset: 3;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-4 {
+    --cc-col-span: 4;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-4 {
+    --cc-col-offset: 4;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-5 {
+    --cc-col-span: 5;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-5 {
+    --cc-col-offset: 5;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-6 {
+    --cc-col-span: 6;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-6 {
+    --cc-col-offset: 6;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-7 {
+    --cc-col-span: 7;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-7 {
+    --cc-col-offset: 7;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-8 {
+    --cc-col-span: 8;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-8 {
+    --cc-col-offset: 8;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-9 {
+    --cc-col-span: 9;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-9 {
+    --cc-col-offset: 9;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-10 {
+    --cc-col-span: 10;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-10 {
+    --cc-col-offset: 10;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-11 {
+    --cc-col-span: 11;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-11 {
+    --cc-col-offset: 11;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-12 {
+    --cc-col-span: 12;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-12 {
+    --cc-col-offset: 12;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-13 {
+    --cc-col-span: 13;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-13 {
+    --cc-col-offset: 13;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-14 {
+    --cc-col-span: 14;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-14 {
+    --cc-col-offset: 14;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-15 {
+    --cc-col-span: 15;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-15 {
+    --cc-col-offset: 15;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-16 {
+    --cc-col-span: 16;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-16 {
+    --cc-col-offset: 16;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-17 {
+    --cc-col-span: 17;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-17 {
+    --cc-col-offset: 17;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-18 {
+    --cc-col-span: 18;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-18 {
+    --cc-col-offset: 18;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-19 {
+    --cc-col-span: 19;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-19 {
+    --cc-col-offset: 19;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-20 {
+    --cc-col-span: 20;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-20 {
+    --cc-col-offset: 20;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-21 {
+    --cc-col-span: 21;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-21 {
+    --cc-col-offset: 21;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-22 {
+    --cc-col-span: 22;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-22 {
+    --cc-col-offset: 22;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-23 {
+    --cc-col-span: 23;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-23 {
+    --cc-col-offset: 23;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-24 {
+    --cc-col-span: 24;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-md-offset-24 {
+    --cc-col-offset: 24;
+  }
+}
+@container cc-space (width >= 1200px) {
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-0 {
+    --cc-col-span: 0;
+    --cc-col-display: none;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-0 {
+    --cc-col-offset: 0;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-1 {
+    --cc-col-span: 1;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-1 {
+    --cc-col-offset: 1;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-2 {
+    --cc-col-span: 2;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-2 {
+    --cc-col-offset: 2;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-3 {
+    --cc-col-span: 3;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-3 {
+    --cc-col-offset: 3;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-4 {
+    --cc-col-span: 4;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-4 {
+    --cc-col-offset: 4;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-5 {
+    --cc-col-span: 5;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-5 {
+    --cc-col-offset: 5;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-6 {
+    --cc-col-span: 6;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-6 {
+    --cc-col-offset: 6;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-7 {
+    --cc-col-span: 7;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-7 {
+    --cc-col-offset: 7;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-8 {
+    --cc-col-span: 8;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-8 {
+    --cc-col-offset: 8;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-9 {
+    --cc-col-span: 9;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-9 {
+    --cc-col-offset: 9;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-10 {
+    --cc-col-span: 10;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-10 {
+    --cc-col-offset: 10;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-11 {
+    --cc-col-span: 11;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-11 {
+    --cc-col-offset: 11;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-12 {
+    --cc-col-span: 12;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-12 {
+    --cc-col-offset: 12;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-13 {
+    --cc-col-span: 13;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-13 {
+    --cc-col-offset: 13;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-14 {
+    --cc-col-span: 14;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-14 {
+    --cc-col-offset: 14;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-15 {
+    --cc-col-span: 15;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-15 {
+    --cc-col-offset: 15;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-16 {
+    --cc-col-span: 16;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-16 {
+    --cc-col-offset: 16;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-17 {
+    --cc-col-span: 17;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-17 {
+    --cc-col-offset: 17;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-18 {
+    --cc-col-span: 18;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-18 {
+    --cc-col-offset: 18;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-19 {
+    --cc-col-span: 19;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-19 {
+    --cc-col-offset: 19;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-20 {
+    --cc-col-span: 20;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-20 {
+    --cc-col-offset: 20;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-21 {
+    --cc-col-span: 21;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-21 {
+    --cc-col-offset: 21;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-22 {
+    --cc-col-span: 22;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-22 {
+    --cc-col-offset: 22;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-23 {
+    --cc-col-span: 23;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-23 {
+    --cc-col-offset: 23;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-24 {
+    --cc-col-span: 24;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-lg-offset-24 {
+    --cc-col-offset: 24;
+  }
+}
+@container cc-space (width >= 1920px) {
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-0 {
+    --cc-col-span: 0;
+    --cc-col-display: none;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-0 {
+    --cc-col-offset: 0;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-1 {
+    --cc-col-span: 1;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-1 {
+    --cc-col-offset: 1;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-2 {
+    --cc-col-span: 2;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-2 {
+    --cc-col-offset: 2;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-3 {
+    --cc-col-span: 3;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-3 {
+    --cc-col-offset: 3;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-4 {
+    --cc-col-span: 4;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-4 {
+    --cc-col-offset: 4;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-5 {
+    --cc-col-span: 5;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-5 {
+    --cc-col-offset: 5;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-6 {
+    --cc-col-span: 6;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-6 {
+    --cc-col-offset: 6;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-7 {
+    --cc-col-span: 7;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-7 {
+    --cc-col-offset: 7;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-8 {
+    --cc-col-span: 8;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-8 {
+    --cc-col-offset: 8;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-9 {
+    --cc-col-span: 9;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-9 {
+    --cc-col-offset: 9;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-10 {
+    --cc-col-span: 10;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-10 {
+    --cc-col-offset: 10;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-11 {
+    --cc-col-span: 11;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-11 {
+    --cc-col-offset: 11;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-12 {
+    --cc-col-span: 12;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-12 {
+    --cc-col-offset: 12;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-13 {
+    --cc-col-span: 13;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-13 {
+    --cc-col-offset: 13;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-14 {
+    --cc-col-span: 14;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-14 {
+    --cc-col-offset: 14;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-15 {
+    --cc-col-span: 15;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-15 {
+    --cc-col-offset: 15;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-16 {
+    --cc-col-span: 16;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-16 {
+    --cc-col-offset: 16;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-17 {
+    --cc-col-span: 17;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-17 {
+    --cc-col-offset: 17;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-18 {
+    --cc-col-span: 18;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-18 {
+    --cc-col-offset: 18;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-19 {
+    --cc-col-span: 19;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-19 {
+    --cc-col-offset: 19;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-20 {
+    --cc-col-span: 20;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-20 {
+    --cc-col-offset: 20;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-21 {
+    --cc-col-span: 21;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-21 {
+    --cc-col-offset: 21;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-22 {
+    --cc-col-span: 22;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-22 {
+    --cc-col-offset: 22;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-23 {
+    --cc-col-span: 23;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-23 {
+    --cc-col-offset: 23;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-24 {
+    --cc-col-span: 24;
+    --cc-col-display: block;
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .el-col-xl-offset-24 {
+    --cc-col-offset: 24;
+  }
+}
+@container cc-space (width < 700px) {
+  :is(.cc-runtime-view, ._fc-m-drag) .cc-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  :is(.cc-runtime-view, ._fc-m-drag) .cc-card .el-card__body {
+    padding: 15px;
+  }
+}

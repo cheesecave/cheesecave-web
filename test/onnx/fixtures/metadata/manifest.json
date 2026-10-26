@@ -1,0 +1,49 @@
+{
+  "onnxVersion": "1.23.2",
+  "fixtures": {
+    "static": {
+      "bytes": 278,
+      "sha256": "27978d9a754d52d5a35d85476f12714c15dfc415f416eff1352096c56f0d96ec"
+    },
+    "dynamic": {
+      "bytes": 165,
+      "sha256": "f6ca10327feb8500d6ca05c920a43e737ff94789c7aad52f141b05a59d4c26bf"
+    },
+    "uint8": {
+      "bytes": 148,
+      "sha256": "aa1c545fe1f4c527f2bc910665fcf54b2efbb6fc241f0cb9a9bc88fe61ef4295"
+    },
+    "unknown-rank": {
+      "bytes": 112,
+      "sha256": "4c1aa66498bc68842f748aa96220fa2e77f9c91cb8e85a2db91c07abb0dddda7"
+    },
+    "scalar": {
+      "bytes": 116,
+      "sha256": "1c2c431be5b0ca8f90941b16072fd3e33eb2f1f83d6eb196cecca5a83f6fda33"
+    },
+    "sequence": {
+      "bytes": 148,
+      "sha256": "83eed1bf063a989d954bf98dfcbed9fd6ee55f094a9ac8fc7cd8be4bc5f5cc17"
+    },
+    "initializer-input": {
+      "bytes": 191,
+      "sha256": "d4cb8d20fb33a913b9cc91718950740059b667e995260f7d867d7e01d0c2d07a"
+    },
+    "external-initializer": {
+      "bytes": 204,
+      "sha256": "bf6b1e416bf38c2689651fe1344f8f1cecfdf1ab6c790e5f5f679f79e4848784"
+    },
+    "external-subgraph": {
+      "bytes": 471,
+      "sha256": "723b93ce2f6fe7b5a537897c20eb8e5ac5c77884f4bd036176753a1093b2dc2b"
+    },
+    "external-sparse": {
+      "bytes": 231,
+      "sha256": "d8254450d07b8707d8aab991697678add737881ff2bf07904b3f426619052d5a"
+    },
+    "external-function": {
+      "bytes": 281,
+      "sha256": "7a2726d74edbdaa25b14f5fe90b007112b8667bc6f577516b2fa4b91fa47aca9"
+    }
+  }
+}

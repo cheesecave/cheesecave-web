@@ -4,13 +4,16 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "pnpm prepare:space && vite",
     "prebuild": "node scripts/prebuild.cjs",
-    "build": "vite build",
+    "build": "pnpm prepare:space && vite build",
     "preview": "vite preview",
     "format": "prettier --write \"src/**/*.{js,vue,css,scss,json}\"",
-    "test": "vitest run --config vitest.config.js --coverage",
-    "test:watch": "vitest --config vitest.config.js"
+    "test": "pnpm build:vendor && vitest run --config vitest.config.js --coverage",
+    "test:watch": "pnpm build:vendor && vitest --config vitest.config.js",
+    "build:vendor": "node scripts/build-vendor.mjs",
+    "prepare:onnx": "node scripts/prepare-onnx-runtime.mjs",
+    "prepare:space": "pnpm build:vendor && pnpm prepare:onnx"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.19.0",
@@ -58,7 +61,10 @@
     "pinia": "^3.0.3",
     "vue": "^3.5.22",
     "vue-router": "^4.5.1",
-    "xz-decompress": "0.2.3"
+    "xz-decompress": "0.2.3",
+    "@form-create/designer": "workspace:*",
+    "@form-create/element-ui": "workspace:*",
+    "onnxruntime-web": "1.30.0"
   },
   "devDependencies": {
     "@iconify-json/carbon": "^1.2.13",
@@ -80,7 +86,8 @@
     "unplugin-vue-components": "^29.1.0",
     "unplugin-vue-router": "^0.15.0",
     "vite": "npm:rolldown-vite@7.1.14",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "@vitejs/plugin-vue-jsx": "5.1.1"
   },
   "packageManager": "pnpm@10.18.1",
   "engines": {

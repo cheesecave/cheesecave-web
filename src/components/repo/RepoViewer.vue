@@ -182,7 +182,14 @@
             <div class="w-0 h-0 p-0 m-0"></div>
             <LinkButton
               v-if="isOwner"
-              :to="`/${repoType}s/${namespace}/${name}/settings`"
+              :to="
+                repoType === 'space'
+                  ? {
+                      path: `/spaces/${namespace}/${name}/settings`,
+                      query: { revision: currentBranch },
+                    }
+                  : `/${repoType}s/${namespace}/${name}/settings`
+              "
               size="small"
               class="w-full sm:w-auto m-0 sm:m-1"
               plain
@@ -233,55 +240,64 @@
 
         <!-- Tab Content -->
         <div v-if="activeTab === 'card'" class="card overflow-hidden">
-          <div class="max-w-full overflow-x-auto">
-            <div v-if="readmeLoading" class="text-center py-12">
-              <el-icon class="is-loading" :size="40">
-                <div class="i-carbon-circle-dash" />
-              </el-icon>
-              <p class="mt-4 text-gray-500 dark:text-gray-400">
-                Loading README...
-              </p>
-            </div>
-            <div v-else-if="readmeContent">
-              <MarkdownViewer
-                :content="readmeContent"
-                :heading-offset="1"
-                :repo-type="repoType"
-                :namespace="namespace"
-                :name="name"
-                :branch="currentBranch"
-              />
-            </div>
-            <!--
+          <SpaceApp
+            :context="{ id: `${namespace}/${name}`, revision: currentBranch }"
+            :is-external="repoType !== 'space' || Boolean(isExternalRepo)"
+          >
+            <template #fallback>
+              <div class="max-w-full overflow-x-auto">
+                <div v-if="readmeLoading" class="text-center py-12">
+                  <el-icon class="is-loading" :size="40">
+                    <div class="i-carbon-circle-dash" />
+                  </el-icon>
+                  <p class="mt-4 text-gray-500 dark:text-gray-400">
+                    Loading README...
+                  </p>
+                </div>
+                <div v-else-if="readmeContent">
+                  <MarkdownViewer
+                    :content="readmeContent"
+                    :heading-offset="1"
+                    :repo-type="repoType"
+                    :namespace="namespace"
+                    :name="name"
+                    :branch="currentBranch"
+                  />
+                </div>
+                <!--
               When the README fetch itself errored (gated / unavailable /
               not-found on any fallback source), show the classified
               state instead of the "No README.md found" placeholder —
               the latter implied "the repo has no README", when actually
               we just couldn't read it.
             -->
-            <ErrorState
-              v-else-if="readmeError"
-              :error="readmeError"
-              :context="errorContext('README')"
-              mode="inline-panel"
-              :retry="loadReadme"
-            />
-            <div
-              v-else
-              class="text-center py-12 text-gray-500 dark:text-gray-400"
-            >
-              <div class="i-carbon-document-blank text-6xl mb-4 inline-block" />
-              <p>No README.md found</p>
-              <el-button
-                v-if="isOwner"
-                class="mt-4"
-                type="primary"
-                @click="createReadme"
-              >
-                Create README.md
-              </el-button>
-            </div>
-          </div>
+                <ErrorState
+                  v-else-if="readmeError"
+                  :error="readmeError"
+                  :context="errorContext('README')"
+                  mode="inline-panel"
+                  :retry="loadReadme"
+                />
+                <div
+                  v-else
+                  class="text-center py-12 text-gray-500 dark:text-gray-400"
+                >
+                  <div
+                    class="i-carbon-document-blank text-6xl mb-4 inline-block"
+                  />
+                  <p>No README.md found</p>
+                  <el-button
+                    v-if="isOwner"
+                    class="mt-4"
+                    type="primary"
+                    @click="createReadme"
+                  >
+                    Create README.md
+                  </el-button>
+                </div>
+              </div>
+            </template>
+          </SpaceApp>
         </div>
 
         <!-- Metadata Tab -->
@@ -953,9 +969,11 @@ import { decodeError, hubFetch, notifyError, KIND } from "@/errors";
 import { useErrorContext } from "@/composables/useErrorContext";
 import { useAsyncResource } from "@/composables/useAsyncResource";
 import { resolveRepoTreeEntryPath } from "@/utils/repo-paths";
+import { onnxAppLocation } from "@/utils/onnx-space";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import MetadataHeader from "@/components/repo/metadata/MetadataHeader.vue";
 import LinkButton from "@/components/common/LinkButton.vue";
+import SpaceApp from "@/components/space/SpaceApp.vue";
 import ModelInfoCard from "@/components/repo/metadata/ModelInfoCard.vue";
 import {
   mergeDisplayMetadata,
@@ -1372,8 +1390,20 @@ function chunkPaths(paths, size) {
   return chunks;
 }
 
-// Where each tab lives. Plain strings, so the tabs can be real links.
+// Route destinations keep each tab a real link, including the viewed Space revision.
 function tabTarget(tab) {
+  if (props.repoType === "space") {
+    const app = onnxAppLocation({
+      id: `${props.namespace}/${props.name}`,
+      revision: currentBranch.value,
+    });
+    const branch = encodeURIComponent(currentBranch.value);
+    if (tab === "files") return `${app.path}/tree/${branch}`;
+    if (tab === "commits") return `${app.path}/commits/${branch}`;
+    if (tab === "metadata")
+      return { ...app, query: { ...app.query, tab: "metadata" } };
+    return app;
+  }
   const page = `/${props.repoType}s/${props.namespace}/${props.name}`;
   switch (tab) {
     case "files":

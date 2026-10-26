@@ -1,7 +1,8 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@10.18.1 --activate
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY vendor-src ./vendor-src
 RUN pnpm install --frozen-lockfile
 COPY . .
 ARG VITE_GIT_COMMIT
@@ -15,4 +16,5 @@ COPY nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY LICENSE LICENSING.md NOTICE.md /usr/share/doc/cheesecave-web/
 COPY provenance /usr/share/doc/cheesecave-web/provenance
+COPY --from=build /app/public/onnx/licenses /usr/share/doc/cheesecave-web/onnx-space
 EXPOSE 80

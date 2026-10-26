@@ -1,0 +1,40 @@
+{
+  "preset": "image-inference-v1",
+  "version": 1,
+  "model": {
+    "id": "face_detect_v1.4_n",
+    "label": "Anime Face Detection v1.4 · Nano",
+    "url": "/models/model.onnx",
+    "bytes": 12102558,
+    "sha256": "fd860b650a4377046842c3cd80d01b0b408bdfbdb4acee5759630f82c6ef04a9"
+  },
+  "sample": {
+    "id": "mostima",
+    "label": "官方示例 · 三人动漫图片",
+    "url": "/assets/sample.jpg"
+  },
+  "pipeline": {
+    "version": 1,
+    "input": {
+      "name": "images",
+      "width": 640,
+      "height": 640,
+      "layout": "NCHW",
+      "color": "RGB",
+      "resize": "stretch",
+      "interpolation": "pillow-bicubic",
+      "scale": 0.00392156862745098,
+      "mean": [0, 0, 0],
+      "std": [1, 1, 1]
+    },
+    "output": {
+      "name": "output0",
+      "kind": "yolo-detection",
+      "layout": "BCN",
+      "labels": ["face"],
+      "activation": "none",
+      "topK": 1
+    }
+  },
+  "params": { "threshold": 0.278, "backend": "auto", "iou": 0.7, "repeats": 1 }
+}

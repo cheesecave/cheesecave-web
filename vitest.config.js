@@ -75,6 +75,9 @@ export default defineConfig({
       // `\\[` escapes the brackets of file-route names, which are glob classes otherwise
       include: [
         "src/App.vue",
+        "src/onnx/**/*.{js,vue}",
+        "src/components/space/*.vue",
+        "src/utils/onnx-space*.js",
         "src/stores/auth.js",
         "src/stores/theme.js",
         "src/stores/markdownStyle.js",

@@ -1,0 +1,10 @@
+{
+  "name": "form-create-cheesecave-source",
+  "private": true,
+  "version": "0.0.0",
+  "description": "CheeseCave source fork: Vue 3 and Element Plus only",
+  "license": "MIT",
+  "scripts": {
+    "build": "node ../../scripts/build-vendor.mjs"
+  }
+}

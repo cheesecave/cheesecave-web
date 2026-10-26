@@ -6,8 +6,11 @@
   >
     <SessionBanner class="shrink-0" />
     <TheHeader class="shrink-0" :expanded="authStore.isAuthenticated" />
-    <PageScrollArea>
-      <main class="site-main flex-1 min-w-0">
+    <PageScrollArea :fit="isOnnxEditor">
+      <main
+        class="site-main flex-1 min-w-0"
+        :class="{ 'site-main-workbench': isOnnxEditor }"
+      >
         <RouterView v-slot="{ Component, route }">
           <RouteBoundary :route-key="route.path">
             <keep-alive :include="['RepoViewer']">
@@ -16,7 +19,7 @@
           </RouteBoundary>
         </RouterView>
       </main>
-      <TheFooter v-if="!isWorkspaceHome" />
+      <TheFooter v-if="!isWorkspaceHome && !isOnnxEditor" />
     </PageScrollArea>
   </div>
 </template>
@@ -35,6 +38,9 @@ const route = useRoute();
 const authStore = useAuthStore();
 const isWorkspaceHome = computed(
   () => authStore.isAuthenticated && route.path === "/",
+);
+const isOnnxEditor = computed(() =>
+  /^\/spaces\/[^/]+\/[^/]+\/onnx-editor\//.test(route.path),
 );
 
 // Theme is applied early via inline script in index.html to prevent flash
@@ -60,6 +66,13 @@ function getRouteKey(route) {
 .site-main {
   min-height: calc(100vh - var(--site-header-height));
   min-height: calc(100dvh - var(--site-header-height));
+}
+.site-main-workbench {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 @media (max-width: 767px) {
   .app-shell {

@@ -1,0 +1,6 @@
+packages:
+  - vendor-src/form-create/packages/element-ui
+  - vendor-src/form-create-designer/packages/element-ui
+onlyBuiltDependencies:
+  - '@tailwindcss/oxide'
+  - esbuild

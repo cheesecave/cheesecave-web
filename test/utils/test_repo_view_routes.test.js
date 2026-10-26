@@ -92,6 +92,28 @@ describe("repository view route normalization", () => {
     lifecycle.mounts = 0;
   });
 
+  it("reads the Space App and Metadata revision from the shared root route", async () => {
+    const { wrapper, navigate } = await mountRouter(
+      "/spaces/mai_lin/demo?revision=feature%2Fv2",
+    );
+    expect(JSON.parse(wrapper.get("output").text())).toMatchObject({
+      repoType: "space",
+      branch: "feature/v2",
+      tab: "card",
+    });
+    await navigate("/spaces/mai_lin/demo?revision=feature%2Fv2&tab=metadata");
+    expect(JSON.parse(wrapper.get("output").text())).toMatchObject({
+      branch: "feature/v2",
+      tab: "metadata",
+    });
+    await navigate("/spaces/mai_lin/demo/tree/feature%2Fv2");
+    expect(JSON.parse(wrapper.get("output").text())).toMatchObject({
+      branch: "feature/v2",
+      tab: "files",
+    });
+    wrapper.unmount();
+  });
+
   it("retains the repository instance and header across tab route records", async () => {
     const { wrapper, navigate } = await mountRouter("/datasets/mai_lin/demo");
     const header = wrapper.get("header").element;

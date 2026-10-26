@@ -1,6 +1,7 @@
 <template>
   <ElScrollbar
     class="page-scroll-area"
+    :class="{ 'page-scroll-fit': fit }"
     wrap-class="page-scroll-wrap"
     view-class="page-scroll-content"
     :tabindex="0"
@@ -14,6 +15,7 @@
 
 <script setup>
 import { ElScrollbar } from "element-plus";
+defineProps({ fit: Boolean });
 </script>
 
 <style scoped>
@@ -28,5 +30,15 @@ import { ElScrollbar } from "element-plus";
   display: flex;
   flex-direction: column;
   min-height: 100%;
+}
+.page-scroll-fit :deep(.page-scroll-wrap) {
+  overflow: hidden;
+}
+.page-scroll-fit :deep(.page-scroll-content) {
+  height: 100%;
+  min-height: 0;
+}
+.page-scroll-fit :deep(.el-scrollbar__bar) {
+  display: none;
 }
 </style>

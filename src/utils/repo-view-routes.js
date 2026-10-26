@@ -32,7 +32,11 @@ export function createRepoViewRoutes(routes) {
       repoType: resolvedRoute.params.type,
       namespace: resolvedRoute.params.namespace,
       name: resolvedRoute.params.name,
-      branch: resolvedRoute.params.branch || "main",
+      branch:
+        resolvedRoute.params.branch ||
+        (typeof resolvedRoute.query.revision === "string"
+          ? resolvedRoute.query.revision
+          : "main"),
       currentPath: normalizeCatchAllParam(resolvedRoute.params.path),
       tab:
         tab === "card" && ROOT_TABS.has(resolvedRoute.query.tab)

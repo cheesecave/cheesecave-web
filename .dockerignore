@@ -5,3 +5,8 @@ coverage
 .env
 .env.*
 *.log
+vendor-src/**/node_modules
+vendor-src/**/dist
+vendor-src/build-report.json
+public/onnx/vendor
+public/onnx/licenses

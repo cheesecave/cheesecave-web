@@ -1,0 +1,31 @@
+.cc-onnx-space {
+  --cc-page-bg: var(--site-bg);
+  --cc-surface: var(--site-card);
+  --cc-surface-soft: var(--site-hover);
+  --cc-surface-muted: var(--site-bg);
+  --cc-border: var(--site-border);
+  --cc-border-strong: var(--el-border-color-dark);
+  --cc-text-strong: var(--site-card-text);
+  --cc-text-secondary: var(--site-text);
+  --cc-text-muted: var(--site-muted);
+  --cc-text-subtle: var(--site-muted);
+  color: var(--site-text);
+  font-family: inherit;
+  min-width: 0;
+}
+.cc-onnx-space.cc-studio {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+.cc-onnx-space .cc-preview-link {
+  color: var(--el-color-primary);
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+.cc-onnx-space .cc-preview-link:hover {
+  text-decoration: underline;
+}
