@@ -151,6 +151,50 @@ describe("RepoViewer loading on a big repository", () => {
     expect(info.expand).not.toContain("siblings");
   });
 
+  it("keeps the Space revision across App, Metadata, Files and Commits links", async () => {
+    server.use(
+      http.get("/api/spaces/open-media-lab/big-repo", () =>
+        jsonResponse({ id: "open-media-lab/big-repo", private: false }),
+      ),
+      http.get(/\/api\/spaces\/open-media-lab\/big-repo\/tree\//, () =>
+        jsonResponse([]),
+      ),
+    );
+    const wrapper = mountViewer("files", {
+      repoType: "space",
+      branch: "feature/v2",
+    });
+    try {
+      await vi.waitFor(() =>
+        expect(
+          wrapper.find('nav[aria-label="Repository sections"]').exists(),
+        ).toBe(true),
+      );
+      const targets = Object.fromEntries(
+        wrapper
+          .get('nav[aria-label="Repository sections"]')
+          .findAllComponents(RouterLinkStub)
+          .map((link) => [link.text(), link.props("to")]),
+      );
+      expect(targets.App).toEqual({
+        path: "/spaces/open-media-lab/big-repo",
+        query: { revision: "feature/v2" },
+      });
+      expect(targets.Metadata).toEqual({
+        path: "/spaces/open-media-lab/big-repo",
+        query: { revision: "feature/v2", tab: "metadata" },
+      });
+      expect(targets.Files).toBe(
+        "/spaces/open-media-lab/big-repo/tree/feature%2Fv2",
+      );
+      expect(targets.Commits).toBe(
+        "/spaces/open-media-lab/big-repo/commits/feature%2Fv2",
+      );
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
   it("starts the file list without waiting for repo info", async () => {
     infoGate = deferred();
     const wrapper = mountViewer("files");
@@ -280,7 +324,9 @@ describe("RepoViewer loading on a big repository", () => {
     await wrapper.setProps({ tab: "card", currentPath: "" });
     await vi.waitFor(() =>
       expect(
-        seen.filter((request) => request.what === "tree" && request.path === ""),
+        seen.filter(
+          (request) => request.what === "tree" && request.path === "",
+        ),
       ).toHaveLength(1),
     );
     await vi.waitFor(() =>

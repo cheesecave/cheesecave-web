@@ -1,0 +1,307 @@
+{
+  "schemaVersion": 1,
+  "name": "我的旧版动漫工具",
+  "task": {
+    "preset": "anime-face-v1",
+    "version": 1,
+    "model": "face_detect_v1.4_n",
+    "sample": "mostima",
+    "params": {
+      "threshold": 0.8,
+      "backend": "wasm",
+      "iou": 0.7,
+      "repeats": 10
+    }
+  },
+  "bindings": {
+    "image": "image",
+    "threshold": "threshold",
+    "backend": "backend",
+    "result": "result_mvnyqkjx_1"
+  },
+  "ui": {
+    "options": {
+      "form": {
+        "labelPosition": "top",
+        "labelWidth": "120px",
+        "size": "default"
+      },
+      "submitBtn": false,
+      "resetBtn": false
+    },
+    "rules": [
+      {
+        "type": "ccDetectionResult",
+        "field": "result_mvnyqkjx_1",
+        "props": {
+          "title": "新绑定的检测结果",
+          "showScores": true
+        },
+        "display": true,
+        "hidden": false
+      },
+      {
+        "type": "ccHeading",
+        "props": {
+          "text": "发现画面中的每一张脸",
+          "level": 2
+        },
+        "display": true,
+        "hidden": false
+      },
+      {
+        "type": "ccText",
+        "props": {
+          "text": "选择图片，调整置信度，然后开始检测。"
+        },
+        "display": true,
+        "hidden": false
+      },
+      {
+        "type": "ccImageInput",
+        "field": "image",
+        "props": {
+          "title": "输入图片",
+          "description": "选择或拖入图片，也可以使用示例",
+          "showSample": true
+        },
+        "display": true,
+        "hidden": false
+      },
+      {
+        "type": "slider",
+        "field": "threshold",
+        "title": "置信度阈值",
+        "value": 0.8,
+        "col": {
+          "xs": 24,
+          "md": 14
+        },
+        "props": {
+          "min": 0.01,
+          "max": 1,
+          "step": 0.001,
+          "showInput": true
+        },
+        "display": true,
+        "hidden": false
+      },
+      {
+        "type": "ccCard",
+        "props": {
+          "title": "作者的操作区域"
+        },
+        "children": [
+          {
+            "type": "ccActionButton",
+            "props": {
+              "actionId": "run",
+              "label": "识别我的图片",
+              "type": "primary"
+            },
+            "col": {
+              "xs": 24,
+              "sm": 6
+            },
+            "wrap": {
+              "show": false
+            },
+            "display": true,
+            "hidden": false
+          },
+          {
+            "type": "ccActionButton",
+            "props": {
+              "actionId": "benchmark",
+              "label": "连续测量 10 次",
+              "type": "default"
+            },
+            "col": {
+              "xs": 24,
+              "sm": 6
+            },
+            "wrap": {
+              "show": false
+            },
+            "display": true,
+            "hidden": false
+          },
+          {
+            "type": "ccActionButton",
+            "props": {
+              "actionId": "reset",
+              "label": "重置图片",
+              "type": "default"
+            },
+            "col": {
+              "xs": 24,
+              "sm": 4
+            },
+            "wrap": {
+              "show": false
+            },
+            "display": true,
+            "hidden": false
+          },
+          {
+            "type": "ccActionButton",
+            "props": {
+              "actionId": "release",
+              "label": "释放会话",
+              "type": "default"
+            },
+            "col": {
+              "xs": 24,
+              "sm": 4
+            },
+            "wrap": {
+              "show": false
+            },
+            "display": true,
+            "hidden": false
+          },
+          {
+            "type": "ccActionButton",
+            "props": {
+              "actionId": "export",
+              "label": "导出测量",
+              "type": "default"
+            },
+            "col": {
+              "xs": 24,
+              "sm": 4
+            },
+            "wrap": {
+              "show": false
+            },
+            "display": true,
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "type": "select",
+        "field": "backend",
+        "title": "执行后端",
+        "value": "wasm",
+        "col": {
+          "xs": 24,
+          "md": 10
+        },
+        "options": [
+          {
+            "label": "自动选择",
+            "value": "auto"
+          },
+          {
+            "label": "WebGPU",
+            "value": "webgpu"
+          },
+          {
+            "label": "WASM · CPU",
+            "value": "wasm"
+          }
+        ],
+        "display": true,
+        "hidden": false
+      },
+      {
+        "type": "ccDetectionResult",
+        "field": "detections",
+        "props": {
+          "title": "检测结果",
+          "showScores": true
+        },
+        "display": true,
+        "hidden": false
+      },
+      {
+        "type": "ccInferenceStatus",
+        "props": {
+          "title": "运行与测量",
+          "showDetails": true,
+          "showHistory": true
+        },
+        "display": true,
+        "hidden": false
+      },
+      {
+        "type": "row",
+        "props": {
+          "gutter": 20
+        },
+        "children": [
+          {
+            "type": "col",
+            "props": {
+              "span": 12,
+              "xs": 24,
+              "md": 12
+            },
+            "display": true,
+            "hidden": false
+          },
+          {
+            "type": "col",
+            "props": {
+              "span": 12,
+              "xs": 24,
+              "md": 12
+            },
+            "display": true,
+            "hidden": false
+          }
+        ],
+        "display": true,
+        "hidden": false
+      },
+      {
+        "type": "ccCard",
+        "props": {
+          "title": "卡片"
+        },
+        "display": true,
+        "hidden": false
+      },
+      {
+        "type": "elTabs",
+        "props": {
+          "type": "border-card"
+        },
+        "children": [
+          {
+            "type": "elTabPane",
+            "props": {
+              "label": "选项卡",
+              "name": "tab_mvnyqp1g_1"
+            },
+            "display": true,
+            "hidden": false
+          },
+          {
+            "type": "elTabPane",
+            "props": {
+              "label": "选项卡",
+              "name": "tab_mvnyqp1g_2"
+            },
+            "display": true,
+            "hidden": false
+          }
+        ],
+        "display": true,
+        "hidden": false
+      },
+      {
+        "type": "input",
+        "field": "input_mvnyqp52_3",
+        "title": "文本输入",
+        "value": "",
+        "props": {
+          "placeholder": "请输入"
+        },
+        "display": true,
+        "hidden": false
+      }
+    ]
+  }
+}

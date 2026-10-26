@@ -3,7 +3,7 @@
 // `/organizations/:x/settings`) leave one of them dead: the router picks one, and a change to the other does
 // nothing and nobody notices.
 
-import { readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -45,6 +45,17 @@ describe("routeShape", () => {
 });
 
 describe("src/pages", () => {
+  it("does not nest the ONNX editor under a page without a RouterView outlet", () => {
+    const files = pageFiles(PAGES).map((file) => file.replaceAll("\\", "/"));
+    const editor = files.find((file) => file.includes("/onnx-editor/"));
+    expect(editor).toBeDefined();
+    const parts = editor.split("/");
+    for (let index = 1; index < parts.length; index++) {
+      const parent = join(PAGES, `${parts.slice(0, index).join("/")}.vue`);
+      if (existsSync(parent))
+        expect(readFileSync(parent, "utf8")).toMatch(/<router-?view/i);
+    }
+  });
   it("has no two page files for one route", () => {
     const byShape = new Map();
     for (const file of pageFiles(PAGES)) {

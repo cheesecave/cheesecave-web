@@ -35,7 +35,11 @@
       </el-breadcrumb-item>
       <el-breadcrumb-item>
         <RouterLink
-          :to="`/${repoType}s/${route.params.namespace}/${route.params.name}`"
+          :to="
+            repoType === 'space'
+              ? onnxAppLocation(onnxContext)
+              : `/${repoType}s/${route.params.namespace}/${route.params.name}`
+          "
           class="text-blue-600 dark:text-blue-400 hover:underline"
         >
           {{ route.params.name }}
@@ -59,6 +63,11 @@
           :retry="loadRepoInfo"
         />
         <div v-else class="max-w-2xl space-y-6">
+          <OnnxSpaceSettings
+            v-if="repoType === 'space' && infoReady"
+            :context="onnxContext"
+            :is-external="isExternalRepo"
+          />
           <!-- Visibility -->
           <div class="card">
             <h2 class="text-xl font-semibold mb-4">Visibility</h2>
@@ -611,6 +620,8 @@
 </template>
 
 <script setup>
+import OnnxSpaceSettings from "@/components/space/OnnxSpaceSettings.vue";
+import { onnxAppLocation } from "@/utils/onnx-space";
 import { useRoute, useRouter } from "vue-router";
 import { repoAPI, settingsAPI, validationAPI, quotaAPI } from "@/utils/api";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -659,6 +670,7 @@ const squashEnabled = ref(false);
 const errorContext = useErrorContext();
 const infoError = ref(null);
 const infoReady = ref(false);
+const isExternalRepo = ref(false);
 const quotaError = ref(null);
 const lfsError = ref(null);
 
@@ -669,6 +681,11 @@ function failure(err) {
 
 const repoId = computed(() => `${route.params.namespace}/${route.params.name}`);
 const repoType = computed(() => route.params.type);
+const onnxContext = computed(() => ({
+  id: repoId.value,
+  revision:
+    typeof route.query?.revision === "string" ? route.query.revision : "main",
+}));
 
 const maxQuotaBytes = computed(() => {
   if (!quotaInfo.value) return 0;
@@ -698,6 +715,7 @@ async function loadRepoInfo() {
       ["private"],
     );
     settings.value.private = data.private || false;
+    isExternalRepo.value = Boolean(data._source && data._source !== "local");
     moveToRepo.value = repoId.value;
     infoReady.value = true;
   } catch (err) {

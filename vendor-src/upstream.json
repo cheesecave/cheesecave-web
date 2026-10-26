@@ -1,0 +1,18 @@
+{
+  "renderer": {
+    "repository": "https://github.com/xaboy/form-create",
+    "tag": "v3.3.5",
+    "commit": "0b431bc0cbe9dd7a4760ae94e4f64fd71a315946",
+    "localBranch": "cheesecave/element-plus-only",
+    "license": "MIT",
+    "retained": ["packages/element-ui", "packages/core", "packages/utils", "components/element-ui", "components/common/subform"]
+  },
+  "designer": {
+    "repository": "https://github.com/xaboy/form-create-designer",
+    "tag": "v3.5.0",
+    "commit": "02485bc95ab8c86e9b9613101709d22d480dc598",
+    "localBranch": "cheesecave/element-plus-only",
+    "license": "MIT",
+    "retained": ["packages/element-ui"]
+  }
+}

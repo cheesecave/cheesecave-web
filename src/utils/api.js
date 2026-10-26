@@ -1,7 +1,19 @@
 // src/kohaku-hub-ui/src/utils/api.js
 import axios from "axios";
 import { formatAuthHeader, getExternalTokens } from "./externalTokens";
-import { KIND, decodeError, decodeResponse, emitAuthRequired } from "@/errors";
+import {
+  AppError,
+  KIND,
+  decodeError,
+  decodeResponse,
+  emitAuthRequired,
+  hubFetch,
+} from "@/errors";
+import {
+  onnxContext,
+  onnxResourceUrl,
+  requireOnnxResourceUrl,
+} from "./onnx-space-paths.js";
 
 const api = axios.create({
   timeout: 30000,
@@ -92,6 +104,88 @@ export const workspaceAPI = {
 };
 
 export default api;
+
+export const onnxSpaceAPI = {
+  async getHead(context, { signal } = {}) {
+    const { encodedId, encodedRevision } = onnxContext(context);
+    const { data } = await api.get(
+      `/api/spaces/${encodedId}/revision/${encodedRevision}`,
+      {
+        signal,
+        params: { expand: ["sha"], fallback: false },
+        paramsSerializer: { indexes: null },
+      },
+    );
+    return data.sha;
+  },
+  async readResource(url, { signal } = {}) {
+    requireOnnxResourceUrl(url);
+    const token = localStorage.getItem("hf_token");
+    try {
+      // Cross-origin S3 redirects drop Hub credentials in the browser. A
+      // same-origin storage proxy must strip them before forwarding to S3.
+      return await hubFetch(`${url}?fallback=false`, {
+        signal,
+        cache: "no-store",
+        credentials: "same-origin",
+        mode: "cors",
+        redirect: "follow",
+        headers: token ? { Authorization: formatAuthHeader(token) } : {},
+      });
+    } catch (error) {
+      if (error.kind === KIND.AUTH_REQUIRED) emitAuthRequired(error);
+      throw error;
+    }
+  },
+  async listFiles(context, { signal } = {}) {
+    const { encodedId, encodedRevision } = onnxContext(context);
+    const path = `/api/spaces/${encodedId}/tree/${encodedRevision}/`;
+    const files = [],
+      seen = new Set();
+    let cursor;
+    for (let page = 0; page < MAX_LIST_PAGES; page++) {
+      const response = await api.get(path, {
+        signal,
+        params: {
+          recursive: true,
+          expand: false,
+          limit: 1000,
+          fallback: false,
+          ...(cursor ? { cursor } : {}),
+        },
+      });
+      if (!Array.isArray(response.data))
+        throw new AppError({
+          kind: KIND.UNEXPECTED,
+          serverMessage: "仓库文件列表格式无效",
+        });
+      for (const entry of response.data) {
+        if (entry.type === "file" && typeof entry.path === "string")
+          files.push({ ...entry, url: onnxResourceUrl(context, entry.path) });
+      }
+      const link = getNextLinkFromHeader(response.headers?.link);
+      if (!link) return files;
+      const next = new URL(link, window.location.origin);
+      cursor = next.searchParams.get("cursor");
+      // Rebuild the URL on this origin: deployments may advertise another
+      // public host, but no pagination response can redirect our credentials.
+      if (
+        next.pathname.replace(/\/$/, "") !== path.replace(/\/$/, "") ||
+        !cursor ||
+        seen.has(cursor)
+      )
+        throw new AppError({
+          kind: KIND.UNEXPECTED,
+          serverMessage: "仓库分页地址无效",
+        });
+      seen.add(cursor);
+    }
+    throw new AppError({
+      kind: KIND.TOO_LARGE,
+      serverMessage: "仓库文件列表超过读取上限",
+    });
+  },
+};
 
 // RFC 8288: `<url>; rel="next"`, possibly with other relations and parameters
 function getNextLinkFromHeader(linkHeader) {
@@ -614,6 +708,7 @@ export const repoAPI = {
                 legacyOnProgress(fileProgress);
               }
             },
+            type,
           );
 
           // Add lfsFile operation to NDJSON
@@ -703,6 +798,9 @@ export const repoAPI = {
       value: {
         summary: data.message,
         description: data.description || "",
+        ...(data.parentCommit != null
+          ? { parentCommit: data.parentCommit }
+          : {}),
       },
     });
 
@@ -1284,5 +1382,8 @@ export const preferencesAPI = {
   get: (username) =>
     api.get(`/api/users/${encodeURIComponent(username)}/preferences`),
   update: (username, preferences) =>
-    api.put(`/api/users/${encodeURIComponent(username)}/preferences`, preferences),
+    api.put(
+      `/api/users/${encodeURIComponent(username)}/preferences`,
+      preferences,
+    ),
 };

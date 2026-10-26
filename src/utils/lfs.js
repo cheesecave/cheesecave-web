@@ -303,6 +303,7 @@ async function uploadPartsInParallel(parts, partUrls, concurrency, onProgress) {
  * @param {string} sha256 - Pre-calculated SHA256 hash
  * @param {Object} lfsObject - LFS batch response object with multipart info
  * @param {Function} onProgress - Progress callback
+ * @param {"model"|"dataset"|"space"} repoType - Repository that owns the upload
  * @returns {Promise<Object>} - { oid: string, size: number }
  */
 async function uploadLFSFileMultipart(
@@ -402,12 +403,22 @@ async function uploadLFSFileMultipart(
  * @param {Function} onProgress - Progress callback
  * @returns {Promise<Object>} - { oid: string, size: number }
  */
-export async function uploadLFSFile(repoId, file, sha256, onProgress) {
+export async function uploadLFSFile(
+  repoId,
+  file,
+  sha256,
+  onProgress,
+  repoType = "model",
+) {
+  if (!["model", "dataset", "space"].includes(repoType))
+    throw new Error("Invalid repository type");
   const size = file.size;
+  const repoPath = repoId.split("/").map(encodeURIComponent).join("/");
+  const prefix = repoType === "model" ? "" : `${repoType}s/`;
 
   // Call LFS batch API to get upload URL
   const batchResponse = await api.post(
-    `/${repoId}.git/info/lfs/objects/batch`,
+    `/${prefix}${repoPath}.git/info/lfs/objects/batch`,
     {
       operation: "upload",
       transfers: ["basic"],

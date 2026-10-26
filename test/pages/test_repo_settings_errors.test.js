@@ -7,6 +7,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ElementPlusStubs, RouterLinkStub } from "../helpers/vue";
 
 const mocks = vi.hoisted(() => ({
+  route: {
+    params: { type: "model", namespace: "acme", name: "demo" },
+    query: {},
+  },
   notify: vi.fn(),
   push: vi.fn(),
   msg: { warning: vi.fn(), success: vi.fn(), error: vi.fn() },
@@ -29,9 +33,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("vue-router", () => ({
-  useRoute: () => ({
-    params: { type: "model", namespace: "acme", name: "demo" },
-  }),
+  useRoute: () => mocks.route,
   useRouter: () => ({ push: mocks.push }),
 }));
 vi.mock("@/stores/auth", () => ({
@@ -81,6 +83,7 @@ const mountPage = async () => {
         ElTable: true,
         ElTableColumn: true,
         RouterLink: RouterLinkStub,
+        OnnxSpaceSettings: true,
       },
     },
   });
@@ -91,6 +94,8 @@ const title = (w) => w.get('[data-testid="error-title"]').text();
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.route.params.type = "model";
+  mocks.route.query = {};
   vi.spyOn(console, "error").mockImplementation(() => {});
   vi.spyOn(console, "warn").mockImplementation(() => {});
   mocks.repoAPI.getInfo.mockResolvedValue({ data: { private: true } });
@@ -104,6 +109,25 @@ beforeEach(() => {
 });
 
 describe("repo settings load failures", () => {
+  it("returns from Space settings to the same App revision", async () => {
+    mocks.route.params.type = "space";
+    mocks.route.query = { revision: "feature/v2" };
+    const wrapper = await mountPage();
+    try {
+      const repositoryLink = wrapper
+        .findAllComponents(RouterLinkStub)
+        .find((link) => link.text() === "demo");
+      expect(repositoryLink.props("to")).toEqual({
+        path: "/spaces/acme/demo",
+        query: { revision: "feature/v2" },
+      });
+      expect(
+        wrapper.findComponent({ name: "OnnxSpaceSettings" }).props("context"),
+      ).toEqual({ id: "acme/demo", revision: "feature/v2" });
+    } finally {
+      wrapper.unmount();
+    }
+  });
   it("shows why the repository did not load, saves nothing, and recovers on retry", async () => {
     mocks.repoAPI.getInfo.mockRejectedValueOnce(down(503));
     const wrapper = await mountPage();

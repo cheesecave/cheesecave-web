@@ -72,6 +72,24 @@ import { useAuthStore } from "@/stores/auth";
 
 describe("App shell", () => {
   beforeEach(() => setActivePinia(createPinia()));
+  it("fits the ONNX editor into the shell without hiding the header or using the page footer", async () => {
+    routeState.value = { path: "/spaces/alice/demo/onnx-editor/draft" };
+    const wrapper = mount(App, {
+      global: { components: { RouterView: RouterViewStub } },
+    });
+    expect(wrapper.find('[data-header="true"]').exists()).toBe(true);
+    expect(wrapper.find('[data-footer="true"]').exists()).toBe(false);
+    expect(wrapper.get(".site-main").classes()).toContain(
+      "site-main-workbench",
+    );
+    expect(wrapper.get(".page-scroll-area").classes()).toContain(
+      "page-scroll-fit",
+    );
+    routeState.value = { path: "/spaces/alice/demo" };
+    await nextTick();
+    expect(wrapper.find('[data-footer="true"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
   it("renders the layout and reuses repo views for the same repository", async () => {
     mountCounts.repoViewer = 0;
     routeState.value = {

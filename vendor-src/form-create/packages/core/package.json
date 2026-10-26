@@ -1,0 +1,46 @@
+{
+  "name": "@form-create/core",
+  "version": "3.3.5",
+  "description": "FormCreate 低代码表单渲染引擎，可以通过 JSON 生成具有动态渲染、数据收集、验证和提交功能的低代码表单。",
+  "main": "./dist/index.min.js",
+  "module": "./dist/index.esm.js",
+  "typings": "./types/index.d.ts",
+  "scripts": {
+    "build": "node ../../../../scripts/build-vendor.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xaboy/form-create.git"
+  },
+  "keywords": [
+    "动态表单",
+    "@form-create",
+    "form-builder",
+    "form",
+    "components",
+    "vue3",
+    "json-form",
+    "dynamic-form"
+  ],
+  "files": [
+    "README.md",
+    "package.json",
+    "LICENSE",
+    "src",
+    "types",
+    "dist"
+  ],
+  "author": "xaboy",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/xaboy/form-create/issues"
+  },
+  "homepage": "http://www.form-create.com/v3/",
+  "peerDependencies": {
+    "vue": "^3.5.12"
+  },
+  "dependencies": {
+    "@form-create/utils": "workspace:^"
+  },
+  "private": true
+}

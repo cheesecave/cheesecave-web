@@ -78,6 +78,12 @@ function repositoryTitle(type, parts) {
   const id = `${decode(parts[1])}/${decode(parts[2])}`;
   if (parts.length === 3) return { title: id, section: SECTIONS[type] };
   const view = parts.slice(3).join("/");
+  const editor = type === "spaces" && /^onnx-editor\/([^/]+)$/.exec(view);
+  if (editor)
+    return {
+      title: `Edit ONNX demo · ${id} at ${decode(editor[1])}`,
+      site: false,
+    };
   for (const [pattern, title] of REPO_VIEWS) {
     const match = pattern.exec(view);
     if (match) return { title: title(match, id), site: false };

@@ -84,6 +84,10 @@ describe("the title of each page", () => {
       "Commit 0123456 · demo/gamma-t5",
     ],
     ["/spaces/demo/s/settings", "Settings · demo/s"],
+    [
+      "/spaces/demo/s/onnx-editor/feature%2Fv2",
+      "Edit ONNX demo · demo/s at feature/v2",
+    ],
     ["/models/demo/gamma-t5/upload/main", "Upload files · demo/gamma-t5"],
   ])(
     "inside a repository, %s, is %j: it names the repository and not the site",
@@ -111,6 +115,7 @@ describe("the title of each page", () => {
     "/x/y/z",
     "/models/demo/gamma-t5/nothing",
     "/models/demo/gamma-t5/commit",
+    "/models/demo/gamma-t5/onnx-editor/main",
     "/invite/a/b",
     "/organizations/acme/nothing",
     "/organizations/a/b/c",

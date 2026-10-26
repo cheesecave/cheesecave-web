@@ -71,6 +71,7 @@ export default defineConfig({
   ],
 
   resolve: {
+    dedupe: ["vue", "element-plus"],
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
@@ -97,6 +98,8 @@ export default defineConfig({
       // UI library
       "element-plus",
       "element-plus/es",
+      "@form-create/element-ui",
+      "@form-create/designer",
 
       // HTTP / time
       "axios",
@@ -254,6 +257,10 @@ export default defineConfig({
         },
       },
       // Proxy Git LFS endpoints
+      "^/(models|datasets|spaces)/[^/]+/[^/]+\\.git/info/lfs/": {
+        target: process.env.VITE_BACKEND_URL || "http://localhost:48888",
+        changeOrigin: true,
+      },
       // This catches: /{namespace}/{name}.git/info/lfs/*
       "^/[^/]+/[^/]+\\.git/info/lfs/": {
         target: process.env.VITE_BACKEND_URL || "http://localhost:48888",

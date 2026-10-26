@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ElementPlusStubs } from "../helpers/vue";
+import { ElementPlusStubs, RouterLinkStub } from "../helpers/vue";
 import { CreationFormStub } from "../helpers/creation-form";
 
 const mocks = vi.hoisted(() => ({
@@ -10,6 +10,15 @@ const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   success: vi.fn(),
   error: vi.fn(),
+  loadOnnx: vi.fn(),
+  saveOnnx: vi.fn(),
+}));
+vi.mock("@/utils/onnx-space", () => ({
+  loadOnnxSpace: mocks.loadOnnx,
+  saveOnnxSpace: mocks.saveOnnx,
+  onnxEditorLocation: ({ id, revision }) => ({
+    path: `/spaces/${id}/onnx-editor/${revision}`,
+  }),
 }));
 vi.mock("@/utils/api", () => ({
   repoAPI: { create: mocks.create },
@@ -38,12 +47,26 @@ describe("shared repository creation form", () => {
     useAuthStore().user = { username: "alice" };
     mocks.getUserOrgs.mockResolvedValue({ data: { organizations: [] } });
     mocks.create.mockResolvedValue({ data: {} });
+    mocks.loadOnnx.mockResolvedValue({
+      config: { version: 1, enabled: false, document: null },
+      commit: "created-head",
+    });
+    mocks.saveOnnx.mockResolvedValue({
+      config: { version: 1, enabled: true, document: null },
+      commit: "enabled-head",
+    });
   });
   afterEach(() => wrappers.splice(0).forEach((wrapper) => wrapper.unmount()));
   function mountForm(props = {}) {
     const wrapper = mount(CreateRepositoryForm, {
       props,
-      global: { stubs: { ...ElementPlusStubs, ElForm: CreationFormStub } },
+      global: {
+        stubs: {
+          ...ElementPlusStubs,
+          ElForm: CreationFormStub,
+          RouterLink: RouterLinkStub,
+        },
+      },
     });
     wrappers.push(wrapper);
     return wrapper;
@@ -147,7 +170,9 @@ describe("shared repository creation form", () => {
     await flushPromises();
     expect(mocks.error).toHaveBeenCalledWith(
       expect.objectContaining({
-        message: expect.stringContaining("Failed to create space: Quota exceeded"),
+        message: expect.stringContaining(
+          "Failed to create space: Quota exceeded",
+        ),
       }),
     );
     expect(
@@ -160,7 +185,8 @@ describe("shared repository creation form", () => {
   });
 
   describe("the SDK of a Space", () => {
-    const sdkSelect = (wrapper) => wrapper.find('select[aria-label="Select SDK"]');
+    const sdkSelect = (wrapper) =>
+      wrapper.find('select[aria-label="Select SDK"]');
 
     it("asks for an SDK, Gradio unless chosen otherwise, only when creating a Space", async () => {
       const space = mountForm({ fixedType: "space" });
@@ -170,7 +196,11 @@ describe("shared repository creation form", () => {
 
       expect(sdkSelect(space).exists()).toBe(true);
       expect(sdkSelect(space).element.value).toBe("gradio");
-      expect(sdkSelect(space).findAll("option").map((o) => [o.element.value, o.text()])).toEqual([
+      expect(
+        sdkSelect(space)
+          .findAll("option")
+          .map((o) => [o.element.value, o.text()]),
+      ).toEqual([
         ["gradio", "Gradio"],
         ["streamlit", "Streamlit"],
         ["docker", "Docker"],
@@ -183,18 +213,32 @@ describe("shared repository creation form", () => {
     it("sends the chosen SDK, so the Space starts with the card that names it", async () => {
       const wrapper = mountForm({ fixedType: "space" });
       await flushPromises();
-      await wrapper.get('input[placeholder="my-space"], input[placeholder="my-awesome-space"]').setValue("demo");
+      await wrapper
+        .get(
+          'input[placeholder="my-space"], input[placeholder="my-awesome-space"]',
+        )
+        .setValue("demo");
       await sdkSelect(wrapper).setValue("static");
       await button(wrapper, "Create Space").trigger("click");
       await flushPromises();
 
-      expect(mocks.create).toHaveBeenCalledWith({ type: "space", name: "demo", organization: null, private: false, sdk: "static" });
+      expect(mocks.create).toHaveBeenCalledWith({
+        type: "space",
+        name: "demo",
+        organization: null,
+        private: false,
+        sdk: "static",
+      });
     });
 
     it("sends Gradio when the choice was not touched", async () => {
       const wrapper = mountForm({ fixedType: "space" });
       await flushPromises();
-      await wrapper.get('input[placeholder="my-space"], input[placeholder="my-awesome-space"]').setValue("demo");
+      await wrapper
+        .get(
+          'input[placeholder="my-space"], input[placeholder="my-awesome-space"]',
+        )
+        .setValue("demo");
       await button(wrapper, "Create Space").trigger("click");
       await flushPromises();
 
@@ -206,12 +250,21 @@ describe("shared repository creation form", () => {
       await flushPromises();
       await sdkSelect(wrapper).setValue("docker");
       await wrapper.setProps({ initialType: "model" });
-      await wrapper.get('input[placeholder="my-model"], input[placeholder="my-awesome-model"]').setValue("m");
+      await wrapper
+        .get(
+          'input[placeholder="my-model"], input[placeholder="my-awesome-model"]',
+        )
+        .setValue("m");
       await button(wrapper, "Create Model").trigger("click");
       await flushPromises();
 
       expect(sdkSelect(wrapper).exists()).toBe(false);
-      expect(mocks.create).toHaveBeenCalledWith({ type: "model", name: "m", organization: null, private: false });
+      expect(mocks.create).toHaveBeenCalledWith({
+        type: "model",
+        name: "m",
+        organization: null,
+        private: false,
+      });
     });
 
     it("goes back to Gradio when the form is cancelled", async () => {
@@ -222,6 +275,72 @@ describe("shared repository creation form", () => {
 
       expect(sdkSelect(wrapper).element.value).toBe("gradio");
     });
+  });
+
+  it("enables ONNX as an additional capability without changing the chosen SDK", async () => {
+    const wrapper = mountForm({ fixedType: "space" });
+    await flushPromises();
+    await wrapper
+      .get('input[placeholder="my-awesome-space"]')
+      .setValue("browser-demo");
+    await wrapper.get('select[aria-label="Select SDK"]').setValue("docker");
+    await wrapper
+      .get('[data-testid="create-onnx-enabled"] input')
+      .setValue(true);
+    await button(wrapper, "Create Space").trigger("click");
+    await flushPromises();
+    expect(mocks.create).toHaveBeenCalledExactlyOnceWith({
+      type: "space",
+      name: "browser-demo",
+      organization: null,
+      private: false,
+      sdk: "docker",
+    });
+    expect(mocks.saveOnnx).toHaveBeenCalledWith(
+      { id: "alice/browser-demo", revision: "main" },
+      { version: 1, enabled: true, document: null },
+      expect.objectContaining({ parentCommit: "created-head" }),
+    );
+    expect(mocks.push).toHaveBeenCalledWith({
+      path: "/spaces/alice/browser-demo/onnx-editor/main",
+    });
+  });
+
+  it("keeps the created Space and retries only enabling ONNX after the second stage fails", async () => {
+    mocks.saveOnnx.mockRejectedValueOnce(new Error("enable failed"));
+    const wrapper = mountForm({ fixedType: "space" });
+    await flushPromises();
+    await wrapper
+      .get('input[placeholder="my-awesome-space"]')
+      .setValue("existing-now");
+    await wrapper
+      .get('[data-testid="create-onnx-enabled"] input')
+      .setValue(true);
+    await button(wrapper, "Create Space").trigger("click");
+    await flushPromises();
+    expect(wrapper.text()).toContain("Space created");
+    expect(wrapper.text()).toContain("alice/existing-now");
+    expect(mocks.push).not.toHaveBeenCalled();
+    await wrapper.get('[data-testid="retry-enable-onnx"]').trigger("click");
+    await flushPromises();
+    expect(mocks.create).toHaveBeenCalledTimes(1);
+    expect(mocks.saveOnnx).toHaveBeenCalledTimes(2);
+    expect(mocks.push).toHaveBeenCalledWith({
+      path: "/spaces/alice/existing-now/onnx-editor/main",
+    });
+  });
+
+  it("does not create an ONNX manifest for an ordinary Space", async () => {
+    const wrapper = mountForm({ fixedType: "space" });
+    await flushPromises();
+    await wrapper
+      .get('input[placeholder="my-awesome-space"]')
+      .setValue("ordinary");
+    await button(wrapper, "Create Space").trigger("click");
+    await flushPromises();
+    expect(mocks.loadOnnx).not.toHaveBeenCalled();
+    expect(mocks.saveOnnx).not.toHaveBeenCalled();
+    expect(mocks.push).toHaveBeenCalledWith("/spaces/alice/ordinary");
   });
 
   it("clears account drafts and ignores late organization and creation responses", async () => {

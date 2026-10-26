@@ -1,0 +1,63 @@
+{
+  "name": "@form-create/designer",
+  "version": "3.5.0",
+  "description": "好用的Vue低代码可视化表单设计器，可以通过拖拽的方式快速创建表单，提高开发者对表单的开发效率。",
+  "typings": "./types/index.d.ts",
+  "main": "./dist/index.es.js",
+  "module": "./dist/index.es.js",
+  "scripts": {
+    "build": "node ../../../../scripts/build-vendor.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xaboy/form-create-designer.git"
+  },
+  "keywords": [
+    "AI",
+    "可视化表单设计器",
+    "form-create",
+    "form-builder",
+    "form-designer",
+    "draggable",
+    "form",
+    "components",
+    "vue",
+    "element-plus",
+    "json-form",
+    "dynamic-form"
+  ],
+  "files": [
+    "README.md",
+    "package.json",
+    "LICENSE",
+    "src",
+    "types",
+    "dist",
+    "locale"
+  ],
+  "author": "xaboy",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/xaboy/form-create-designer/issues"
+  },
+  "homepage": "https://form-create.com",
+  "peerDependencies": {
+    "vue": "3.5.22",
+    "element-plus": "2.11.4"
+  },
+  "dependencies": {
+    "@form-create/element-ui": "workspace:*",
+    "codemirror": "6.65.7",
+    "js-beautify": "1.15.1",
+    "marked": "17.0.0",
+    "signature_pad": "5.0.10",
+    "sortablejs": "1.14.0",
+    "vuedraggable": "4.1.0"
+  },
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.es.js",
+    "./dist/components.es": "./dist/components.es.js"
+  }
+}

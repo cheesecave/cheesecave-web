@@ -1,0 +1,40 @@
+{
+  "name": "@form-create/component-elm-upload",
+  "version": "3.3.0",
+  "description": "@form-create/element-ui 内置组件",
+  "main": "./dist/index.min.js",
+  "module": "./dist/index.esm.js",
+  "scripts": {
+    "build": "node ../../../../../scripts/build-vendor.mjs"
+  },
+  "files": [
+    "README.md",
+    "package.json",
+    "LICENSE",
+    "src",
+    "dist"
+  ],
+  "keywords": [
+    "@form-create",
+    "form-create-component",
+    "element-ui",
+    "element-plus"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xaboy/form-create.git"
+  },
+  "author": "xaboy",
+  "license": "MIT",
+  "dependencies": {
+    "@form-create/utils": "workspace:^"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.12"
+  },
+  "bugs": {
+    "url": "https://github.com/xaboy/form-create/issues"
+  },
+  "homepage": "http://www.form-create.com",
+  "private": true
+}

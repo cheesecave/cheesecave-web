@@ -1,0 +1,29 @@
+{
+  "name": "@form-create/utils",
+  "version": "3.3.0",
+  "description": "FormCreate 工具函数库",
+  "main": "./lib/index.js",
+  "files": [
+    "README.md",
+    "package.json",
+    "LICENSE",
+    "lib"
+  ],
+  "keywords": [
+    "@form-create"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xaboy/form-create.git"
+  },
+  "author": "xaboy",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/xaboy/form-create/issues"
+  },
+  "homepage": "http://www.form-create.com",
+  "private": true,
+  "scripts": {
+    "build": "node ../../../../scripts/build-vendor.mjs"
+  }
+}

@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Generated from checked-in source forks and the pinned ONNX Runtime package
+/vendor-src/build-report.json
+/public/onnx/vendor/
+/public/onnx/licenses/
+
 # Generated/copied documentation files
 public/documentation
 public/CONTRIBUTING.md
