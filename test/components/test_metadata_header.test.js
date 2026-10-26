@@ -20,6 +20,11 @@ const links = (wrapper) =>
     .map((a) => [a.text(), JSON.parse(a.attributes("href"))]);
 const link = (wrapper, text) =>
   links(wrapper).find(([label]) => label === text)?.[1];
+// the count of a group ("+3 more", then "Show less") is a button
+const more = (wrapper, text) =>
+  wrapper.findAll("button").find((button) => button.text() === text);
+const metadataLink = (wrapper) =>
+  wrapper.findAll("button").find((b) => b.text().startsWith("All metadata"));
 
 const groups = splitTags(
   [
@@ -130,7 +135,7 @@ describe("the header of a model", () => {
     expect(chips(wrapper)).toEqual(["Transformers", "PyTorch", "bert"]);
   });
 
-  it("shows the first free tags and says how many more there are", async () => {
+  it("shows the first free tags and says how many more there are", () => {
     const tags = Array.from({ length: 9 }, (_, n) => `tag${n}`);
     const wrapper = mountHeader({
       repoType: "model",
@@ -139,12 +144,7 @@ describe("the header of a model", () => {
     });
 
     expect(chips(wrapper).filter((t) => t.startsWith("tag"))).toHaveLength(6);
-    const more = wrapper
-      .findAll("[data-el-tag='true']")
-      .find((t) => t.text() === "+3 more");
-    expect(more.exists()).toBe(true);
-    await more.trigger("click");
-    expect(wrapper.emitted("navigate-to-metadata")).toHaveLength(1);
+    expect(more(wrapper, "+3 more").exists()).toBe(true);
   });
 
   it("says nothing of more tags when they all fit", () => {
@@ -259,5 +259,208 @@ describe("the header of a dataset", () => {
     );
     expect(shown.some((t) => /10K/.test(t))).toBe(true);
     expect(wrapper.find("a[href^='https://arxiv.org']").exists()).toBe(false);
+  });
+});
+
+describe("unfolding what a count stands for", () => {
+  const manyTags = Array.from({ length: 9 }, (_, n) => `tag${n}`);
+  const papers = Array.from({ length: 4 }, (_, n) => `arxiv:2401.0000${n + 1}`);
+  const modelProps = {
+    repoType: "model",
+    metadata: { language: ["en", "fr", "de", "it", "es"] },
+    ...splitTags([...manyTags, ...papers]),
+  };
+
+  it("unfolds the languages after their count, which turns into Show less, and folds them back", async () => {
+    const wrapper = mountHeader({
+      repoType: "model",
+      metadata: { language: ["en", "fr", "de", "it", "es"] },
+    });
+    expect(chips(wrapper)).toEqual(["English", "French", "German", "+2 more"]);
+    expect(more(wrapper, "+2 more").attributes("type")).toBe("button");
+    expect(more(wrapper, "+2 more").attributes("aria-expanded")).toBe("false");
+
+    await more(wrapper, "+2 more").trigger("click");
+    // the button stays where the count was and the rest follows it
+    expect(chips(wrapper)).toEqual([
+      "English",
+      "French",
+      "German",
+      "Show less",
+      "Italian",
+      "Spanish",
+    ]);
+    expect(more(wrapper, "Show less").attributes("aria-expanded")).toBe("true");
+    expect(link(wrapper, "Italian")).toEqual({
+      path: "/models",
+      query: { language: "it" },
+    });
+
+    await more(wrapper, "Show less").trigger("click");
+    expect(chips(wrapper)).toEqual(["English", "French", "German", "+2 more"]);
+  });
+
+  it("does not leave for the Metadata tab on a click on a count any more", async () => {
+    const wrapper = mountHeader(modelProps);
+    await more(wrapper, "+2 more").trigger("click");
+    expect(wrapper.emitted("navigate-to-metadata")).toBeUndefined();
+  });
+
+  it("unfolds the free tags after their count and leads the rest to the discovery page too", async () => {
+    const wrapper = mountHeader({
+      repoType: "model",
+      metadata: {},
+      ...splitTags(manyTags),
+    });
+    await more(wrapper, "+3 more").trigger("click");
+
+    expect(chips(wrapper)).toEqual([
+      "tag0",
+      "tag1",
+      "tag2",
+      "tag3",
+      "tag4",
+      "tag5",
+      "Show less",
+      "tag6",
+      "tag7",
+      "tag8",
+    ]);
+    expect(link(wrapper, "tag8")).toEqual({
+      path: "/models",
+      query: { tag: "tag8" },
+    });
+    await more(wrapper, "Show less").trigger("click");
+    expect(chips(wrapper)).toHaveLength(7);
+  });
+
+  it("unfolds the tasks of a dataset after their count", async () => {
+    const wrapper = mountHeader({
+      repoType: "dataset",
+      metadata: {
+        task_categories: ["a", "b", "c", "d", "e"],
+      },
+    });
+    expect(chips(wrapper)).toEqual(["a", "b", "+3 more"]);
+
+    await more(wrapper, "+3 more").trigger("click");
+    expect(chips(wrapper)).toEqual(["a", "b", "Show less", "c", "d", "e"]);
+    const rest = wrapper
+      .findAll("[data-el-tag='true']")
+      .filter((tag) => ["c", "d", "e"].includes(tag.text()));
+    for (const tag of rest) {
+      expect(tag.attributes("data-type")).toBe("success");
+      expect(tag.find(".i-carbon-checkbox-checked").exists()).toBe(true);
+    }
+
+    await more(wrapper, "Show less").trigger("click");
+    expect(chips(wrapper)).toEqual(["a", "b", "+3 more"]);
+  });
+
+  it("counts the papers after the second and unfolds the rest, away from the site and safely", async () => {
+    const wrapper = mountHeader({
+      repoType: "model",
+      metadata: {},
+      ...splitTags(papers),
+    });
+    expect(chips(wrapper)).toEqual([
+      "arXiv:2401.00001",
+      "arXiv:2401.00002",
+      "+2 more",
+    ]);
+
+    await more(wrapper, "+2 more").trigger("click");
+    expect(chips(wrapper)).toEqual([
+      "arXiv:2401.00001",
+      "arXiv:2401.00002",
+      "Show less",
+      "arXiv:2401.00003",
+      "arXiv:2401.00004",
+    ]);
+    const rest = wrapper.find("a[href='https://arxiv.org/abs/2401.00004']");
+    expect(rest.exists()).toBe(true);
+    expect(rest.attributes("target")).toBe("_blank");
+    expect(rest.attributes("rel")).toBe("noopener noreferrer");
+
+    await more(wrapper, "Show less").trigger("click");
+    expect(chips(wrapper)).toHaveLength(3);
+  });
+
+  it("has no count for two papers or fewer", () => {
+    const wrapper = mountHeader({
+      repoType: "model",
+      metadata: {},
+      ...splitTags(papers.slice(0, 2)),
+    });
+    expect(chips(wrapper)).toEqual(["arXiv:2401.00001", "arXiv:2401.00002"]);
+  });
+
+  it("unfolds each group on its own", async () => {
+    const wrapper = mountHeader(modelProps);
+    await more(wrapper, "+2 more").trigger("click"); // the languages
+
+    expect(chips(wrapper)).toEqual(expect.arrayContaining(["Italian"]));
+    expect(chips(wrapper)).not.toContain("tag6");
+    expect(chips(wrapper)).not.toContain("arXiv:2401.00003");
+    // the tags and the papers still have their own counts
+    expect(more(wrapper, "+3 more")).toBeDefined();
+    expect(more(wrapper, "+2 more")).toBeDefined();
+
+    await more(wrapper, "+3 more").trigger("click"); // the tags
+    expect(chips(wrapper)).toContain("tag6");
+    expect(chips(wrapper)).toContain("Italian");
+  });
+
+  it("holds an open header to a scrolling box, and only an open one", async () => {
+    const wrapper = mountHeader(modelProps);
+    const box = () => wrapper.get(".metadata-header > div");
+    expect(box().classes()).not.toContain("metadata-header-open");
+
+    await more(wrapper, "+2 more").trigger("click");
+    expect(box().classes()).toContain("metadata-header-open");
+
+    await more(wrapper, "Show less").trigger("click");
+    expect(box().classes()).not.toContain("metadata-header-open");
+  });
+
+  it("offers the way to the Metadata tab while anything is open, and only then", async () => {
+    const wrapper = mountHeader(modelProps);
+    expect(metadataLink(wrapper)).toBeUndefined();
+
+    await more(wrapper, "+2 more").trigger("click");
+    await more(wrapper, "+3 more").trigger("click");
+    expect(metadataLink(wrapper).attributes("type")).toBe("button");
+
+    // one group folded, one still open: the link stays
+    await more(wrapper, "Show less").trigger("click");
+    expect(metadataLink(wrapper)).toBeDefined();
+
+    await more(wrapper, "Show less").trigger("click");
+    expect(metadataLink(wrapper)).toBeUndefined();
+  });
+
+  it("takes the way to the Metadata tab that a count used to take", async () => {
+    const wrapper = mountHeader(modelProps);
+    await more(wrapper, "+2 more").trigger("click");
+
+    await metadataLink(wrapper).trigger("click");
+    expect(wrapper.emitted("navigate-to-metadata")).toHaveLength(1);
+  });
+
+  it("counts tasks for a dataset only: a model or a Space has none to show", () => {
+    const metadata = { task_categories: ["a", "b", "c"] };
+    for (const repoType of ["model", "space"]) {
+      const shown = chips(mountHeader({ repoType, metadata }));
+      expect(shown.some((text) => text.includes("more"))).toBe(false);
+    }
+  });
+
+  it("shows the free tags of a model only", () => {
+    const wrapper = mountHeader({
+      repoType: "dataset",
+      metadata: {},
+      ...splitTags(manyTags),
+    });
+    expect(chips(wrapper)).toEqual([]);
   });
 });

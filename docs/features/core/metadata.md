@@ -93,10 +93,16 @@ source_datasets:               # Source
 - Languages (up to 3, then "+N more")
 - Framework (models)
 - Pipeline tag (models)
+- Free tags (models; up to 6, then "+N more")
+- Papers (models; up to 2, then "+N more")
 - Size (datasets - prominent red badge)
-- Task categories (up to 2, then "+N more")
+- Task categories (datasets; up to 2, then "+N more")
 
-**Clicking "+N more"** → Navigates to Metadata tab
+**Clicking "+N more"** → Unfolds the rest of that group right there, after the button, which now reads "Show less" and folds it back. The groups unfold on their own. An open header is held to a scrolling box, so a repository with thousands of languages stays usable. While anything is open, an "All metadata →" link under the box goes to the Metadata tab.
+
+### Repository Cards
+
+A repository card on a profile, an organization or the home page shows up to 3 chips (task, library or SDK, license, then free tags), each a link to the discovery page filtered by it. When there are more, a "+N" button opens a popover with the rest: it closes on a click outside or on Escape, holds a long list in a scrolling box, and is not kept in the page while closed. A click on the button does not open the repository; a click anywhere else on the card does.
 
 ### Metadata Tab (Full Grid)
 
@@ -220,7 +226,7 @@ Contains 5M images...
 **MetadataHeader:**
 - Horizontal badges above tabs
 - Shows only most important fields
-- Clickable "+N more" badges
+- "+N more" buttons that unfold the rest of a group, and "Show less" to fold it back
 
 **DetailedMetadataPanel:**
 - Grid of individual cards
