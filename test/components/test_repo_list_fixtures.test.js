@@ -40,10 +40,15 @@ describe("RepoList captured backend fixtures", () => {
     expect(wrapper.text()).toContain(String(repoStats.downloads));
     expect(wrapper.text()).toContain(String(repoStats.likes));
 
-    await wrapper.get(".card").trigger("click");
-    expect(pushMock).toHaveBeenCalledWith(
+    // the name is the one link and stretches over the card: no click handler
+    const link = wrapper.get(".card h3 a");
+    expect(link.attributes("href")).toBe(
       "/models/mai_lin/lineart-caption-base",
     );
+    expect(link.classes()).toContain("stretched-link");
+    expect(wrapper.get(".card").classes()).toContain("relative");
+    await wrapper.get(".card").trigger("click");
+    expect(pushMock).not.toHaveBeenCalled();
   });
 
   it("renders captured dataset and space overview entries from the backend", () => {

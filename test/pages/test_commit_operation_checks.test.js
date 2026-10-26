@@ -391,8 +391,9 @@ describe("commit page media diff", () => {
     const wrapper = mountPage();
     await flushPromises();
 
+    // links styled as buttons, so they open in a new tab
     const buttons = wrapper
-      .findAll("button")
+      .findAll("a")
       .filter((button) => button.text().includes("View File"));
     expect(buttons).toHaveLength(3);
     for (const button of buttons)

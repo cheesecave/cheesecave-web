@@ -61,3 +61,7 @@ pnpm build      # production build
 - Handle backend errors through the shared error model in `src/errors/`, not ad hoc strings.
 - Keep user-visible text in English unless the surrounding component already uses another language.
 - Prefer existing UnoCSS utilities and the design tokens in `src/styles/` over new CSS files.
+- A control that goes to a page of its own is a real link, so right-click, middle-click and
+  Ctrl/Cmd-click work: a `RouterLink`, a `LinkButton` when it should look like a button, or the
+  `.stretched-link` pattern for a card (see `ProfileRepoCard`). A control that does something else,
+  or whose meaning is relative to where you came from (Cancel, Back, Logout), stays a button.

@@ -122,13 +122,18 @@
               <div
                 v-for="org in userOrgs"
                 :key="org.name"
-                class="flex items-center justify-between p-3 border rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                @click="goToOrganization(org.name)"
+                class="relative flex items-center justify-between p-3 border rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <div class="flex items-center gap-3">
                   <div class="i-carbon-group text-2xl text-gray-500" />
                   <div>
-                    <div class="font-medium">{{ org.name }}</div>
+                    <div class="font-medium">
+                      <RouterLink
+                        :to="`/organizations/${org.name}`"
+                        class="stretched-link !text-inherit"
+                        >{{ org.name }}</RouterLink
+                      >
+                    </div>
                     <div class="text-sm text-gray-600">
                       {{ org.roleInOrg || org.role }}
                     </div>
@@ -338,7 +343,6 @@ import { storeToRefs } from "pinia";
 import { useAuthStore } from "@/stores/auth";
 import MarkdownStylePicker from "@/components/settings/MarkdownStylePicker.vue";
 import ChangePasswordForm from "@/components/settings/ChangePasswordForm.vue";
-import { useRouter } from "vue-router";
 import { authAPI, settingsAPI } from "@/utils/api";
 import { copyToClipboard } from "@/utils/clipboard";
 import {
@@ -353,7 +357,6 @@ import ErrorState from "@/components/common/ErrorState.vue";
 import { KIND, decodeError } from "@/errors";
 import { useErrorContext } from "@/composables/useErrorContext";
 
-const router = useRouter();
 const authStore = useAuthStore();
 const { user } = storeToRefs(authStore);
 
@@ -470,10 +473,6 @@ async function loadUserProfile() {
     return;
   }
   profileReady.value = true;
-}
-
-function goToOrganization(orgName) {
-  router.push(`/organizations/${orgName}`);
 }
 
 async function handleCreateToken() {

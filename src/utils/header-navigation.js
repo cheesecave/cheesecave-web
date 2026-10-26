@@ -34,7 +34,7 @@ export const HEADER_CREATION_ITEMS = [
     id: repository.type,
     label: `New ${repository.label}`,
     icon: repositoryIcon(repository),
-    to: { path: "/new", query: { type: repository.type } },
+    to: `/new?type=${repository.type}`,
   })),
   {
     ...organizationEntry,

@@ -46,23 +46,29 @@ export const ElementPlusStubs = {
       plain: { type: Boolean, default: false },
       text: { type: Boolean, default: false },
       circle: { type: Boolean, default: false },
+      // like the real one: a tag name or a component (LinkButton passes RouterLink)
+      tag: { type: [String, Object], default: "button" },
     },
     emits: ["click"],
     setup(props, { slots, emit }) {
-      return () =>
-        h(
-          "button",
+      return () => {
+        const isButton = props.tag === "button";
+        const content = slots.default ? slots.default() : [];
+        return h(
+          props.tag,
           {
-            type: "button",
-            disabled: props.disabled || props.loading,
+            ...(isButton
+              ? { type: "button", disabled: props.disabled || props.loading }
+              : {}),
             "data-el-button": "true",
             "data-type": props.type,
             "data-size": props.size,
             "data-loading": String(props.loading),
             onClick: (event) => emit("click", event),
           },
-          slots.default ? slots.default() : [],
+          typeof props.tag === "string" ? content : { default: () => content },
         );
+      };
     },
   }),
   ElInput: defineComponent({

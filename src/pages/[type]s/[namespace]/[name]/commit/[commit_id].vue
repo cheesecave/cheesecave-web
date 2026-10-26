@@ -183,11 +183,13 @@
         >
           <div class="flex items-center gap-2 text-sm">
             <span class="text-gray-600 dark:text-gray-400">Parent:</span>
-            <code
-              class="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-xs"
+            <RouterLink
+              :to="commitPath(commitData.parent_commit)"
+              data-testid="parent-commit-link"
+              class="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-xs font-mono text-blue-600 dark:text-blue-400 hover:underline"
             >
-              {{ commitData.parent_commit?.substring(0, 8) }}
-            </code>
+              {{ commitData.parent_commit.substring(0, 8) }}
+            </RouterLink>
           </div>
         </div>
       </div>
@@ -584,10 +586,10 @@
 
                 <!-- View file button -->
                 <div v-if="file.type !== 'removed'" class="mt-3">
-                  <el-button size="small" @click="viewFile(file.path)">
+                  <LinkButton size="small" :to="blobPath(file.path)">
                     <div class="i-carbon-view inline-block mr-1" />
                     View File
-                  </el-button>
+                  </LinkButton>
                 </div>
               </div>
 
@@ -596,10 +598,10 @@
                 <div class="text-xs text-green-700 dark:text-green-400 mb-2">
                   New file created
                 </div>
-                <el-button size="small" @click="viewFile(file.path)">
+                <LinkButton size="small" :to="blobPath(file.path)">
                   <div class="i-carbon-view inline-block mr-1" />
                   View File
-                </el-button>
+                </LinkButton>
               </div>
 
               <!-- Removed files -->
@@ -618,14 +620,14 @@
                       : "Diff not available"
                   }}
                 </div>
-                <el-button
+                <LinkButton
                   v-if="file.type !== 'removed'"
                   size="small"
-                  @click="viewFile(file.path)"
+                  :to="blobPath(file.path)"
                 >
                   <div class="i-carbon-view inline-block mr-1" />
                   View File
-                </el-button>
+                </LinkButton>
               </div>
             </div>
           </el-collapse-item>
@@ -636,6 +638,7 @@
 </template>
 
 <script setup>
+import LinkButton from "@/components/common/LinkButton.vue";
 import { mediaKind } from "@/utils/media-types";
 import axios from "axios";
 import dayjs from "dayjs";
@@ -919,11 +922,11 @@ function getChangeType(type) {
   }
 }
 
-function viewFile(path) {
-  router.push(
-    `/${type.value}s/${namespace.value}/${name.value}/blob/main/${path}`,
-  );
-}
+const blobPath = (path) =>
+  `/${type.value}s/${namespace.value}/${name.value}/blob/main/${path}`;
+
+const commitPath = (id) =>
+  `/${type.value}s/${namespace.value}/${name.value}/commit/${id}`;
 
 function isBinaryFile(path) {
   // Check file extension to determine if it's a binary file

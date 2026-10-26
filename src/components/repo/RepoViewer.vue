@@ -180,16 +180,16 @@
               Download
             </el-button>
             <div class="w-0 h-0 p-0 m-0"></div>
-            <el-button
+            <LinkButton
               v-if="isOwner"
-              @click="navigateToSettings"
+              :to="`/${repoType}s/${namespace}/${name}/settings`"
               size="small"
               class="w-full sm:w-auto m-0 sm:m-1"
               plain
             >
               <div class="i-carbon-settings inline-block mr-1" />
               Settings
-            </el-button>
+            </LinkButton>
           </div>
         </div>
 
@@ -204,70 +204,32 @@
           @navigate-to-metadata="navigateToTab('metadata')"
         />
 
-        <!-- Navigation Tabs -->
-        <div class="repo-tabs mb-6 -mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto">
+        <!-- Navigation Tabs: real links, so "Open in new tab" works on each of them -->
+        <nav
+          class="repo-tabs mb-6 -mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto"
+          aria-label="Repository sections"
+        >
           <div
             class="flex gap-1 border-b border-gray-200 dark:border-gray-700 min-w-max sm:min-w-0"
           >
-            <button
-              :class="[
-                'px-2.5 sm:px-4 py-2 text-sm sm:text-base font-medium transition-colors',
-                activeTab === 'card'
-                  ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200',
-              ]"
-              @click="navigateToTab('card')"
-            >
-              {{
-                repoType === "model"
-                  ? "Model Card"
-                  : repoType === "dataset"
-                    ? "Dataset Card"
-                    : "App"
-              }}
-            </button>
-            <button
-              :class="[
-                'px-2.5 sm:px-4 py-2 text-sm sm:text-base font-medium transition-colors',
-                activeTab === 'files'
-                  ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200',
-              ]"
-              @click="navigateToTab('files')"
-            >
-              Files
-            </button>
-            <button
-              :class="[
-                'px-2.5 sm:px-4 py-2 text-sm sm:text-base font-medium transition-colors',
-                activeTab === 'commits'
-                  ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200',
-                isExternalRepo ? 'opacity-50 cursor-not-allowed' : '',
-              ]"
-              @click="!isExternalRepo && navigateToTab('commits')"
-              :disabled="isExternalRepo"
-              :title="
-                isExternalRepo
-                  ? `Commits not available for ${externalSourceName} repos`
-                  : ''
-              "
-            >
-              Commits
-            </button>
-            <button
-              :class="[
-                'px-2.5 sm:px-4 py-2 text-sm sm:text-base font-medium transition-colors',
-                activeTab === 'metadata'
-                  ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200',
-              ]"
-              @click="navigateToTab('metadata')"
-            >
-              Metadata
-            </button>
+            <template v-for="item in repoTabs" :key="item.key">
+              <span
+                v-if="item.disabledReason"
+                :class="[tabClass(false), 'opacity-50 cursor-not-allowed']"
+                aria-disabled="true"
+                :title="item.disabledReason"
+                >{{ item.label }}</span
+              >
+              <RouterLink
+                v-else
+                :to="tabTarget(item.key)"
+                :class="tabClass(activeTab === item.key)"
+                :aria-current="activeTab === item.key ? 'page' : undefined"
+                >{{ item.label }}</RouterLink
+              >
+            </template>
           </div>
-        </div>
+        </nav>
 
         <!-- Tab Content -->
         <div v-if="activeTab === 'card'" class="card overflow-hidden">
@@ -376,16 +338,16 @@
             <div
               class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
             >
-              <el-button
+              <LinkButton
                 v-if="isOwner"
+                :to="`/${repoType}s/${namespace}/${name}/upload/${currentBranch}`"
                 size="small"
                 type="primary"
-                @click="navigateToUpload"
                 class="w-full sm:w-auto"
               >
                 <div class="i-carbon-cloud-upload inline-block mr-1" />
                 Upload Files
-              </el-button>
+              </LinkButton>
               <el-input
                 aria-label="Filter files by name prefix"
                 v-model="fileSearchQuery"
@@ -660,8 +622,8 @@
               <div
                 v-for="commit in commits"
                 :key="commit.id"
-                class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
-                @click="viewCommit(commit.id)"
+                data-testid="repo-commit-row"
+                class="relative border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
               >
                 <div class="flex items-start gap-3">
                   <div
@@ -671,8 +633,7 @@
                     <div class="font-medium text-sm mb-1">
                       <RouterLink
                         :to="getCommitPath(commit.id)"
-                        class="block text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                        @click.stop
+                        class="stretched-link block text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                       >
                         {{ commit.title }}
                       </RouterLink>
@@ -684,8 +645,7 @@
                         <div class="i-carbon-user-avatar" />
                         <RouterLink
                           :to="`/${commit.author}`"
-                          class="text-blue-600 dark:text-blue-400 hover:underline"
-                          @click.stop
+                          class="stretched-link-above text-blue-600 dark:text-blue-400 hover:underline"
                         >
                           {{ commit.author }}
                         </RouterLink>
@@ -703,6 +663,7 @@
                         placement="top"
                       >
                         <el-tag
+                          class="stretched-link-above"
                           size="small"
                           type="danger"
                           effect="plain"
@@ -717,6 +678,7 @@
                         placement="top"
                       >
                         <el-tag
+                          class="stretched-link-above"
                           size="small"
                           :type="badge.type"
                           effect="plain"
@@ -993,6 +955,7 @@ import { useAsyncResource } from "@/composables/useAsyncResource";
 import { resolveRepoTreeEntryPath } from "@/utils/repo-paths";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import MetadataHeader from "@/components/repo/metadata/MetadataHeader.vue";
+import LinkButton from "@/components/common/LinkButton.vue";
 import ModelInfoCard from "@/components/repo/metadata/ModelInfoCard.vue";
 import {
   mergeDisplayMetadata,
@@ -1409,45 +1372,53 @@ function chunkPaths(paths, size) {
   return chunks;
 }
 
-function navigateToTab(tab) {
+// Where each tab lives. Plain strings, so the tabs can be real links.
+function tabTarget(tab) {
+  const page = `/${props.repoType}s/${props.namespace}/${props.name}`;
   switch (tab) {
     case "files":
-      router.push(
-        `/${props.repoType}s/${props.namespace}/${props.name}/tree/${currentBranch.value}`,
-      );
-      break;
+      return `${page}/tree/${currentBranch.value}`;
     case "commits":
-      router.push(
-        `/${props.repoType}s/${props.namespace}/${props.name}/commits/${currentBranch.value}`,
-      );
-      break;
+      return `${page}/commits/${currentBranch.value}`;
     case "metadata":
-      router.push({
-        path: `/${props.repoType}s/${props.namespace}/${props.name}`,
-        query: { tab: "metadata" },
-      });
-      break;
+      return `${page}?tab=metadata`;
     default:
-      router.push(`/${props.repoType}s/${props.namespace}/${props.name}`);
+      return page;
   }
 }
 
-function navigateToSettings() {
-  router.push(`/${props.repoType}s/${props.namespace}/${props.name}/settings`);
+function navigateToTab(tab) {
+  router.push(tabTarget(tab));
 }
 
-function navigateToUpload() {
-  router.push(
-    `/${props.repoType}s/${props.namespace}/${props.name}/upload/${currentBranch.value}`,
-  );
-}
+const cardTabLabel = computed(
+  () =>
+    ({ model: "Model Card", dataset: "Dataset Card" })[props.repoType] || "App",
+);
+
+const repoTabs = computed(() => [
+  { key: "card", label: cardTabLabel.value },
+  { key: "files", label: "Files" },
+  {
+    key: "commits",
+    label: "Commits",
+    disabledReason: isExternalRepo.value
+      ? `Commits not available for ${externalSourceName.value} repos`
+      : "",
+  },
+  { key: "metadata", label: "Metadata" },
+]);
+
+const tabClass = (active) => [
+  // flex + items-center: the label stays vertically centred in the stretched row, as in a button
+  "flex items-center px-2.5 sm:px-4 py-2 text-sm sm:text-base font-medium transition-colors",
+  active
+    ? "border-b-2 border-blue-500 text-blue-600 dark:text-blue-400"
+    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200",
+];
 
 function getCommitPath(commitId) {
   return `/${props.repoType}s/${props.namespace}/${props.name}/commit/${commitId}`;
-}
-
-function viewCommit(commitId) {
-  router.push(getCommitPath(commitId));
 }
 
 function handleBranchChange() {

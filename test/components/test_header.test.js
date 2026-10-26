@@ -89,9 +89,9 @@ describe("TheHeader", () => {
   ];
 
   const creationEntries = [
-    ["New Model", { path: "/new", query: { type: "model" } }],
-    ["New Dataset", { path: "/new", query: { type: "dataset" } }],
-    ["New Space", { path: "/new", query: { type: "space" } }],
+    ["New Model", "/new?type=model"],
+    ["New Dataset", "/new?type=dataset"],
+    ["New Space", "/new?type=space"],
     ["New Organization", "/organizations/new"],
   ];
 
@@ -128,12 +128,18 @@ describe("TheHeader", () => {
     expect(document.documentElement.classList.contains("dark")).toBe(true);
     expect(localStorage.getItem("theme")).toBe("dark");
 
-    const signUpButton = buttons.find((button) =>
-      button.text().includes("Sign Up"),
+    // Login and Sign Up are links styled as buttons, so they open in a new tab
+    const links = Object.fromEntries(
+      wrapper
+        .findAll("a")
+        .map((link) => [link.text(), link.attributes("href")]),
     );
-    await signUpButton.trigger("click");
-
-    expect(mocks.router.push).toHaveBeenCalledWith("/register");
+    expect(links.Login).toBe("/login");
+    expect(links["Sign Up"]).toBe("/register");
+    expect(
+      buttons.filter((button) => ["Login", "Sign Up"].includes(button.text())),
+    ).toHaveLength(0);
+    expect(mocks.router.push).not.toHaveBeenCalled();
   });
 
   it("renders the same navigation destinations and authenticated menu entries on desktop and mobile", async () => {
@@ -203,22 +209,29 @@ describe("TheHeader", () => {
   );
 
   it.each(creationEntries)(
-    "routes %s to the same destination on desktop and mobile",
+    "links %s to the same destination on desktop and mobile",
     async (label, to) => {
       authenticate();
       const wrapper = mountHeader();
-      await wrapper
+      const desktop = wrapper
         .get('[data-el-dropdown-menu="true"]')
         .findAll("button")
         .find((item) => item.text() === label)
-        .trigger("click");
-      expect(mocks.router.push).toHaveBeenLastCalledWith(to);
-      mocks.router.push.mockClear();
+        .get("a");
+      expect(desktop.attributes("href")).toBe(to);
+      // the menu item is the one keyboard stop; the link inside it is not a second one
+      expect(desktop.attributes("tabindex")).toBe("-1");
 
       const drawer = await openMobileMenu(wrapper);
-      await mobileAction(drawer, label).trigger("click");
-      expect(mocks.router.push).toHaveBeenCalledExactlyOnceWith(to);
+      const mobile = mobileAction(drawer, label);
+      expect(mobile.element.tagName).toBe("A");
+      expect(mobile.attributes("href")).toBe(to);
+      mobile.element.addEventListener("click", (e) => e.preventDefault(), {
+        once: true,
+      });
+      await mobile.trigger("click");
       expect(wrapper.find('[data-el-drawer="true"]').exists()).toBe(false);
+      expect(mocks.router.push).not.toHaveBeenCalled();
       wrapper.unmount();
     },
   );
@@ -226,56 +239,96 @@ describe("TheHeader", () => {
   it.each([
     ["Profile", "/alice"],
     ["Settings", "/settings"],
-    ["Logout", "/"],
-  ])(
-    "uses the same %s account action on desktop and mobile",
-    async (label, to) => {
-      const authStore = authenticate();
-      const wrapper = mountHeader();
-      await wrapper
-        .findAll('[data-el-dropdown-menu="true"]')[1]
-        .findAll("button")
-        .find((item) => item.text() === label)
-        .trigger("click");
-      await flushPromises();
-      expect(mocks.router.push).toHaveBeenCalledExactlyOnceWith(to);
-      expect(authStore.logout).toHaveBeenCalledTimes(
-        label === "Logout" ? 1 : 0,
-      );
-      mocks.router.push.mockClear();
-      authStore.logout.mockClear();
+  ])("links %s to the same page on desktop and mobile", async (label, to) => {
+    authenticate();
+    const wrapper = mountHeader();
+    const desktop = wrapper
+      .findAll('[data-el-dropdown-menu="true"]')[1]
+      .findAll("button")
+      .find((item) => item.text() === label)
+      .get("a");
+    expect(desktop.attributes("href")).toBe(to);
+    expect(desktop.attributes("tabindex")).toBe("-1");
 
-      const drawer = await openMobileMenu(wrapper);
-      await mobileAction(drawer, label).trigger("click");
-      expect(wrapper.find('[data-el-drawer="true"]').exists()).toBe(false);
-      await flushPromises();
-      expect(mocks.router.push).toHaveBeenCalledExactlyOnceWith(to);
-      expect(authStore.logout).toHaveBeenCalledTimes(
-        label === "Logout" ? 1 : 0,
-      );
-      if (label === "Logout") {
-        expect(mocks.elMessage.success).toHaveBeenCalledWith(
-          "Logged out successfully",
-        );
-      }
-      wrapper.unmount();
-    },
-  );
+    const drawer = await openMobileMenu(wrapper);
+    const mobile = mobileAction(drawer, label);
+    expect(mobile.element.tagName).toBe("A");
+    expect(mobile.attributes("href")).toBe(to);
+    mobile.element.addEventListener("click", (e) => e.preventDefault(), {
+      once: true,
+    });
+    await mobile.trigger("click");
+    expect(wrapper.find('[data-el-drawer="true"]').exists()).toBe(false);
+    expect(mocks.router.push).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("keeps Logout an action, not a link, on desktop and mobile", async () => {
+    const authStore = authenticate();
+    const wrapper = mountHeader();
+    const desktop = wrapper
+      .findAll('[data-el-dropdown-menu="true"]')[1]
+      .findAll("button")
+      .find((item) => item.text() === "Logout");
+    expect(desktop.find("a").exists()).toBe(false);
+    await desktop.trigger("click");
+    await flushPromises();
+    expect(authStore.logout).toHaveBeenCalledTimes(1);
+    expect(mocks.router.push).toHaveBeenCalledExactlyOnceWith("/");
+    expect(mocks.elMessage.success).toHaveBeenCalledWith(
+      "Logged out successfully",
+    );
+    mocks.router.push.mockClear();
+    authStore.logout.mockClear();
+
+    const drawer = await openMobileMenu(wrapper);
+    const mobile = mobileAction(drawer, "Logout");
+    expect(mobile.element.tagName).not.toBe("A");
+    await mobile.trigger("click");
+    expect(wrapper.find('[data-el-drawer="true"]').exists()).toBe(false);
+    await flushPromises();
+    expect(authStore.logout).toHaveBeenCalledTimes(1);
+    expect(mocks.router.push).toHaveBeenCalledExactlyOnceWith("/");
+    wrapper.unmount();
+  });
+
+  it("follows a menu link when Enter or Space reaches the item, which Element Plus reports as a click carrying the key event", async () => {
+    authenticate();
+    const wrapper = mountHeader();
+    const items = wrapper
+      .get('[data-el-dropdown-menu="true"]')
+      .findAll("button");
+    const item = items.find((entry) => entry.text() === "New Dataset");
+    const anchor = item.get("a").element;
+    const follow = vi.spyOn(anchor, "click").mockImplementation(() => {});
+    const dropdownItem = wrapper
+      .findAllComponents({ name: "ElDropdownItem" })
+      .find((entry) => entry.text() === "New Dataset");
+
+    // a mouse click lands on the link itself, which navigates by itself
+    dropdownItem.vm.$emit("click", new MouseEvent("click"));
+    expect(follow).not.toHaveBeenCalled();
+
+    const key = new KeyboardEvent("keydown", { key: "Enter" });
+    Object.defineProperty(key, "target", { value: item.element });
+    dropdownItem.vm.$emit("click", key);
+    expect(follow).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+  });
 
   it("updates both profile actions when the authenticated username changes", async () => {
     const authStore = authenticate();
     const wrapper = mountHeader();
     authStore.user = { username: "bob" };
     await nextTick();
-    await wrapper
+    const desktop = wrapper
       .findAll('[data-el-dropdown-menu="true"]')[1]
       .findAll("button")
       .find((item) => item.text() === "Profile")
-      .trigger("click");
-    expect(mocks.router.push).toHaveBeenLastCalledWith("/bob");
+      .get("a");
+    expect(desktop.attributes("href")).toBe("/bob");
     const drawer = await openMobileMenu(wrapper);
-    await mobileAction(drawer, "Profile").trigger("click");
-    expect(mocks.router.push).toHaveBeenLastCalledWith("/bob");
+    expect(mobileAction(drawer, "Profile").attributes("href")).toBe("/bob");
     wrapper.unmount();
   });
 
@@ -283,18 +336,23 @@ describe("TheHeader", () => {
     ["Login", "/login"],
     ["Sign Up", "/register"],
   ])(
-    "routes anonymous %s from the mobile drawer and closes it",
+    "links anonymous %s from the mobile drawer and closes it",
     async (label, to) => {
       const wrapper = mountHeader();
       const drawer = await openMobileMenu(wrapper);
       expect(drawer.text()).not.toContain("CREATE NEW");
-      const button = drawer
-        .findAll("button")
-        .find((item) => item.text() === label);
-      expect(button.classes()).toContain("w-full");
-      await button.trigger("click");
-      expect(mocks.router.push).toHaveBeenCalledExactlyOnceWith(to);
+      const link = drawer.findAll("a").find((item) => item.text() === label);
+      expect(link.attributes("href")).toBe(to);
+      expect(link.classes()).toContain("w-full");
+      expect(drawer.findAll("button").map((b) => b.text())).not.toContain(
+        label,
+      );
+      link.element.addEventListener("click", (e) => e.preventDefault(), {
+        once: true,
+      });
+      await link.trigger("click");
       expect(wrapper.find('[data-el-drawer="true"]').exists()).toBe(false);
+      expect(mocks.router.push).not.toHaveBeenCalled();
       wrapper.unmount();
     },
   );

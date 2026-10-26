@@ -234,73 +234,12 @@
           </div>
 
           <div v-if="filteredRepos.length > 0" class="grid grid-cols-2 gap-4">
-            <div
+            <ProfileRepoCard
               v-for="repo in filteredRepos"
               :key="repo.id"
-              class="card hover:shadow-md transition-shadow cursor-pointer"
-              @click="goToRepo('model', repo)"
-            >
-              <div class="flex items-start gap-2 mb-2">
-                <div
-                  class="i-carbon-model text-blue-500 text-xl flex-shrink-0"
-                />
-                <div class="flex-1 min-w-0">
-                  <h3 class="font-semibold flex items-center gap-2">
-                    <RouterLink
-                      :to="getRepoPath('model', repo)"
-                      class="block text-blue-600 dark:text-blue-400 hover:underline truncate min-w-0"
-                      @click.stop
-                    >
-                      {{ repo.id }}
-                    </RouterLink>
-                    <PrivateBadge v-if="repo.private" />
-                  </h3>
-                  <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                    Updated {{ formatDate(repo.lastModified) }}
-                  </div>
-                </div>
-              </div>
-
-              <div
-                v-if="repo.tags && repo.tags.length"
-                class="flex gap-1 mb-2 flex-wrap"
-              >
-                <el-tag
-                  v-for="tag in repo.tags.slice(0, 2)"
-                  :key="tag"
-                  size="small"
-                  effect="plain"
-                >
-                  {{ tag }}
-                </el-tag>
-              </div>
-
-              <!-- External Source Badge + Link -->
-              <div v-if="repo._source && repo._source !== 'local'" class="mb-2">
-                <el-button
-                  size="small"
-                  type="primary"
-                  plain
-                  @click.stop="openExternalRepo(repo)"
-                >
-                  <div class="i-carbon-launch inline-block mr-1" />
-                  View on {{ repo._source }}
-                </el-button>
-              </div>
-
-              <div
-                class="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400"
-              >
-                <div class="flex items-center gap-1">
-                  <div class="i-carbon-download" />
-                  {{ repo.downloads || 0 }}
-                </div>
-                <div class="flex items-center gap-1">
-                  <div class="i-carbon-favorite" />
-                  {{ repo.likes || 0 }}
-                </div>
-              </div>
-            </div>
+              :repo="repo"
+              type="model"
+            />
           </div>
 
           <div
@@ -353,60 +292,12 @@
           </div>
 
           <div v-if="filteredRepos.length > 0" class="grid grid-cols-2 gap-4">
-            <div
+            <ProfileRepoCard
               v-for="repo in filteredRepos"
               :key="repo.id"
-              class="card hover:shadow-md transition-shadow cursor-pointer"
-              @click="goToRepo('dataset', repo)"
-            >
-              <div class="flex items-start gap-2 mb-2">
-                <div
-                  class="i-carbon-data-table text-green-500 text-xl flex-shrink-0"
-                />
-                <div class="flex-1 min-w-0">
-                  <h3 class="font-semibold flex items-center gap-2">
-                    <RouterLink
-                      :to="getRepoPath('dataset', repo)"
-                      class="block text-blue-600 dark:text-blue-400 hover:underline truncate min-w-0"
-                      @click.stop
-                    >
-                      {{ repo.id }}
-                    </RouterLink>
-                    <PrivateBadge v-if="repo.private" />
-                  </h3>
-                  <div class="text-xs text-gray-600 mt-1">
-                    Updated {{ formatDate(repo.lastModified) }}
-                  </div>
-                </div>
-              </div>
-
-              <div
-                v-if="repo.tags && repo.tags.length"
-                class="flex gap-1 mb-2 flex-wrap"
-              >
-                <el-tag
-                  v-for="tag in repo.tags.slice(0, 2)"
-                  :key="tag"
-                  size="small"
-                  effect="plain"
-                >
-                  {{ tag }}
-                </el-tag>
-              </div>
-
-              <div
-                class="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400"
-              >
-                <div class="flex items-center gap-1">
-                  <div class="i-carbon-download" />
-                  {{ repo.downloads || 0 }}
-                </div>
-                <div class="flex items-center gap-1">
-                  <div class="i-carbon-favorite" />
-                  {{ repo.likes || 0 }}
-                </div>
-              </div>
-            </div>
+              :repo="repo"
+              type="dataset"
+            />
           </div>
 
           <div
@@ -459,60 +350,12 @@
           </div>
 
           <div v-if="filteredRepos.length > 0" class="grid grid-cols-2 gap-4">
-            <div
+            <ProfileRepoCard
               v-for="repo in filteredRepos"
               :key="repo.id"
-              class="card hover:shadow-md transition-shadow cursor-pointer"
-              @click="goToRepo('space', repo)"
-            >
-              <div class="flex items-start gap-2 mb-2">
-                <div
-                  class="i-carbon-application text-purple-500 text-xl flex-shrink-0"
-                />
-                <div class="flex-1 min-w-0">
-                  <h3 class="font-semibold flex items-center gap-2">
-                    <RouterLink
-                      :to="getRepoPath('space', repo)"
-                      class="block text-blue-600 dark:text-blue-400 hover:underline truncate min-w-0"
-                      @click.stop
-                    >
-                      {{ repo.id }}
-                    </RouterLink>
-                    <PrivateBadge v-if="repo.private" />
-                  </h3>
-                  <div class="text-xs text-gray-600 mt-1">
-                    Updated {{ formatDate(repo.lastModified) }}
-                  </div>
-                </div>
-              </div>
-
-              <div
-                v-if="repo.tags && repo.tags.length"
-                class="flex gap-1 mb-2 flex-wrap"
-              >
-                <el-tag
-                  v-for="tag in repo.tags.slice(0, 2)"
-                  :key="tag"
-                  size="small"
-                  effect="plain"
-                >
-                  {{ tag }}
-                </el-tag>
-              </div>
-
-              <div
-                class="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400"
-              >
-                <div class="flex items-center gap-1">
-                  <div class="i-carbon-download" />
-                  {{ repo.downloads || 0 }}
-                </div>
-                <div class="flex items-center gap-1">
-                  <div class="i-carbon-favorite" />
-                  {{ repo.likes || 0 }}
-                </div>
-              </div>
-            </div>
+              :repo="repo"
+              type="space"
+            />
           </div>
 
           <div
@@ -530,8 +373,8 @@
 
 <script setup>
 import { repoAPI, orgAPI } from "@/utils/api";
+import ProfileRepoCard from "@/components/profile/ProfileRepoCard.vue";
 import axios from "axios";
-import PrivateBadge from "@/components/repo/PrivateBadge.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import IncompleteNotice from "@/components/common/IncompleteNotice.vue";
 import { useIncompleteSources } from "@/composables/useIncompleteSources";
@@ -606,44 +449,6 @@ function getCount(type) {
 
 function formatDate(date) {
   return formatRelativeTime(date, "never");
-}
-
-function getRepoPath(type, repo) {
-  const [namespace, name] = repo.id.split("/");
-  return `/${type}s/${namespace}/${name}`;
-}
-
-function goToRepo(type, repo) {
-  router.push(getRepoPath(type, repo));
-}
-
-function openExternalRepo(repo) {
-  if (!repo._source_url) return;
-
-  // Check if source is HuggingFace
-  const isHF =
-    repo._source &&
-    (repo._source.toLowerCase().includes("huggingface") ||
-      repo._source_url.includes("huggingface.co"));
-
-  let url;
-  if (isHF) {
-    // HuggingFace URLs: models have no prefix, datasets and spaces have prefix
-    if (repoType.value === "model") {
-      url = `${repo._source_url}/${repo.id}`;
-    } else {
-      const typeMap = { model: "models", dataset: "datasets", space: "spaces" };
-      const typePlural = typeMap[repoType.value] || "models";
-      url = `${repo._source_url}/${typePlural}/${repo.id}`;
-    }
-  } else {
-    // KohakuHub and other sources: always use type prefix
-    const typeMap = { model: "models", dataset: "datasets", space: "spaces" };
-    const typePlural = typeMap[repoType.value] || "models";
-    url = `${repo._source_url}/${typePlural}/${repo.id}`;
-  }
-
-  window.open(url, "_blank");
 }
 
 async function checkIfOrganization() {

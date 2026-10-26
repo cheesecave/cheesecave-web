@@ -237,16 +237,21 @@ describe("home page", () => {
     expect(hero.get('a[href="/self-hosted"]').text()).toContain(
       "Host Your Own Hub",
     );
-    const buttons = wrapper.findAll("button");
-    await buttons
-      .find((button) => button.text().includes("View all models"))
-      .trigger("click");
-    await buttons
-      .find((button) => button.text().includes("View all datasets"))
-      .trigger("click");
-    await buttons
-      .find((button) => button.text().includes("View all spaces"))
-      .trigger("click");
+    // "View all" goes to the list page of its own, so it is a link
+    const viewAll = Object.fromEntries(
+      wrapper
+        .findAll("a")
+        .filter((link) => link.text().startsWith("View all"))
+        .map((link) => [link.text(), link.attributes("href")]),
+    );
+    expect(viewAll).toEqual({
+      "View all models →": "/models",
+      "View all datasets →": "/datasets",
+      "View all spaces →": "/spaces",
+    });
+    expect(
+      wrapper.findAll("button").filter((b) => b.text().includes("View all")),
+    ).toHaveLength(0);
 
     const sortSelect = wrapper.get('select[data-el-select="true"]');
     expect(
@@ -284,9 +289,7 @@ describe("home page", () => {
         value: "downloads",
       },
     );
-    expect(mocks.router.push).toHaveBeenCalledWith("/models");
-    expect(mocks.router.push).toHaveBeenCalledWith("/datasets");
-    expect(mocks.router.push).toHaveBeenCalledWith("/spaces");
+    expect(mocks.router.push).not.toHaveBeenCalledWith("/models");
   });
 
   it("handles invalid token query params and cleans up the URL", async () => {

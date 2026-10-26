@@ -80,16 +80,16 @@
           <div
             class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto"
           >
-            <el-button
+            <LinkButton
               v-if="canEdit"
-              @click="editFile"
+              :to="editPath"
               size="small"
               class="flex-1 sm:flex-initial"
             >
               <div class="i-carbon-edit inline-block mr-1" />
               <span class="hidden sm:inline">Edit</span>
               <span class="sm:hidden">Edit</span>
-            </el-button>
+            </LinkButton>
             <el-button
               @click="copyFileUrl"
               size="small"
@@ -262,16 +262,16 @@
               >
             </el-radio-group>
             <div class="flex gap-2 w-full sm:w-auto">
-              <el-button
+              <LinkButton
                 v-if="canEdit"
+                :to="editPath"
                 size="small"
                 type="primary"
-                @click="editFile"
                 class="flex-1 sm:flex-initial"
               >
                 <div class="i-carbon-edit inline-block mr-1" />
                 Edit
-              </el-button>
+              </LinkButton>
               <el-button
                 v-if="markdownView === 'source'"
                 size="small"
@@ -322,6 +322,7 @@ import { notifyError } from "@/errors";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import CodeViewer from "@/components/common/CodeViewer.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
+import LinkButton from "@/components/common/LinkButton.vue";
 import TarBrowserPanel from "@/components/repo/preview/TarBrowserPanel.vue";
 import FileMetadataPanel from "@/components/repo/preview/FileMetadataPanel.vue";
 import PsdPreview from "@/components/repo/preview/PsdPreview.vue";
@@ -824,11 +825,10 @@ function getFolderPath(folderPath) {
   return `/${repoType.value}s/${namespace.value}/${name.value}/tree/${branch.value}/${folderPath}`;
 }
 
-function editFile() {
-  router.push(
+const editPath = computed(
+  () =>
     `/${repoType.value}s/${namespace.value}/${name.value}/edit/${branch.value}/${filePath.value}`,
-  );
-}
+);
 
 async function confirmDeleteFile() {
   try {

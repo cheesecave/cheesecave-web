@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from "vue";
-import { useRouter } from "vue-router/auto";
 import RepoDiscoveryCard from "@/components/discovery/RepoDiscoveryCard.vue";
+import LinkButton from "@/components/common/LinkButton.vue";
 import { getRepositoryType } from "@/utils/repository-types";
 
 const props = defineProps({
@@ -9,7 +9,6 @@ const props = defineProps({
   repositories: { type: Array, default: () => [] },
   total: { type: Number, default: 0 },
 });
-const router = useRouter();
 const category = computed(() => getRepositoryType(props.repoType));
 </script>
 
@@ -33,9 +32,9 @@ const category = computed(() => getRepositoryType(props.repoType));
         :repo-type="repoType"
         class="discovery-repo-link"
       />
-      <el-button class="w-full" @click="router.push(`/${repoType}s`)">
+      <LinkButton class="w-full" :to="`/${repoType}s`">
         View all {{ category.plural.toLowerCase() }} →
-      </el-button>
+      </LinkButton>
     </div>
   </section>
 </template>

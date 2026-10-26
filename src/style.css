@@ -29,6 +29,18 @@ h1 {
   font-size: 3.2em;
   line-height: 1.1;
 }
+/* A card made of one link: the link's ::after covers the positioned card, so the whole card is
+   the link (right-click, middle-click, hover URL) without nesting anything in an <a>. Controls
+   inside the card that must stay clickable get .stretched-link-above. */
+.stretched-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.stretched-link-above {
+  position: relative;
+  z-index: 1;
+}
 a {
   font-weight: 500;
   color: var(--site-page-link, #94621f);

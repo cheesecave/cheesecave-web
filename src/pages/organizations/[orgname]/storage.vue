@@ -130,7 +130,14 @@
                       class="text-lg flex-shrink-0"
                     />
                     <div>
-                      <div class="font-medium">{{ repo.name }}</div>
+                      <div class="font-medium">
+                        <RouterLink
+                          :to="repoPath(repo)"
+                          class="!text-inherit hover:underline"
+                          @click.stop
+                          >{{ repo.name }}</RouterLink
+                        >
+                      </div>
                       <div
                         v-if="repo.is_inheriting"
                         class="text-xs text-gray-500"
@@ -294,9 +301,14 @@ function getProgressColor(percentage) {
   return "#67c23a"; // Green
 }
 
-function goToRepo(repo) {
+function repoPath(repo) {
   const [namespace, name] = repo.repo_id.split("/");
-  router.push(`/${repo.repo_type}s/${namespace}/${name}`);
+  return `/${repo.repo_type}s/${namespace}/${name}`;
+}
+
+// The name is a link; the rest of the row is a shortcut to the same page
+function goToRepo(repo) {
+  router.push(repoPath(repo));
 }
 
 async function loadStorageData() {
