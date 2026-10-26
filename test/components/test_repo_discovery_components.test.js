@@ -1,4 +1,5 @@
 import { mount } from "@vue/test-utils";
+import { createMemoryHistory, createRouter } from "vue-router";
 import { describe, expect, it } from "vitest";
 import RepoFilterPanel from "@/components/discovery/RepoFilterPanel.vue";
 import RepoDiscoveryCard from "@/components/discovery/RepoDiscoveryCard.vue";
@@ -25,10 +26,20 @@ function facets() {
   ];
 }
 
+// Where a chip leads: the page with that value switched on or off, as a plain string here
+const chipTarget = (key, value) => `/models?${key}=${value}`;
+
+function mountPanel({ props = {} } = {}) {
+  return mount(RepoFilterPanel, {
+    props: { target: chipTarget, ...props },
+    global: { stubs: { RouterLink: RouterLinkStub } },
+  });
+}
+
 describe("RepoFilterPanel", () => {
-  it("groups actual facets and emits repeated toggles without mutating selected values", async () => {
+  it("groups actual facets and shows the chosen values without mutating selected values", async () => {
     const selected = { task: ["task-0", "task-1"], library: ["transformers"] };
-    const wrapper = mount(RepoFilterPanel, {
+    const wrapper = mountPanel({
       props: { facets: facets(), selected },
     });
     expect(
@@ -37,29 +48,55 @@ describe("RepoFilterPanel", () => {
         .map((group) => group.attributes("aria-label")),
     ).toEqual(["Tasks", "Libraries"]);
     expect(wrapper.get(".selection-count").text()).toBe("3");
-    expect(
-      wrapper
-        .get('[aria-label="Tasks"] .facet-chip')
-        .attributes("aria-pressed"),
-    ).toBe("true");
     const chip = wrapper.get('[aria-label="Tasks"] .facet-chip');
-    await chip.trigger("click");
-    await chip.trigger("click");
-    expect(wrapper.emitted("toggle")).toEqual([
-      [{ key: "task", value: "task-0" }],
-      [{ key: "task", value: "task-0" }],
-    ]);
+    expect(chip.attributes("aria-current")).toBe("true");
     expect(selected.task).toEqual(["task-0", "task-1"]);
     await wrapper.setProps({ selected: { task: ["task-1"] } });
-    expect(chip.attributes("aria-pressed")).toBe("false");
+    expect(chip.attributes("aria-current")).toBeUndefined();
     expect(wrapper.get(".selection-count").text()).toBe("1");
     await wrapper.get(".clear-filters").trigger("click");
     expect(wrapper.emitted("clear")).toEqual([[]]);
     wrapper.unmount();
   });
 
-  it("can leave out its own heading (the drawer it sits in has the title), keeping the count and the clear button", async () => {
+  it("makes every chip a real link to the page it would show, replacing history", () => {
+    const wrapper = mountPanel({ props: { facets: facets() } });
+    const chips = wrapper.findAll('[aria-label="Tasks"] a.facet-chip');
+    expect(chips).toHaveLength(8);
+    expect(chips[0].attributes("href")).toBe("/models?task=task-0");
+    expect(chips[0].attributes("replace")).toBeDefined();
+    expect(wrapper.find("button.facet-chip").exists()).toBe(false);
+    expect(
+      wrapper.get('[aria-label="Libraries"] a.facet-chip').attributes("href"),
+    ).toBe("/models?library=transformers");
+    wrapper.unmount();
+  });
+
+  it("marks only the chosen chips as current, with the real RouterLink too", async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/models", component: { render: () => null } }],
+    });
+    await router.push("/models");
     const wrapper = mount(RepoFilterPanel, {
+      props: {
+        facets: facets(),
+        selected: { task: ["task-1"] },
+        target: (key, value) => ({ path: "/models", query: { [key]: value } }),
+      },
+      global: { plugins: [router] },
+    });
+    const chips = wrapper.findAll('[aria-label="Tasks"] .facet-chip');
+    expect(chips.map((chip) => chip.attributes("aria-current"))).toEqual([
+      undefined,
+      "true",
+      ...Array(6).fill(undefined),
+    ]);
+    wrapper.unmount();
+  });
+
+  it("can leave out its own heading (the drawer it sits in has the title), keeping the count and the clear button", async () => {
+    const wrapper = mountPanel({
       props: { facets: facets(), heading: false },
     });
     expect(wrapper.find("h2").exists()).toBe(false);
@@ -75,13 +112,13 @@ describe("RepoFilterPanel", () => {
   });
 
   it("has its heading by default", () => {
-    const wrapper = mount(RepoFilterPanel, { props: { facets: facets() } });
+    const wrapper = mountPanel({ props: { facets: facets() } });
     expect(wrapper.get("h2").text()).toBe("Filters");
     wrapper.unmount();
   });
 
   it("expands long groups, searches all options, and switches categories", async () => {
-    const wrapper = mount(RepoFilterPanel, { props: { facets: facets() } });
+    const wrapper = mountPanel({ props: { facets: facets() } });
     expect(wrapper.findAll('[aria-label="Tasks"] .facet-chip')).toHaveLength(8);
     const more = wrapper.get('[aria-label="Show more Tasks filters"]');
     expect(more.attributes("aria-expanded")).toBe("false");
@@ -116,7 +153,7 @@ describe("RepoFilterPanel", () => {
   });
 
   it("distinguishes unavailable facets from a search with no matches", async () => {
-    const wrapper = mount(RepoFilterPanel);
+    const wrapper = mountPanel();
     expect(wrapper.text()).toContain(
       "No filters available for these repositories.",
     );
@@ -130,7 +167,7 @@ describe("RepoFilterPanel", () => {
   });
 
   it("uses the exact facet value when the API omits its optional display label", () => {
-    const wrapper = mount(RepoFilterPanel, {
+    const wrapper = mountPanel({
       props: {
         facets: [
           {

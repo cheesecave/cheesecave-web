@@ -6,8 +6,10 @@ const props = defineProps({
   selected: { type: Object, default: () => ({}) },
   // False where the panel sits under a title that already says "Filters" (the phone drawer)
   heading: { type: Boolean, default: true },
+  // (key, value) -> route location of the page with that filter switched on or off
+  target: { type: Function, required: true },
 });
-const emit = defineEmits(["toggle", "clear"]);
+const emit = defineEmits(["clear"]);
 const search = ref("");
 const category = ref(null);
 const expanded = ref({});
@@ -115,20 +117,20 @@ function visibleOptions(group) {
     >
       <h3>{{ group.label }}</h3>
       <div class="facet-options">
-        <button
+        <RouterLink
           v-for="option in visibleOptions(group)"
           :key="option.value"
-          type="button"
+          replace
           class="facet-chip"
-          :aria-pressed="isSelected(group.key, option.value)"
+          :to="target(group.key, option.value)"
+          :aria-current="isSelected(group.key, option.value) ? 'true' : null"
           :title="option.label || option.value"
-          @click="emit('toggle', { key: group.key, value: option.value })"
         >
           <span class="facet-label">{{ option.label || option.value }}</span>
           <span v-if="Number.isFinite(option.count)" class="facet-count">{{
             option.count.toLocaleString()
           }}</span>
-        </button>
+        </RouterLink>
       </div>
       <button
         v-if="group.options.length > 8 && !search.trim()"
@@ -177,6 +179,7 @@ button {
   cursor: pointer;
 }
 button:focus-visible,
+.facet-chip:focus-visible,
 input:focus-visible {
   outline: 2px solid var(--site-primary, #c28b37);
   outline-offset: 3px;
@@ -264,13 +267,15 @@ input:focus-visible {
   background: var(--site-card, #fffdf7);
   color: var(--site-card-text, #2c332b);
   font-size: 11px;
+  font-weight: 400;
   line-height: 1.4;
+  text-decoration: none;
 }
 .facet-chip:hover,
 .filter-categories button:hover {
   border-color: var(--site-primary, #c28b37);
 }
-.facet-chip[aria-pressed="true"] {
+.facet-chip[aria-current="true"] {
   border-color: var(--site-primary, #c28b37);
   color: var(--site-primary-text, #000);
   background: var(--site-primary, #c28b37);
@@ -285,7 +290,7 @@ input:focus-visible {
   color: var(--site-muted, #6b7068);
   font-size: 10px;
 }
-.facet-chip[aria-pressed="true"] .facet-count {
+.facet-chip[aria-current="true"] .facet-count {
   color: inherit;
 }
 .facet-more {

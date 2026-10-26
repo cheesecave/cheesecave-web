@@ -2,6 +2,9 @@ import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ElementPlusStubs, RouterLinkStub } from "../helpers/vue";
+import repoInfo from "../fixtures/repo-info.json";
+import repoStats from "../fixtures/repo-stats.json";
+import userOverview from "../fixtures/user-overview.json";
 
 const mocks = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("vue-router/auto", () => ({
@@ -122,5 +125,28 @@ describe("ProfileRepoCard", () => {
     const wrapper = mountCard({ _source: "partner hub" });
     await wrapper.get("button").trigger("click");
     expect(open).not.toHaveBeenCalled();
+  });
+
+  // Shapes captured from the real backend, not hand-written ones
+  it("renders a captured model repository, its name the one link over the card", async () => {
+    const wrapper = mountCard(repoInfo, "model");
+    expect(wrapper.text()).toContain("mai_lin/lineart-caption-base");
+    expect(wrapper.text()).toContain(String(repoStats.downloads));
+    expect(wrapper.text()).toContain(String(repoStats.likes));
+    expect(wrapper.get(".card h3 a").attributes("href")).toBe(
+      "/models/mai_lin/lineart-caption-base",
+    );
+    await wrapper.get(".card").trigger("click");
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it("renders captured dataset and space overview entries with their own links", () => {
+    const dataset = mountCard(userOverview.datasets[0], "dataset");
+    expect(dataset.text()).toContain("mai_lin/street-sign-zh-en");
+    expect(dataset.get("a").attributes("href")).toBe(
+      "/datasets/mai_lin/street-sign-zh-en",
+    );
+    const space = mountCard(userOverview.spaces[0], "space");
+    expect(space.get("a").attributes("href")).toBe("/spaces/mai_lin/mai_lin");
   });
 });

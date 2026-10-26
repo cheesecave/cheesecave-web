@@ -90,3 +90,16 @@ export function discoveryQuery(state, previous = {}) {
     if (state.selected[key]?.length) query[key] = state.selected[key];
   return query;
 }
+
+// The selection with one filter value switched on or off, facet keys with no values dropped.
+export function toggleFacet(selected, key, value) {
+  const values = selected[key] || [];
+  const next = {
+    ...selected,
+    [key]: values.includes(value)
+      ? values.filter((item) => item !== value)
+      : [...values, value].sort(),
+  };
+  if (!next[key].length) delete next[key];
+  return next;
+}

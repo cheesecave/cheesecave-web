@@ -5,7 +5,7 @@
         <RepoFilterPanel
           :facets="facets"
           :selected="selectedFilters"
-          @toggle="toggleFilter"
+          :target="filterTarget"
           @clear="clearFilters"
         />
       </el-scrollbar>
@@ -140,15 +140,12 @@
           </template>
         </el-skeleton>
       </section>
-      <el-pagination
+      <LinkPager
         v-if="total > discoveryPageSize"
-        class="discovery-pagination"
         :current-page="currentPage"
         :page-size="discoveryPageSize"
         :total="total"
-        layout="prev, pager, next"
-        :pager-count="5"
-        @current-change="changePage"
+        :target="pageTarget"
       />
     </div>
     <el-drawer
@@ -164,7 +161,7 @@
           :heading="false"
           :facets="facets"
           :selected="selectedFilters"
-          @toggle="toggleFilter"
+          :target="filterTarget"
           @clear="clearFilters"
         />
       </el-scrollbar>
@@ -194,6 +191,7 @@
 
 <script setup>
 import { computed, ref } from "vue";
+import LinkPager from "@/components/discovery/LinkPager.vue";
 import RepoFilterPanel from "@/components/discovery/RepoFilterPanel.vue";
 import RepoDiscoveryCard from "@/components/discovery/RepoDiscoveryCard.vue";
 import CreateRepositoryForm from "@/components/repo/CreateRepositoryForm.vue";
@@ -233,7 +231,8 @@ const {
   clearFilters,
   resetSearch,
   changeSort,
-  changePage,
+  pageTarget,
+  filterTarget,
   loadRepos,
 } = useRepositoryDiscovery(() => props.repoType);
 const showFilters = ref(false);
@@ -389,10 +388,6 @@ const showCreateDialog = ref(false);
   box-shadow: var(--site-card-shadow, none);
   background: var(--site-card);
   border: 1px solid var(--site-border);
-}
-.discovery-pagination {
-  margin-top: 24px;
-  justify-content: center;
 }
 @media (max-width: 1100px) {
   .repo-discovery {

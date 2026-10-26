@@ -5,11 +5,7 @@ import { defineComponent, h, reactive } from "vue";
 
 import RepoFilterPanel from "@/components/discovery/RepoFilterPanel.vue";
 import { http } from "@/testing/msw";
-import {
-  ElementPlusStubs,
-  InvalidElFormStub,
-  RouterLinkStub,
-} from "../helpers/vue";
+import { ElementPlusStubs, InvalidElFormStub } from "../helpers/vue";
 import {
   cloneFixture,
   jsonResponse,
@@ -78,23 +74,30 @@ const SkeletonItemStub = defineComponent({
   },
 });
 
-const DiscoveryPaginationStub = defineComponent({
-  name: "ElPagination",
-  props: ElementPlusStubs.ElPagination.props,
-  emits: ["update:currentPage", "current-change"],
-  setup(props, { emit }) {
-    return ElementPlusStubs.ElPagination.setup(
-      new Proxy(props, {
-        get(target, key) {
-          return key === "pageCount"
-            ? Math.max(1, Math.ceil(target.total / target.pageSize))
-            : target[key];
+// A router link that behaves like the real one for a location with a query: it is an <a href>,
+// and a plain click is handled by the router (replace) instead of the browser following it.
+const NavigatingLink = defineComponent({
+  name: "RouterLink",
+  props: { to: { type: [String, Object], required: true } },
+  setup(props, { slots }) {
+    const href = () =>
+      typeof props.to === "string" ? props.to : JSON.stringify(props.to);
+    return () =>
+      h(
+        "a",
+        {
+          href: href(),
+          onClick: (event) => {
+            if (typeof props.to === "string") return;
+            event.preventDefault();
+            mocks.router.replace(props.to);
+          },
         },
-      }),
-      { emit },
-    );
+        slots.default?.(),
+      );
   },
 });
+const hrefQuery = (link) => JSON.parse(link.attributes("href")).query;
 
 function deferResponse() {
   let release;
@@ -217,7 +220,6 @@ describe("RepoListPage", () => {
           ...ElementPlusStubs,
           ElSkeleton: RepoSkeletonStub,
           ElSkeletonItem: SkeletonItemStub,
-          ElPagination: DiscoveryPaginationStub,
           ElScrollbar: defineComponent({
             setup:
               (_, { slots }) =>
@@ -225,7 +227,7 @@ describe("RepoListPage", () => {
                 h("div", slots.default?.()),
           }),
           ...extraStubs,
-          RouterLink: RouterLinkStub,
+          RouterLink: NavigatingLink,
         },
       },
     });
@@ -795,6 +797,62 @@ describe("RepoListPage", () => {
     },
   );
 
+  it("gives page numbers and filter chips hrefs that open the same list in a new tab", async () => {
+    const repo = (name) => ({
+      ...cloneFixture(uiApiFixtures.repo.info),
+      id: `catalogue/${name}`,
+    });
+    server.use(
+      http.get("/api/models/discover", () =>
+        jsonResponse(
+          discoveryResponse([repo("one")], {
+            total: 100,
+            facets: [
+              {
+                key: "task",
+                label: "Tasks",
+                options: [
+                  { value: "image-to-text", label: "Image to text", count: 31 },
+                  { value: "text-generation", label: "Text", count: 27 },
+                ],
+              },
+            ],
+          }),
+        ),
+      ),
+    );
+    mocks.route.query = {
+      campaign: "launch",
+      task: ["text-generation"],
+      page: "2",
+    };
+    const wrapper = mountPage();
+    await flushPromises();
+    // another page keeps the filters and unrelated keys; page 1 drops the page key
+    expect(hrefQuery(wrapper.get('a[aria-label="Page 3"]'))).toMatchObject({
+      campaign: "launch",
+      task: ["text-generation"],
+      page: "3",
+    });
+    expect(
+      hrefQuery(wrapper.get('a[aria-label="Page 1"]')).page,
+    ).toBeUndefined();
+    // a chip leads to the page with that value toggled, from the first page
+    const chips = wrapper.findAll('[aria-label="Tasks"] a.facet-chip');
+    expect(hrefQuery(chips[0])).toMatchObject({
+      campaign: "launch",
+      task: ["image-to-text", "text-generation"],
+    });
+    expect(hrefQuery(chips[0]).page).toBeUndefined();
+    expect(hrefQuery(chips[1]).task).toBeUndefined();
+    expect(chips.map((chip) => chip.attributes("aria-current"))).toEqual([
+      undefined,
+      "true",
+    ]);
+    // the links do not change the open page until followed
+    expect(mocks.route.query.page).toBe("2");
+  });
+
   it("uses server facets across the full catalogue and paginates filtered results", async () => {
     const calls = [];
     const repo = (name) => ({
@@ -842,7 +900,7 @@ describe("RepoListPage", () => {
     );
     expect(calls.at(-1).getAll("task")).toEqual(["image-to-text"]);
     expect(calls.at(-1).get("offset")).toBe("0");
-    await wrapper.get('[data-el-pagination-page="2"]').trigger("click");
+    await wrapper.get('a[aria-label="Page 2"]').trigger("click");
     await vi.waitFor(() =>
       expect(wrapper.text()).toContain("catalogue/filtered-page-two"),
     );
@@ -861,7 +919,7 @@ describe("RepoListPage", () => {
     expect(
       wrapper
         .findAll('[aria-label="Tasks"] .facet-chip')
-        .map((chip) => chip.attributes("aria-pressed")),
+        .map((chip) => chip.attributes("aria-current")),
     ).toEqual(["true", "true"]);
     await wrapper.get(".clear-filters").trigger("click");
     await vi.waitFor(() => expect(calls.at(-1).getAll("task")).toEqual([]));
@@ -961,12 +1019,12 @@ describe("RepoListPage", () => {
       expect(
         wrapper
           .get('[aria-label="Libraries"] .facet-chip')
-          .attributes("aria-pressed"),
+          .attributes("aria-current"),
       ).toBe("true");
       expect(
         wrapper
           .get('[aria-label="Tags"] .facet-chip')
-          .attributes("aria-pressed"),
+          .attributes("aria-current"),
       ).toBe("true");
     });
     expect(calls[0].getAll("library")).toEqual(["transformers"]);
@@ -979,8 +1037,8 @@ describe("RepoListPage", () => {
     expect(
       wrapper
         .get('[aria-label="Libraries"] .facet-chip')
-        .attributes("aria-pressed"),
-    ).toBe("false");
+        .attributes("aria-current"),
+    ).toBeUndefined();
     await wrapper
       .get('button[aria-label="Remove strasse filter"]')
       .trigger("click");
@@ -1132,7 +1190,7 @@ describe("RepoListPage", () => {
       expect(wrapper.text()).toContain("alice/private-session");
       expect(wrapper.vm.facets).toHaveLength(1);
       try {
-        await wrapper.get("[data-el-pagination-next]").trigger("click");
+        await wrapper.get("a[rel='next']").trigger("click");
         await vi.waitFor(() => expect(oldStarted).toHaveBeenCalledOnce());
         expect(wrapper.vm.currentPage).toBe(3);
         if (field === "token") auth.token = "session-b";
@@ -1222,7 +1280,7 @@ describe("RepoListPage", () => {
         expect(wrapper.vm.indexing).toEqual({ pending: 0, total: 0 });
         expect(wrapper.text()).not.toContain("alice/private-project");
         expect(wrapper.text()).not.toContain("private-facet");
-        expect(wrapper.find(".discovery-pagination").exists()).toBe(false);
+        expect(wrapper.find(".link-pager").exists()).toBe(false);
       }
       await wrapper.get(".discovery-error button").trigger("click");
       await flushPromises();
