@@ -267,6 +267,7 @@ input:focus-visible {
   background: var(--site-card, #fffdf7);
   color: var(--site-card-text, #2c332b);
   font-size: 11px;
+  font-weight: 400;
   line-height: 1.4;
   text-decoration: none;
 }

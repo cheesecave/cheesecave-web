@@ -11,6 +11,8 @@ const props = defineProps({
   target: { type: Function, required: true },
 });
 const JUMP = 3;
+// RouterLink marks every link to the open route as aria-current="page" (it ignores the query),
+// so each link says `aria-current` is null; only the open page's own <span> carries it.
 // Looked up by name, as LinkButton does, so tests that mock vue-router can stub it
 const RouterLink = resolveComponent("RouterLink");
 const pageCount = computed(() =>
@@ -52,7 +54,12 @@ function range(from, to) {
       aria-label="Previous page"
       v-bind="
         currentPage > 1
-          ? { to: target(currentPage - 1), replace: true, rel: 'prev' }
+          ? {
+              to: target(currentPage - 1),
+              replace: true,
+              rel: 'prev',
+              'aria-current': null,
+            }
           : { 'aria-disabled': 'true' }
       "
     >
@@ -73,6 +80,7 @@ function range(from, to) {
         :class="{ 'pager-jump': item.jump }"
         :to="target(item.page)"
         replace
+        :aria-current="null"
         :aria-label="
           item.jump ? `${item.jump} ${JUMP} pages` : `Page ${item.page}`
         "
@@ -86,7 +94,12 @@ function range(from, to) {
       aria-label="Next page"
       v-bind="
         currentPage < pageCount
-          ? { to: target(currentPage + 1), replace: true, rel: 'next' }
+          ? {
+              to: target(currentPage + 1),
+              replace: true,
+              rel: 'next',
+              'aria-current': null,
+            }
           : { 'aria-disabled': 'true' }
       "
     >
@@ -96,11 +109,11 @@ function range(from, to) {
 </template>
 
 <style scoped>
+/* The look of the Element Plus pager it replaces: tiles on the card colour, the open page bold */
 .link-pager {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
   margin-top: 24px;
   font-size: 14px;
 }
@@ -112,25 +125,30 @@ function range(from, to) {
   min-width: 32px;
   height: 32px;
   padding: 0 4px;
-  border-radius: 4px;
+  border-radius: 2px;
+  background: var(--site-card, #fffdf7);
   color: var(--site-text, #2c332b);
+  font-weight: 400;
   text-decoration: none;
+}
+.pager-jump {
+  font-weight: 700;
 }
 a.pager-page:hover,
 a.pager-step:hover {
-  color: var(--site-primary, #c28b37);
+  color: var(--site-page-link, #94621f);
 }
 a.pager-page:focus-visible,
 a.pager-step:focus-visible {
   outline: 2px solid var(--site-primary, #c28b37);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }
 .pager-page[aria-current="page"] {
   font-weight: 700;
-  color: var(--site-primary, #c28b37);
+  color: var(--site-page-link, #94621f);
 }
 .pager-step[aria-disabled="true"] {
-  opacity: 0.4;
+  color: var(--el-pagination-button-disabled-color, #858881);
   cursor: not-allowed;
 }
 </style>

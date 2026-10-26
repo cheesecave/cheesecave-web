@@ -1,4 +1,5 @@
 import { mount } from "@vue/test-utils";
+import { createMemoryHistory, createRouter } from "vue-router";
 import { describe, expect, it } from "vitest";
 
 import { RouterLinkStub } from "../helpers/vue";
@@ -125,6 +126,31 @@ describe("LinkPager", () => {
   it("has a landmark of its own", () => {
     expect(mountPager(1, 3).get("nav").attributes("aria-label")).toBe(
       "Pagination",
+    );
+  });
+
+  // The real RouterLink marks every link to the open route (query is not compared) as the
+  // current page; a stub cannot show it, so this one runs against a real router.
+  it("marks only the open page as current, not every link to the same route", async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/list", component: { render: () => null } }],
+    });
+    await router.push("/list");
+    const wrapper = mount(LinkPager, {
+      props: {
+        currentPage: 6,
+        pageSize: 10,
+        total: 110,
+        target: (page) => ({ path: "/list", query: { page } }),
+      },
+      global: { plugins: [router] },
+    });
+    const current = wrapper.findAll("[aria-current]");
+    expect(current).toHaveLength(1);
+    expect(current[0].text()).toBe("6");
+    expect(wrapper.get("a[rel='next']").attributes("href")).toBe(
+      "/list?page=7",
     );
   });
 });

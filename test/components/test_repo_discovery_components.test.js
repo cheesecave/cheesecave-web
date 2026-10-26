@@ -1,4 +1,5 @@
 import { mount } from "@vue/test-utils";
+import { createMemoryHistory, createRouter } from "vue-router";
 import { describe, expect, it } from "vitest";
 import RepoFilterPanel from "@/components/discovery/RepoFilterPanel.vue";
 import RepoDiscoveryCard from "@/components/discovery/RepoDiscoveryCard.vue";
@@ -68,6 +69,29 @@ describe("RepoFilterPanel", () => {
     expect(
       wrapper.get('[aria-label="Libraries"] a.facet-chip').attributes("href"),
     ).toBe("/models?library=transformers");
+    wrapper.unmount();
+  });
+
+  it("marks only the chosen chips as current, with the real RouterLink too", async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/models", component: { render: () => null } }],
+    });
+    await router.push("/models");
+    const wrapper = mount(RepoFilterPanel, {
+      props: {
+        facets: facets(),
+        selected: { task: ["task-1"] },
+        target: (key, value) => ({ path: "/models", query: { [key]: value } }),
+      },
+      global: { plugins: [router] },
+    });
+    const chips = wrapper.findAll('[aria-label="Tasks"] .facet-chip');
+    expect(chips.map((chip) => chip.attributes("aria-current"))).toEqual([
+      undefined,
+      "true",
+      ...Array(6).fill(undefined),
+    ]);
     wrapper.unmount();
   });
 
