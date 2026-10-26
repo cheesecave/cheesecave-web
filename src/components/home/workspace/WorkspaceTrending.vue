@@ -1,6 +1,7 @@
 <script setup>
 import { ElScrollbar } from "element-plus";
 import SiteAttribution from "@/components/layout/SiteAttribution.vue";
+import RepoChips from "@/components/repo/RepoChips.vue";
 import RepositoryStats from "@/components/repo/RepositoryStats.vue";
 import { buildRepositoryPath } from "@/utils/repo-paths";
 import {
@@ -68,9 +69,7 @@ const trendingType = defineModel("type", { type: String, default: "model" });
               aria-hidden="true"
             /><strong>{{ repo.id }}</strong></RouterLink
           >
-          <p v-if="repo.tags?.length" class="trending-tags">
-            {{ repo.tags.slice(0, 2).join(" · ") }}
-          </p>
+          <RepoChips :repo="repo" :type="trendingType" class="trending-tags" />
           <RepositoryStats :repo="repo" class="trending-stats" />
         </li>
       </ul>
@@ -201,9 +200,6 @@ const trendingType = defineModel("type", { type: String, default: "model" });
 }
 .trending-tags {
   margin: 7px 0 0 24px;
-  color: var(--ws-muted);
-  font-size: 10px;
-  overflow-wrap: anywhere;
 }
 .trending-stats {
   gap: 16px;

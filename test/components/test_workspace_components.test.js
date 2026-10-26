@@ -601,6 +601,33 @@ describe("workspace sections", () => {
     },
   );
 
+  it("tells a trending repository by its chips, not by its first raw tags", () => {
+    const wrapper = render(WorkspaceTrending, {
+      trendingRepositories: [
+        {
+          id: "team/project",
+          pipeline_tag: "text-generation",
+          library_name: "transformers",
+          tags: ["region:us", "transformers", "license:mit", "art", "anime"],
+        },
+        { id: "team/bare", tags: ["region:us"] },
+      ],
+    });
+    const items = wrapper.findAll(".trending-list li");
+    expect(items[0].findAll("[data-el-tag]").map((tag) => tag.text())).toEqual([
+      "Text Generation",
+      "Transformers",
+      "MIT License",
+      "+2",
+    ]);
+    expect(items[0].text()).not.toContain("region:us");
+    expect(
+      JSON.parse(items[0].get(".repo-chips a").attributes("href")),
+    ).toEqual({ path: "/models", query: { task: "text-generation" } });
+    expect(items[1].find("[data-el-tag]").exists()).toBe(false);
+    expect(items[1].find(".trending-tags").exists()).toBe(false);
+  });
+
   it("keeps the right rail scroll region and independent retry/type controls", async () => {
     const wrapper = render(WorkspaceTrending, { trendingError: true });
     expect(
