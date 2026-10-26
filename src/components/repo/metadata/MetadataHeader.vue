@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from "vue";
+import { computed, reactive } from "vue";
 import {
   getLicenseName,
   getPipelineTagName,
@@ -7,6 +7,7 @@ import {
 } from "@/utils/metadata-helpers";
 
 import { SPACE_SDKS } from "@/utils/repository-types";
+import { protoVariant } from "@/utils/proto-variant";
 
 const props = defineProps({
   metadata: {
@@ -28,6 +29,37 @@ const emit = defineEmits(["navigate-to-metadata"]);
 const MAX_OTHERS = 6;
 const MAX_PAPERS = 2;
 
+// PROTOTYPE of what a "+N more" does (`?meta=` in the address bar):
+//   current      goes to the Metadata tab (main today); papers have no count at all
+//   expand       unfolds the rest right here, "Show less" folds it back; papers get a count too
+//   expand-link  the same, and once something is open a link to the Metadata tab appears
+const variant = protoVariant(
+  "meta",
+  ["current", "expand", "expand-link"],
+  "current",
+);
+const expandable = variant !== "current";
+// An open header could hold thousands of chips (fineweb-2 lists 1813 languages): `cap=on` keeps it
+// to a scrolling box, `cap=off` shows what no limit would do
+const capped = protoVariant("cap", ["on", "off"], "on") === "on";
+const open = reactive({
+  languages: false,
+  others: false,
+  tasks: false,
+  papers: false,
+});
+// What is folded behind a count, listed only while its group is open and placed right after the
+// count's own button, so that "Show less" stays where "+N more" was and never scrolls out of sight
+const rest = (list, max, key) =>
+  expandable && open[key] ? list.slice(max) : [];
+const anyOpen = computed(() => Object.values(open).some(Boolean));
+function more(key) {
+  if (expandable) open[key] = !open[key];
+  else emit("navigate-to-metadata");
+}
+const moreLabel = (key, count) =>
+  expandable && open[key] ? "Show less" : `+${count} more`;
+
 // Every chip leads to the discovery page of this kind of repository, filtered by it
 const discoverPath = computed(() => `/${props.repoType}s`);
 const to = (query) => ({ path: discoverPath.value, query });
@@ -40,10 +72,15 @@ const shownLibraries = computed(() => {
 });
 
 const shownOthers = computed(() => props.others.slice(0, MAX_OTHERS));
+const restOthers = computed(() => rest(props.others, MAX_OTHERS, "others"));
 const moreOthers = computed(() =>
   Math.max(0, props.others.length - MAX_OTHERS),
 );
 const shownPapers = computed(() => props.arxiv.slice(0, MAX_PAPERS));
+const restPapers = computed(() => rest(props.arxiv, MAX_PAPERS, "papers"));
+const morePapers = computed(() =>
+  expandable ? Math.max(0, props.arxiv.length - MAX_PAPERS) : 0,
+);
 
 // A card may write the license as a list; the first one is the one shown
 const license = computed(() => {
@@ -67,6 +104,9 @@ const sdkName = computed(() => {
 const asList = (value) => (value ? [].concat(value) : []);
 
 const languages = computed(() => asList(props.metadata.language).slice(0, 3)); // max 3 in the header
+const restLanguages = computed(() =>
+  rest(asList(props.metadata.language), 3, "languages"),
+);
 const moreLanguages = computed(() =>
   Math.max(0, asList(props.metadata.language).length - 3),
 );
@@ -80,6 +120,9 @@ const pipelineTag = computed(() => {
 const taskCategories = computed(() =>
   asList(props.metadata.task_categories).slice(0, 2),
 ); // max 2 tasks
+const restTasks = computed(() =>
+  rest(asList(props.metadata.task_categories), 2, "tasks"),
+);
 const moreTasks = computed(() =>
   Math.max(0, asList(props.metadata.task_categories).length - 2),
 );
@@ -93,7 +136,10 @@ const sizeCategory = computed(
   <div
     class="metadata-header bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 mb-4"
   >
-    <div class="flex flex-wrap items-center gap-2">
+    <div
+      class="flex flex-wrap items-center gap-2"
+      :class="{ 'metadata-header-open': capped && anyOpen }"
+    >
       <!-- Pipeline Tag (Models) -->
       <RouterLink
         v-if="repoType === 'model' && pipelineTag"
@@ -152,10 +198,20 @@ const sizeCategory = computed(
         size="small"
         effect="plain"
         class="cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30"
-        @click="emit('navigate-to-metadata')"
+        @click="more('languages')"
       >
-        +{{ moreLanguages }} more
+        {{ moreLabel("languages", moreLanguages) }}
       </el-tag>
+      <RouterLink
+        v-for="lang in restLanguages"
+        :key="lang"
+        :to="to({ language: String(lang).toLowerCase() })"
+      >
+        <el-tag type="primary" size="small" effect="plain">
+          <div class="i-carbon-language inline-block mr-1" />
+          {{ getLanguageName(lang) }}
+        </el-tag>
+      </RouterLink>
 
       <!-- Free tags (Models) -->
       <RouterLink
@@ -170,14 +226,42 @@ const sizeCategory = computed(
         size="small"
         effect="plain"
         class="cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30"
-        @click="emit('navigate-to-metadata')"
+        @click="more('others')"
       >
-        +{{ moreOthers }} more
+        {{ moreLabel("others", moreOthers) }}
       </el-tag>
+      <RouterLink
+        v-for="tag in repoType === 'model' ? restOthers : []"
+        :key="tag.id"
+        :to="to(tag.query)"
+      >
+        <el-tag size="small" effect="plain">{{ tag.label }}</el-tag>
+      </RouterLink>
 
       <!-- Papers (Models): away from the site -->
       <a
         v-for="paper in repoType === 'model' ? shownPapers : []"
+        :key="paper.id"
+        :href="paper.url"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <el-tag size="small" effect="plain">
+          <div class="i-carbon-document-attachment inline-block mr-1" />
+          {{ paper.label }}
+        </el-tag>
+      </a>
+      <el-tag
+        v-if="repoType === 'model' && morePapers > 0"
+        size="small"
+        effect="plain"
+        class="cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30"
+        @click="more('papers')"
+      >
+        {{ moreLabel("papers", morePapers) }}
+      </el-tag>
+      <a
+        v-for="paper in repoType === 'model' ? restPapers : []"
         :key="paper.id"
         :href="paper.url"
         target="_blank"
@@ -214,10 +298,33 @@ const sizeCategory = computed(
         size="small"
         effect="plain"
         class="cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30"
+        @click="more('tasks')"
+      >
+        {{ moreLabel("tasks", moreTasks) }}
+      </el-tag>
+      <el-tag
+        v-for="task in repoType === 'dataset' ? restTasks : []"
+        :key="task"
+        type="success"
+        size="small"
+      >
+        <div class="i-carbon-checkbox-checked inline-block mr-1" />
+        {{ task }}
+      </el-tag>
+    </div>
+
+    <!-- Outside the scrolling box, so it is in sight whenever something is open -->
+    <div
+      v-if="variant === 'expand-link' && anyOpen"
+      class="mt-2 text-right text-xs"
+    >
+      <button
+        type="button"
+        class="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer bg-transparent border-0"
         @click="emit('navigate-to-metadata')"
       >
-        +{{ moreTasks }} more
-      </el-tag>
+        All metadata →
+      </button>
     </div>
   </div>
 </template>
@@ -225,5 +332,9 @@ const sizeCategory = computed(
 <style scoped>
 .metadata-header {
   border: 1px solid var(--el-border-color-lighter);
+}
+.metadata-header-open {
+  max-height: 12rem;
+  overflow-y: auto;
 }
 </style>
