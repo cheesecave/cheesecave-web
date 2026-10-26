@@ -1,4 +1,4 @@
-import { defineComponent, h } from "vue";
+import { defineComponent, h, ref } from "vue";
 
 const emitValueUpdate = (emit, value) => {
   emit("update:modelValue", value);
@@ -472,6 +472,60 @@ export const ElementPlusStubs = {
     },
   }),
   ElIcon: passthroughDiv("ElIcon", { "data-el-icon": "true" }),
+  // Like the real one with trigger="click": a click on the reference toggles the panel, `hide()` is
+  // exposed, and a panel with `persistent` false is not in the page while closed.
+  ElPopover: defineComponent({
+    name: "ElPopover",
+    props: {
+      trigger: { type: String, default: "hover" },
+      placement: { type: String, default: "bottom" },
+      width: { type: [Number, String], default: 150 },
+      persistent: { type: Boolean, default: true },
+      popperClass: { type: String, default: "" },
+    },
+    setup(props, { slots, expose }) {
+      const visible = ref(false);
+      expose({
+        hide() {
+          visible.value = false;
+        },
+      });
+      return () =>
+        h(
+          "div",
+          {
+            "data-el-popover": "true",
+            "data-trigger": props.trigger,
+            "data-placement": props.placement,
+            "data-width": String(props.width),
+            "data-persistent": String(props.persistent),
+            "data-popper-class": props.popperClass,
+          },
+          [
+            h(
+              "span",
+              {
+                "data-popover-reference": "true",
+                onClick: () => {
+                  visible.value = !visible.value;
+                },
+              },
+              slots.reference ? slots.reference() : [],
+            ),
+            visible.value || props.persistent
+              ? h(
+                  "div",
+                  {
+                    "data-popover-content": "true",
+                    "data-open": String(visible.value),
+                  },
+                  slots.default ? slots.default() : [],
+                )
+              : null,
+          ],
+        );
+    },
+  }),
 };
 
 export const InvalidElFormStub = defineComponent({
