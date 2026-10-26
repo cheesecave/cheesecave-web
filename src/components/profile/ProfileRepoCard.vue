@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from "vue";
 import PrivateBadge from "@/components/repo/PrivateBadge.vue";
+import RepoChips from "@/components/repo/RepoChips.vue";
 import { formatRelativeTime } from "@/utils/datetime";
 import { externalRepoUrl } from "@/utils/external-repo";
 import { buildRepositoryPath } from "@/utils/repo-paths";
@@ -50,16 +51,7 @@ function openExternal() {
       </div>
     </div>
 
-    <div v-if="repo.tags && repo.tags.length" class="flex gap-1 mb-2 flex-wrap">
-      <el-tag
-        v-for="tag in repo.tags.slice(0, 2)"
-        :key="tag"
-        size="small"
-        effect="plain"
-      >
-        {{ tag }}
-      </el-tag>
-    </div>
+    <RepoChips :repo="repo" :type="type" class="mb-2" />
 
     <div v-if="external" class="mb-2">
       <el-button

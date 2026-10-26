@@ -71,11 +71,13 @@ describe("ProfileRepoCard", () => {
     expect(mountCard().find(".repo-private").exists()).toBe(false);
   });
 
-  it("shows the first two tags and the numbers, with 0 for a missing count", () => {
-    const tagged = mountCard({ tags: ["a", "b", "c"] });
+  it("shows the first three chips and the numbers, with 0 for a missing count", () => {
+    const tagged = mountCard({ tags: ["a", "b", "c", "d", "e"] });
     expect(tagged.findAll("[data-el-tag]").map((t) => t.text())).toEqual([
       "a",
       "b",
+      "c",
+      "+2",
     ]);
     expect(tagged.text()).toContain("7");
     expect(tagged.text()).toContain("3");
@@ -87,6 +89,42 @@ describe("ProfileRepoCard", () => {
     });
     expect(bare.find("[data-el-tag]").exists()).toBe(false);
     expect(bare.text().match(/0/g)).toHaveLength(2);
+  });
+
+  it("says what the repository is, as its page does, not what its tags happen to start with", () => {
+    const wrapper = mountCard({
+      pipeline_tag: "text-generation",
+      library_name: "transformers",
+      tags: ["region:us", "transformers", "license:mit", "language:en", "art"],
+    });
+    expect(wrapper.findAll("[data-el-tag]").map((t) => t.text())).toEqual([
+      "Text Generation",
+      "Transformers",
+      "MIT License",
+      "+1",
+    ]);
+    expect(wrapper.text()).not.toContain("region");
+    const links = wrapper
+      .findAll("[data-el-tag]")
+      .map((t) => t.element.closest("a")?.getAttribute("href"));
+    expect(links.slice(0, 3).map((href) => JSON.parse(href))).toEqual([
+      { path: "/models", query: { task: "text-generation" } },
+      { path: "/models", query: { library: "transformers" } },
+      { path: "/models", query: { license: "mit" } },
+    ]);
+    expect(links[3]).toBeUndefined();
+  });
+
+  it("filters by the kind of repository the card is", () => {
+    const wrapper = mountCard(
+      { tags: ["size_categories:1K<n<10K"] },
+      "dataset",
+    );
+    const href = wrapper.get(".repo-chips a").attributes("href");
+    expect(JSON.parse(href)).toEqual({
+      path: "/datasets",
+      query: { size: "1K<n<10K" },
+    });
   });
 
   it("says when it was updated, or never", () => {
