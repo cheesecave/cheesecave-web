@@ -9,6 +9,14 @@ const REPO_VIEW_ROUTES = new Map([
 const ROOT_TABS = new Set(["card", "metadata"]);
 const loadRepoViewer = () => import("../components/repo/RepoViewer.vue");
 
+/** Only the shared model/dataset viewer uses the combined site and repository header. */
+export function isCompositeRepositoryRoute(route) {
+  return (
+    REPO_VIEW_ROUTES.has(route.name) &&
+    ["model", "dataset"].includes(route.params?.type)
+  );
+}
+
 /** A tuple preserves repository boundaries even when both names contain hyphens. */
 export function getRouteViewKey(route) {
   const match = route.path.match(

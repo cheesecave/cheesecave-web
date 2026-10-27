@@ -1,8 +1,39 @@
 <!-- src/components/repo/RepoViewer.vue -->
 <template>
-  <div class="container-main">
+  <div :class="isCompositeHeader ? 'repository-page' : 'container-main'">
+    <RepositoryHeader
+      v-if="isCompositeHeader"
+      :repo-type="repoType"
+      :namespace="namespace"
+      :name="name"
+      :namespace-link="namespaceLink"
+      :repo-info="error ? null : repoInfo"
+      :signed-in="authStore.isAuthenticated"
+      :is-owner="isOwner"
+      :liked="isLiked"
+      :likes-count="likesCount"
+      :liking="likingInProgress"
+      :tabs="headerTabs"
+      :active-tab="activeTab"
+      @copy="copyRepoId"
+      @clone="showCloneDialog = true"
+      @download="downloadRepo"
+      @like="toggleLike"
+    >
+      <template #metadata>
+        <MetadataHeader
+          v-if="hasMetadataHeader && !error"
+          :metadata="displayMetadata"
+          :libraries="tagGroups.libraries"
+          :others="tagGroups.others"
+          :arxiv="tagGroups.arxiv"
+          :repo-type="repoType"
+          @navigate-to-metadata="navigateToTab('metadata')"
+        />
+      </template>
+    </RepositoryHeader>
     <el-breadcrumb
-      v-if="error"
+      v-if="error && !isCompositeHeader"
       separator="/"
       class="repo-breadcrumb mb-6 text-gray-700 dark:text-gray-300"
       aria-label="Repository navigation"
@@ -54,14 +85,19 @@
       :retry="loadRepoInfo"
       :retrying="repoInfoResource.retrying.value"
       :auto-retry-in="repoInfoResource.autoRetryIn.value"
+      :class="{ 'repository-content': isCompositeHeader }"
       @cancel-auto-retry="repoInfoResource.cancelAutoRetry"
     />
 
-    <div v-else class="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
+    <div
+      v-else
+      class="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6"
+      :class="{ 'repository-content': isCompositeHeader }"
+    >
       <!-- Main Content -->
       <main class="min-w-0">
         <!-- Repo Header -->
-        <div class="card repo-header mb-6">
+        <div v-if="!isCompositeHeader" class="card repo-header mb-6">
           <div
             class="flex flex-col sm:flex-row items-start justify-between gap-4 mb-4"
           >
@@ -195,7 +231,7 @@
 
         <!-- Metadata Header (Key badges) -->
         <MetadataHeader
-          v-if="hasMetadataHeader"
+          v-if="!isCompositeHeader && hasMetadataHeader"
           :metadata="displayMetadata"
           :libraries="tagGroups.libraries"
           :others="tagGroups.others"
@@ -206,6 +242,7 @@
 
         <!-- Navigation Tabs: real links, so "Open in new tab" works on each of them -->
         <nav
+          v-if="!isCompositeHeader"
           class="repo-tabs mb-6 -mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto"
           aria-label="Repository sections"
         >
@@ -955,6 +992,7 @@ import { useAsyncResource } from "@/composables/useAsyncResource";
 import { resolveRepoTreeEntryPath } from "@/utils/repo-paths";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import MetadataHeader from "@/components/repo/metadata/MetadataHeader.vue";
+import RepositoryHeader from "@/components/repo/RepositoryHeader.vue";
 import LinkButton from "@/components/common/LinkButton.vue";
 import ModelInfoCard from "@/components/repo/metadata/ModelInfoCard.vue";
 import {
@@ -1185,6 +1223,9 @@ const PATHS_INFO_BATCH_SIZE = 1000;
 
 // Computed
 const activeTab = computed(() => props.tab);
+const isCompositeHeader = computed(() =>
+  ["model", "dataset"].includes(props.repoType),
+);
 
 const repoTypeLabel = computed(() => {
   const labels = { model: "Models", dataset: "Datasets", space: "Spaces" };
@@ -1408,6 +1449,10 @@ const repoTabs = computed(() => [
   },
   { key: "metadata", label: "Metadata" },
 ]);
+
+const headerTabs = computed(() =>
+  repoTabs.value.map((item) => ({ ...item, to: tabTarget(item.key) })),
+);
 
 const tabClass = (active) => [
   // flex + items-center: the label stays vertically centred in the stretched row, as in a button
@@ -2292,3 +2337,20 @@ onMounted(async () => {
   await Promise.all([info, loadActiveTab()]);
 });
 </script>
+
+<style scoped>
+.repository-page {
+  min-width: 0;
+}
+.repository-content {
+  width: 100%;
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: 24px;
+}
+@media (max-width: 767px) {
+  .repository-content {
+    padding: 20px 16px;
+  }
+}
+</style>

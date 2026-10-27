@@ -2,6 +2,7 @@
 <template>
   <header
     class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 transition-colors"
+    :class="{ 'repository-site-header': repository }"
     style="z-index: 1000"
   >
     <div
@@ -318,7 +319,10 @@
 </template>
 
 <script setup>
-defineProps({ expanded: { type: Boolean, default: false } });
+defineProps({
+  expanded: { type: Boolean, default: false },
+  repository: { type: Boolean, default: false },
+});
 import { storeToRefs } from "pinia";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
@@ -377,6 +381,21 @@ async function handleLogout() {
 </script>
 
 <style scoped>
+.repository-site-header {
+  position: relative;
+  border-bottom: 0;
+  background: var(--site-card);
+}
+.repository-site-header > .container-main {
+  width: 100%;
+  max-width: 1680px;
+  padding-inline: 24px;
+}
+@media (max-width: 767px) {
+  .repository-site-header > .container-main {
+    padding-inline: 16px;
+  }
+}
 .workspace-header {
   max-width: none;
   padding-inline: 24px;

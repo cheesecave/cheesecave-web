@@ -157,6 +157,13 @@ describe("RepoViewer loading on a big repository", () => {
     await flushPromises();
 
     expect(seen.map((s) => s.what)).toEqual(["info", "tree"]);
+    const header = wrapper.get('[aria-label="Repository header"]');
+    expect(header.get("h1").text().replace(/\s+/g, "")).toBe(
+      "open-media-lab/big-repo",
+    );
+    expect(
+      header.get('nav[aria-label="Repository sections"]').findAll("a"),
+    ).toHaveLength(4);
 
     infoGate.resolve();
     await flushPromises();
@@ -173,21 +180,15 @@ describe("RepoViewer loading on a big repository", () => {
     expect(seen.filter((s) => s.what === "readme")).toHaveLength(1);
   });
 
-  it("keeps the repository header, sidebar and tab buttons mounted while tab data loads", async () => {
+  it("keeps the repository header, sidebar and tab links mounted while tab data loads", async () => {
     const wrapper = mountViewer("card");
     await vi.waitFor(() =>
       expect(wrapper.find("article").text()).toContain("Big repo main"),
     );
     const heading = wrapper.get("h1").element;
     const sidebar = wrapper.get("aside").element;
-    const buttons = wrapper
-      .findAll("button")
-      .filter((button) =>
-        ["Dataset Card", "Files", "Commits", "Metadata"].includes(
-          button.text(),
-        ),
-      )
-      .map((button) => button.element);
+    const tabs = wrapper.findAll(".repo-tabs a").map((link) => link.element);
+    expect(tabs).toHaveLength(4);
     const gate = deferred();
     gates.set("commits:main", gate);
 
@@ -196,8 +197,8 @@ describe("RepoViewer loading on a big repository", () => {
       await flushPromises();
       expect(wrapper.get("h1").element).toBe(heading);
       expect(wrapper.get("aside").element).toBe(sidebar);
-      for (const button of buttons)
-        expect(wrapper.element.contains(button)).toBe(true);
+      for (const link of tabs)
+        expect(wrapper.element.contains(link)).toBe(true);
     }
     expect(seen.filter((request) => request.what === "info")).toHaveLength(1);
     gate.resolve();
@@ -234,24 +235,31 @@ describe("RepoViewer loading on a big repository", () => {
       );
       const wrapper = mountViewer("files", { repoType });
       await vi.waitFor(() =>
-        expect(wrapper.get(".repo-header h1 a").attributes("href")).toBe(
-          ownerHref,
-        ),
+        expect(
+          wrapper.get(".repo-composite-header h1 a").attributes("href"),
+        ).toBe(ownerHref),
       );
-      const header = wrapper.get(".repo-header").element;
+      const header = wrapper.get(".repo-composite-header").element;
       for (const tab of ["files", "commits", "metadata", "card"]) {
         await wrapper.setProps({ tab });
         expect(wrapper.find(".repo-breadcrumb").exists()).toBe(false);
-        expect(wrapper.get(".repo-header").element).toBe(header);
-        expect(wrapper.get(".repo-header h1").text().replace(/\s+/g, " ")).toBe(
-          "open-media-lab / big-repo",
-        );
+        expect(wrapper.get(".repo-composite-header").element).toBe(header);
+        expect(wrapper.find(".card.repo-header").exists()).toBe(false);
+        expect(
+          wrapper.get(".repo-composite-header h1").text().replace(/\s+/g, ""),
+        ).toBe("open-media-lab/big-repo");
         expect(
           wrapper
-            .get(".repo-header")
+            .get(".repo-composite-header h1")
             .text()
             .match(/big-repo/g),
         ).toHaveLength(1);
+        expect(
+          wrapper
+            .get(`h1 a[href='/${repoType}s/open-media-lab/big-repo']`)
+            .text(),
+        ).toBe("big-repo");
+        expect(wrapper.findAll("h1")).toHaveLength(1);
         expect(
           wrapper.find('button[aria-label="Copy repository ID"]').exists(),
         ).toBe(true);
@@ -260,6 +268,33 @@ describe("RepoViewer loading on a big repository", () => {
       wrapper.unmount();
     },
   );
+
+  it("retains the separate repository card and tabs for Spaces", async () => {
+    server.use(
+      http.get("/api/spaces/open-media-lab/big-repo", () =>
+        jsonResponse({
+          id: "open-media-lab/big-repo",
+          sdk: "gradio",
+          tags: [],
+        }),
+      ),
+      http.get("/api/spaces/open-media-lab/big-repo/tree/main", () =>
+        jsonResponse([]),
+      ),
+      http.post("/api/spaces/open-media-lab/big-repo/paths-info/main", () =>
+        jsonResponse([]),
+      ),
+    );
+    const wrapper = mountViewer("files", { repoType: "space" });
+    await flushPromises();
+    expect(wrapper.find(".repo-composite-header").exists()).toBe(false);
+    expect(wrapper.get(".card.repo-header h1").text()).toContain("big-repo");
+    expect(wrapper.findAll(".repo-tabs a")).toHaveLength(4);
+    expect(wrapper.get(".card.repo-header").find(".repo-tabs").exists()).toBe(
+      false,
+    );
+    wrapper.unmount();
+  });
 
   it("keeps directory breadcrumbs in Files and repository navigation in the full-width Viewer", async () => {
     const wrapper = mountViewer("files", { currentPath: "nested" });
@@ -280,7 +315,9 @@ describe("RepoViewer loading on a big repository", () => {
     await wrapper.setProps({ tab: "card", currentPath: "" });
     await vi.waitFor(() =>
       expect(
-        seen.filter((request) => request.what === "tree" && request.path === ""),
+        seen.filter(
+          (request) => request.what === "tree" && request.path === "",
+        ),
       ).toHaveLength(1),
     );
     await vi.waitFor(() =>

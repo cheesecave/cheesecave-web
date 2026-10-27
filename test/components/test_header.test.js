@@ -142,6 +142,31 @@ describe("TheHeader", () => {
     expect(mocks.router.push).not.toHaveBeenCalled();
   });
 
+  it("keeps site navigation usable in the scrolling repository header", async () => {
+    authenticate();
+    const wrapper = mountHeader({ repository: true, expanded: true });
+    expect(wrapper.get("header").classes()).toContain("repository-site-header");
+    expect(
+      wrapper
+        .get('nav[aria-label="Main navigation"]')
+        .findAll("a")
+        .map((link) => [link.text(), link.attributes("href")]),
+    ).toEqual(navigationEntries.map(([label, to]) => [label, to]));
+    const drawer = await openMobileMenu(wrapper);
+    expect(
+      drawer
+        .get("nav")
+        .findAll("a")
+        .map((link) => link.attributes("href")),
+    ).toEqual(navigationEntries.map(([, to]) => to));
+    await wrapper.setProps({ repository: false });
+    expect(wrapper.get("header").classes()).not.toContain(
+      "repository-site-header",
+    );
+    expect(wrapper.get("header").classes()).toContain("sticky");
+    wrapper.unmount();
+  });
+
   it("renders the same navigation destinations and authenticated menu entries on desktop and mobile", async () => {
     authenticate();
     const wrapper = mountHeader();

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createRepoViewRoutes,
   getRouteViewKey,
+  isCompositeRepositoryRoute,
 } from "@/utils/repo-view-routes";
 
 const lifecycle = vi.hoisted(() => ({ mounts: 0 }));
@@ -42,6 +43,60 @@ const suffixes = [
   ["/blob/[branch]/[...file]", "/blob/:branch/:file(.*)"],
   ["/settings", "/settings"],
 ];
+
+describe("composite repository header route scope", () => {
+  it.each(["model", "dataset"])(
+    "includes only the four RepoViewer route records for %s repositories",
+    (type) => {
+      for (const [suffix] of suffixes.slice(0, 4)) {
+        expect(
+          isCompositeRepositoryRoute({
+            name: prefix + suffix,
+            params: { type, namespace: "team", name: "demo" },
+          }),
+          suffix,
+        ).toBe(true);
+      }
+    },
+  );
+
+  it("excludes Spaces, repository operation pages, lists and unrelated routes", () => {
+    for (const [suffix] of suffixes.slice(0, 4)) {
+      expect(
+        isCompositeRepositoryRoute({
+          name: prefix + suffix,
+          params: { type: "space", namespace: "team", name: "demo" },
+        }),
+      ).toBe(false);
+    }
+    for (const name of [
+      `${prefix}/blob/[branch]/[...file]`,
+      `${prefix}/settings`,
+      `${prefix}/upload/[branch]`,
+      `${prefix}/edit/[branch]/[...file]`,
+      `${prefix}/commit/[commit]`,
+      "/models/",
+      "/datasets/",
+      "/new",
+      "/organizations/[orgname]/",
+      undefined,
+    ]) {
+      expect(
+        isCompositeRepositoryRoute({ name, params: { type: "model" } }),
+        String(name),
+      ).toBe(false);
+    }
+    expect(isCompositeRepositoryRoute({ name: `${prefix}/`, params: {} })).toBe(
+      false,
+    );
+    expect(
+      isCompositeRepositoryRoute({
+        name: `${prefix}/`,
+        params: { type: ["model"] },
+      }),
+    ).toBe(false);
+  });
+});
 
 function generatedRoutes() {
   return suffixes.map(([name, path], index) => ({
