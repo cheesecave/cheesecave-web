@@ -295,8 +295,11 @@ export const repoAPI = {
    * @returns {Promise} - Array of repositories
    */
   // `partial=ok`: when an external source is down, answer without it and say so, instead of a 503
-  listRepos: (type, params) =>
-    api.get(`/api/${type}s`, { params: { partial: "ok", ...params } }),
+  listRepos: (type, params, config = {}) =>
+    api.get(`/api/${type}s`, {
+      ...config,
+      params: { partial: "ok", ...params },
+    }),
 
   /**
    * Every repository of a listing: follows `Link: rel="next"` to the last page.
@@ -324,6 +327,9 @@ export const repoAPI = {
 
   discoverRepos: (type, params) =>
     api.get(`/api/${type}s/discover`, { params }),
+
+  listRefs: (type, namespace, name, config) =>
+    api.get(`/api/${type}s/${namespace}/${name}/refs`, config),
 
   /**
    * Get user overview with all repositories
@@ -768,6 +774,20 @@ export const repoAPI = {
     api
       .get(`/api/${type}s/${namespace}/${name}/commits/${branch}`, { params })
       .then(normalizeCommitListResponse),
+
+  getCommitDetail: (type, namespace, name, commitId, config) =>
+    api.get(
+      `/api/${type}s/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/commit/${encodeURIComponent(commitId)}`,
+      config,
+    ),
+
+  // A separate request: counting a long history must not delay the file list
+  // or its latest-commit summary.
+  getCommitCount: (type, namespace, name, branch, config) =>
+    api.get(
+      `/api/${type}s/${namespace}/${name}/commit-count/${encodeURIComponent(branch)}`,
+      config,
+    ),
 
   /**
    * What a commit list page can mark: revert / reset proven unavailable

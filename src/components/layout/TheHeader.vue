@@ -2,6 +2,7 @@
 <template>
   <header
     class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 transition-colors"
+    :class="{ 'repository-site-header': repository }"
     style="z-index: 1000"
   >
     <div
@@ -11,7 +12,7 @@
       <!-- Logo -->
       <RouterLink
         to="/"
-        class="flex items-center gap-2 min-w-0 max-w-[70%] md:max-w-[25%]"
+        class="header-brand flex items-center gap-2 min-w-0 max-w-[70%] md:max-w-[25%]"
         :aria-label="branding.site_name"
         :title="branding.site_name"
       >
@@ -27,9 +28,11 @@
         >
       </RouterLink>
 
+      <HeaderSearch v-if="repository" class="repository-header-search" />
+
       <!-- Desktop Navigation - hidden on mobile -->
       <nav
-        class="hidden md:flex items-center gap-6"
+        class="header-navigation hidden md:flex items-center gap-6"
         aria-label="Main navigation"
       >
         <RouterLink
@@ -43,7 +46,7 @@
       </nav>
 
       <!-- Desktop User Menu - hidden on mobile -->
-      <div class="hidden md:flex items-center gap-4">
+      <div class="header-account-controls hidden md:flex items-center gap-4">
         <!-- Dark Mode Toggle -->
         <el-button
           @click="themeStore.toggle()"
@@ -146,7 +149,7 @@
 
       <!-- Mobile Menu Button -->
       <div
-        class="flex md:hidden items-center gap-2"
+        class="header-mobile-controls flex md:hidden items-center gap-2"
         style="position: relative; z-index: 1001"
       >
         <!-- Dark Mode Toggle - Mobile -->
@@ -318,7 +321,10 @@
 </template>
 
 <script setup>
-defineProps({ expanded: { type: Boolean, default: false } });
+defineProps({
+  expanded: { type: Boolean, default: false },
+  repository: { type: Boolean, default: false },
+});
 import { storeToRefs } from "pinia";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
@@ -327,6 +333,7 @@ import { computed, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import EntityAvatar from "@/components/common/EntityAvatar.vue";
 import LinkButton from "@/components/common/LinkButton.vue";
+import HeaderSearch from "@/components/layout/HeaderSearch.vue";
 import {
   HEADER_NAVIGATION_ITEMS,
   HEADER_CREATION_ITEMS,
@@ -377,6 +384,68 @@ async function handleLogout() {
 </script>
 
 <style scoped>
+.repository-site-header {
+  position: relative;
+  border-bottom: 0;
+  background: var(--site-card);
+}
+.repository-site-header > .container-main {
+  width: 100%;
+  max-width: none;
+  padding-inline: 24px;
+  column-gap: 24px;
+  justify-content: flex-start;
+}
+.repository-site-header .header-brand {
+  flex: 0 1 auto;
+  max-width: 260px;
+}
+.repository-header-search {
+  flex: 1 1 280px;
+  min-width: 160px;
+  max-width: 360px;
+}
+.repository-site-header .header-navigation {
+  margin-left: auto;
+  flex: none;
+  gap: 20px;
+}
+.repository-site-header .header-account-controls {
+  flex: none;
+}
+@media (min-width: 768px) and (max-width: 1179px) {
+  .repository-site-header .header-navigation,
+  .repository-site-header .header-account-controls {
+    display: none;
+  }
+  .repository-site-header .header-mobile-controls {
+    display: flex;
+    flex: none;
+    margin-left: auto;
+  }
+}
+@media (max-width: 767px) {
+  .repository-site-header > .container-main {
+    padding-inline: 16px;
+    column-gap: 16px;
+    height: auto;
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding-block: 8px 12px;
+  }
+  .repository-site-header .header-mobile-controls {
+    flex: none;
+    margin-left: auto;
+  }
+  .repository-site-header .header-brand {
+    max-width: calc(100% - 104px);
+  }
+  .repository-header-search {
+    order: 1;
+    flex-basis: 100%;
+    max-width: none;
+  }
+}
 .workspace-header {
   max-width: none;
   padding-inline: 24px;

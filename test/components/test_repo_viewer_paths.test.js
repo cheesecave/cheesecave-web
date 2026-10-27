@@ -61,6 +61,9 @@ describe("RepoViewer path handling", () => {
       http.get("/api/datasets/open-media-lab/:name/commits/main", () =>
         jsonResponse(cloneFixture(uiApiFixtures.repo.commitsHf.page1)),
       ),
+      http.get("/api/datasets/open-media-lab/:name/commit-count/:branch", () =>
+        jsonResponse({ count: 3, head: "head123" }),
+      ),
     );
   }
 
@@ -139,6 +142,7 @@ describe("RepoViewer path handling", () => {
             paths: form.getAll("paths"),
             expand: form.get("expand"),
           });
+          if (form.get("expand") === "false") return jsonResponse([]);
           return jsonResponse(cloneFixture(uiApiFixtures.repo.pathsInfo));
         },
       ),
@@ -161,6 +165,11 @@ describe("RepoViewer path handling", () => {
       },
     ]);
     expect(requests.pathsInfo).toEqual([
+      {
+        name: "hierarchy-crawl-fixtures",
+        paths: ["README.md", "readme.md", "Readme.md"],
+        expand: "false",
+      },
       {
         name: "hierarchy-crawl-fixtures",
         paths: ["catalog/section-01"],
@@ -427,6 +436,7 @@ describe("RepoViewer path handling", () => {
             paths: form.getAll("paths"),
             expand: form.get("expand"),
           });
+          if (form.get("expand") === "false") return jsonResponse([]);
           return jsonResponse([
             { type: "file", path: "catalog-next/new.txt", size: 1 },
           ]);
@@ -464,6 +474,11 @@ describe("RepoViewer path handling", () => {
     expect(wrapper.text()).toContain("new.txt");
     expect(wrapper.text()).not.toContain("old.txt");
     expect(requests.pathsInfo).toEqual([
+      {
+        name: "hierarchy-crawl-fixtures",
+        paths: ["README.md", "readme.md", "Readme.md"],
+        expand: "false",
+      },
       {
         name: "hierarchy-crawl-fixtures",
         paths: ["catalog-next/new.txt"],
@@ -614,6 +629,12 @@ describe("RepoViewer path handling", () => {
     // with the numbered pager.
     const observed = [];
     server.use(
+      http.get("/api/datasets/open-media-lab/hierarchy-crawl-fixtures", () =>
+        jsonResponse({
+          ...repoInfoFor("hierarchy-crawl-fixtures"),
+          usedStorage: 5_000_000,
+        }),
+      ),
       http.get(
         "/api/datasets/open-media-lab/hierarchy-crawl-fixtures/tree/main/catalog",
         ({ request }) => {
@@ -658,9 +679,14 @@ describe("RepoViewer path handling", () => {
     expect(wrapper.find('[data-testid="file-list-load-more"]').exists()).toBe(
       true,
     );
-    // Count copy carries the "loaded" suffix while more is available.
-    expect(wrapper.find('[data-testid="file-list-count"]').text()).toContain(
-      "loaded",
+    // Repository storage stays independent of how many entries are loaded.
+    await vi.waitFor(() =>
+      expect(wrapper.get('[data-testid="repository-size"]').text()).toBe(
+        "5.0 MB",
+      ),
+    );
+    expect(wrapper.find('[data-testid="file-list-count"]').exists()).toBe(
+      false,
     );
 
     wrapper.unmount();
@@ -1369,7 +1395,7 @@ describe("RepoViewer path handling", () => {
   });
 
   it("renders an ErrorState for a README that fails to resolve, not the 'No README.md found' placeholder", async () => {
-    // Tree returns one entry — a README — so loadReadme() will try to
+    // Both tree and root paths-info expose the README, so loadReadme() will try to
     // fetch it. That fetch returns a classified 401/GatedRepo body;
     // RepoViewer should show the ErrorState in the README slot
     // instead of the misleading "No README.md found" empty copy.
@@ -1392,7 +1418,10 @@ describe("RepoViewer path handling", () => {
       ),
       http.post(
         "/api/datasets/open-media-lab/hierarchy-crawl-fixtures/paths-info/main",
-        () => jsonResponse([]),
+        () =>
+          jsonResponse([
+            { type: "file", path: "README.md", size: 120, oid: "r" },
+          ]),
       ),
       // The README resolve itself fails with the aggregate-gated body.
       http.get(

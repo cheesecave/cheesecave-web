@@ -1,8 +1,63 @@
 <!-- src/components/repo/RepoViewer.vue -->
 <template>
-  <div class="container-main">
+  <div
+    :class="
+      isCompositeHeader ? 'repository-page' : detailView ? '' : 'container-main'
+    "
+  >
+    <RepositoryHeader
+      v-if="isCompositeHeader"
+      :repo-type="repoType"
+      :namespace="namespace"
+      :name="name"
+      :namespace-link="namespaceLink"
+      :repo-info="error ? null : repoInfo"
+      :signed-in="authStore.isAuthenticated"
+      :is-owner="isOwner"
+      :liked="isLiked"
+      :likes-count="likesCount"
+      :liking="likingInProgress"
+      :tabs="headerTabs"
+      :active-tab="activeTab === 'commits' ? 'files' : activeTab"
+      @copy="copyRepoId"
+      @clone="showCloneDialog = true"
+      @download="downloadRepo"
+      @like="toggleLike"
+    >
+      <template #metadata>
+        <MetadataHeader
+          v-if="hasMetadataHeader && !error"
+          :metadata="displayMetadata"
+          :libraries="tagGroups.libraries"
+          :others="tagGroups.others"
+          :arxiv="tagGroups.arxiv"
+          :repo-type="repoType"
+          @navigate-to-metadata="navigateToTab('metadata')"
+        />
+      </template>
+    </RepositoryHeader>
+    <div
+      v-if="detailView"
+      :class="{
+        'repository-content': isCompositeHeader && detailView !== 'blob',
+      }"
+    >
+      <ErrorState
+        v-if="isCompositeHeader && error"
+        :error="error"
+        :context="errorContext('repository')"
+        :retry="loadRepoInfo"
+        mode="inline-panel"
+      />
+      <component
+        v-if="detailActive"
+        :is="detailComponent"
+        :key="detailKey"
+        :embedded="isCompositeHeader"
+      />
+    </div>
     <el-breadcrumb
-      v-if="error"
+      v-if="!detailView && error && !isCompositeHeader"
       separator="/"
       class="repo-breadcrumb mb-6 text-gray-700 dark:text-gray-300"
       aria-label="Repository navigation"
@@ -41,27 +96,32 @@
       </el-breadcrumb-item>
     </el-breadcrumb>
 
-    <div v-if="loading" class="text-center py-20">
+    <div v-if="!detailView && loading" class="text-center py-20">
       <el-icon class="is-loading" :size="40">
         <div class="i-carbon-circle-dash" />
       </el-icon>
     </div>
 
     <ErrorState
-      v-else-if="error"
+      v-else-if="!detailView && error"
       :error="error"
       :context="errorContext('repository')"
       :retry="loadRepoInfo"
       :retrying="repoInfoResource.retrying.value"
       :auto-retry-in="repoInfoResource.autoRetryIn.value"
+      :class="{ 'repository-content': isCompositeHeader }"
       @cancel-auto-retry="repoInfoResource.cancelAutoRetry"
     />
 
-    <div v-else class="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
+    <div
+      v-else-if="!detailView"
+      class="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6"
+      :class="{ 'repository-content': isCompositeHeader }"
+    >
       <!-- Main Content -->
       <main class="min-w-0">
         <!-- Repo Header -->
-        <div class="card repo-header mb-6">
+        <div v-if="!isCompositeHeader" class="card repo-header mb-6">
           <div
             class="flex flex-col sm:flex-row items-start justify-between gap-4 mb-4"
           >
@@ -195,7 +255,7 @@
 
         <!-- Metadata Header (Key badges) -->
         <MetadataHeader
-          v-if="hasMetadataHeader"
+          v-if="!isCompositeHeader && hasMetadataHeader"
           :metadata="displayMetadata"
           :libraries="tagGroups.libraries"
           :others="tagGroups.others"
@@ -206,6 +266,7 @@
 
         <!-- Navigation Tabs: real links, so "Open in new tab" works on each of them -->
         <nav
+          v-if="!isCompositeHeader"
           class="repo-tabs mb-6 -mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto"
           aria-label="Repository sections"
         >
@@ -311,21 +372,35 @@
           </div>
         </div>
 
-        <div v-if="activeTab === 'files'" class="card">
+        <div v-if="activeTab === 'files'" :class="{ card: !isCompositeHeader }">
           <div
             class="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3"
+            :class="{ 'flex-wrap repository-files-toolbar': isCompositeHeader }"
           >
             <div class="flex items-center gap-2 min-w-0">
               <el-select
                 aria-label="Branch"
                 v-model="currentBranch"
-                size="small"
+                :size="isCompositeHeader ? 'default' : 'small'"
                 class="w-full min-w-28 sm:w-37 sm:min-w-37 sm:flex-none"
+                :class="{ 'repository-branch-select': isCompositeHeader }"
                 @change="handleBranchChange"
               >
+                <template v-if="isCompositeHeader" #prefix>
+                  <span class="i-carbon-branch" aria-hidden="true" />
+                </template>
                 <el-option label="main" value="main" />
               </el-select>
               <span
+                v-if="isCompositeHeader"
+                class="repository-storage-size"
+                data-testid="repository-size"
+                aria-label="Repository storage used"
+                title="Repository storage used"
+                >{{ repositorySize }}</span
+              >
+              <span
+                v-else
                 class="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap"
                 data-testid="file-list-count"
               >
@@ -337,18 +412,43 @@
 
             <div
               class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
+              :class="{ 'sm:ml-auto': isCompositeHeader }"
             >
+              <el-input
+                v-if="isCompositeHeader"
+                aria-label="Filter files by name prefix"
+                v-model="fileSearchQuery"
+                placeholder="Filter by name prefix..."
+                class="w-full sm:w-50 repository-file-filter"
+                clearable
+                data-testid="file-list-name-prefix"
+              >
+                <template #prefix>
+                  <div class="i-carbon-search" />
+                </template>
+              </el-input>
+              <RepoHistoryLink
+                v-if="isCompositeHeader"
+                :repo-type="repoType"
+                :namespace="namespace"
+                :name="name"
+                :branch="currentBranch"
+                :external="isExternalRepo"
+                :source-url="sourceHistoryUrl"
+              />
               <LinkButton
                 v-if="isOwner"
                 :to="`/${repoType}s/${namespace}/${name}/upload/${currentBranch}`"
-                size="small"
+                :size="isCompositeHeader ? 'default' : 'small'"
                 type="primary"
                 class="w-full sm:w-auto"
+                :class="{ 'repository-upload-button': isCompositeHeader }"
               >
                 <div class="i-carbon-cloud-upload inline-block mr-1" />
                 Upload Files
               </LinkButton>
               <el-input
+                v-if="!isCompositeHeader"
                 aria-label="Filter files by name prefix"
                 v-model="fileSearchQuery"
                 placeholder="Filter by name prefix..."
@@ -405,7 +505,18 @@
           </div>
 
           <!-- File List -->
-          <div class="divide-y divide-gray-200 dark:divide-gray-700">
+          <div
+            class="divide-y divide-gray-200 dark:divide-gray-700"
+            :class="{ 'repository-file-list': isCompositeHeader }"
+          >
+            <RepoLatestCommit
+              v-if="isCompositeHeader"
+              :repo-type="repoType"
+              :namespace="namespace"
+              :name="name"
+              :branch="currentBranch"
+              :external="isExternalRepo"
+            />
             <div v-if="filesLoading" class="py-12 text-center">
               <el-icon class="is-loading" :size="40">
                 <div class="i-carbon-circle-dash" />
@@ -430,6 +541,7 @@
             <template v-else>
               <!-- Header Row (desktop only) -->
               <div
+                v-if="!isCompositeHeader"
                 class="hidden md:grid md:grid-cols-[auto_minmax(0,1.4fr)_minmax(0,2fr)_120px_110px] gap-3 py-2 px-2 text-sm font-medium text-gray-600 dark:text-gray-400 border-b"
               >
                 <div></div>
@@ -576,6 +688,16 @@
         </div>
 
         <div v-if="activeTab === 'commits'">
+          <div v-if="isCompositeHeader" class="repository-history-navigation">
+            <RouterLink :to="tabTarget('files')">
+              <span class="i-carbon-arrow-left" aria-hidden="true" />
+              Back to Files
+            </RouterLink>
+            <span class="repository-history-branch">
+              <span class="i-carbon-branch" aria-hidden="true" />
+              {{ currentBranch }}
+            </span>
+          </div>
           <!-- External Repo Warning -->
           <div v-if="isExternalRepo" class="card text-center py-12">
             <div
@@ -729,12 +851,16 @@
         <ModelInfoCard v-if="modelDetails" :summary="modelDetails" />
 
         <!-- Basic Metadata -->
-        <div class="card">
+        <div class="card" aria-label="Repository info">
           <h3 class="font-semibold mb-3">Info</h3>
           <div class="space-y-2 text-sm">
             <div>
               <span class="text-gray-600 dark:text-gray-400">Type:</span>
               <span class="ml-2 font-medium">{{ repoTypeLabel }}</span>
+            </div>
+            <div v-if="isCompositeHeader && repoInfo">
+              <span class="text-gray-600 dark:text-gray-400">Downloads:</span>
+              <span class="ml-2">{{ repoInfo.downloads || 0 }}</span>
             </div>
             <div>
               <span class="text-gray-600 dark:text-gray-400">Created:</span>
@@ -939,6 +1065,7 @@ huggingface-cli download {{ repoInfo?.id }}</pre
 </template>
 
 <script setup>
+import { defineAsyncComponent } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import axios from "axios";
 import { formatRelativeTime, formatUnixRelativeTime } from "@/utils/datetime";
@@ -955,6 +1082,10 @@ import { useAsyncResource } from "@/composables/useAsyncResource";
 import { resolveRepoTreeEntryPath } from "@/utils/repo-paths";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import MetadataHeader from "@/components/repo/metadata/MetadataHeader.vue";
+import RepositoryHeader from "@/components/repo/RepositoryHeader.vue";
+import RepoLatestCommit from "@/components/repo/RepoLatestCommit.vue";
+import RepoHistoryLink from "@/components/repo/RepoHistoryLink.vue";
+import { externalRepoUrl } from "@/utils/external-repo";
 import LinkButton from "@/components/common/LinkButton.vue";
 import ModelInfoCard from "@/components/repo/metadata/ModelInfoCard.vue";
 import {
@@ -984,6 +1115,18 @@ import { tarSidecarPath } from "@/utils/indexed-tar";
 // dropdown collided with the surrounding header chrome and earned
 // nothing in return, so it was removed (issue #56 follow-up).
 const FILE_LIST_BATCH_SIZE = 50;
+const detailComponents = {
+  blob: defineAsyncComponent(
+    () =>
+      import(
+        "../../pages/[type]s/[namespace]/[name]/blob/[branch]/[...file].vue"
+      ),
+  ),
+  commit: defineAsyncComponent(
+    () =>
+      import("../../pages/[type]s/[namespace]/[name]/commit/[commit_id].vue"),
+  ),
+};
 
 /**
  * @typedef {Object} Props
@@ -1001,13 +1144,25 @@ const props = defineProps({
   branch: { type: String, default: "main" },
   currentPath: { type: String, default: "" },
   tab: { type: String, default: "card" },
+  detailView: { type: String, default: "" },
+  detailKey: { type: String, default: "" },
 });
+const detailComponent = computed(() => detailComponents[props.detailView]);
+const detailActive = ref(true);
 
 const router = useRouter();
 const authStore = useAuthStore();
 
 // State
 const repoInfo = ref(null);
+const repositorySize = computed(() => {
+  const bytes = [
+    repoInfo.value?.usedStorage,
+    repoInfo.value?.storage?.used_bytes,
+  ].find((value) => Number.isFinite(value) && value >= 0);
+  if (bytes === undefined) return "Size unavailable";
+  return bytes === 0 ? "0 B" : formatSize(bytes);
+});
 const currentBranch = ref(props.branch);
 const fileTree = ref([]);
 const commits = ref([]);
@@ -1185,6 +1340,9 @@ const PATHS_INFO_BATCH_SIZE = 1000;
 
 // Computed
 const activeTab = computed(() => props.tab);
+const isCompositeHeader = computed(() =>
+  ["model", "dataset"].includes(props.repoType),
+);
 
 const repoTypeLabel = computed(() => {
   const labels = { model: "Models", dataset: "Datasets", space: "Spaces" };
@@ -1409,6 +1567,26 @@ const repoTabs = computed(() => [
   { key: "metadata", label: "Metadata" },
 ]);
 
+const headerTabs = computed(() =>
+  repoTabs.value
+    .filter((item) => item.key !== "commits")
+    .map((item) => ({ ...item, to: tabTarget(item.key) })),
+);
+
+const sourceRepoUrl = computed(() =>
+  repoInfo.value
+    ? externalRepoUrl(
+        { ...repoInfo.value, id: `${props.namespace}/${props.name}` },
+        props.repoType,
+      )
+    : null,
+);
+const sourceHistoryUrl = computed(() =>
+  sourceRepoUrl.value
+    ? `${sourceRepoUrl.value.replace(/\/+$/, "")}/commits/${encodeURIComponent(currentBranch.value)}`
+    : null,
+);
+
 const tabClass = (active) => [
   // flex + items-center: the label stays vertically centred in the stretched row, as in a button
   "flex items-center px-2.5 sm:px-4 py-2 text-sm sm:text-base font-medium transition-colors",
@@ -1418,7 +1596,10 @@ const tabClass = (active) => [
 ];
 
 function getCommitPath(commitId) {
-  return `/${props.repoType}s/${props.namespace}/${props.name}/commit/${commitId}`;
+  const path = `/${props.repoType}s/${props.namespace}/${props.name}/commit/${commitId}`;
+  return currentBranch.value === "main"
+    ? path
+    : `${path}?branch=${encodeURIComponent(currentBranch.value)}`;
 }
 
 function handleBranchChange() {
@@ -1465,9 +1646,9 @@ async function fetchRepoInfo({ signal }) {
     ));
   }
 
-  // Check if current user has liked (only if authenticated)
+  // Private model/dataset headers show visibility instead of a like control.
   let liked = null;
-  if (authStore.isAuthenticated) {
+  if (authStore.isAuthenticated && !(isCompositeHeader.value && data.private)) {
     try {
       const { data: likeData } = await likesAPI.checkLiked(
         props.repoType,
@@ -1486,7 +1667,8 @@ async function fetchRepoInfo({ signal }) {
 
   repoInfo.value = data;
   likesCount.value = data.likes || 0;
-  if (liked !== null) isLiked.value = liked;
+  if (isCompositeHeader.value && data.private) isLiked.value = false;
+  else if (liked !== null) isLiked.value = liked;
 
   // Check if namespace is an org (for correct linking)
   checkIfNamespaceIsOrg();
@@ -1512,15 +1694,23 @@ const loadRepoInfo = () => repoInfoResource.reload();
 let wasHidden = false;
 onDeactivated(() => {
   wasHidden = true;
+  // Detail pages read the active route; retain the header, but remount details
+  // when returning so another repository cannot change their cached content.
+  detailActive.value = false;
   repoInfoResource.stop();
 });
 onActivated(() => {
+  detailActive.value = true;
   if (!wasHidden) return;
   wasHidden = false;
-  if (!repoInfoResource.ready.value) repoInfoResource.reload();
+  if (props.detailView && !isCompositeHeader.value) return;
+  if (!repoInfoResource.ready.value && !repoInfoResource.loading.value) {
+    repoInfoResource.reload();
+  }
 });
 
 async function toggleLike() {
+  if (isCompositeHeader.value && repoInfo.value?.private) return;
   if (!authStore.isAuthenticated) {
     ElMessage.warning("Please login to like repositories");
     return;
@@ -1843,13 +2033,15 @@ async function fetchReadme(branch, requestId) {
   readmeError.value = null;
   try {
     let readmeFile = fileTree.value.find(
-      (f) => f.type === "file" && f.path.toLowerCase().endsWith("readme.md"),
+      (f) =>
+        f.type === "file" &&
+        (isCompositeHeader.value
+          ? f.path.toLowerCase() === "readme.md"
+          : f.path.toLowerCase().endsWith("readme.md")),
     );
 
-    // Paginated tree may not contain README.md on the current page —
-    // probe the common variants directly via paths-info so the Card
-    // tab does not silently render "No README" when one exists later
-    // in the listing.
+    // Header metadata belongs to the repository root, even on a subfolder
+    // or detail route. Probe directly without waiting for a paginated tree.
     if (!readmeFile) {
       readmeFile = await findReadmeViaPathsInfo(branch);
     }
@@ -1895,7 +2087,7 @@ async function findReadmeViaPathsInfo(branch = currentBranch.value) {
   // README.md / readme.md / Readme.md cover the case-insensitive
   // variants seen in the wild. paths-info returns only the entries
   // that exist, so a single call is enough.
-  if (props.currentPath) return null;
+  if (props.currentPath && !isCompositeHeader.value) return null;
   try {
     const { data } = await repoAPI.getPathsInfo(
       props.repoType,
@@ -1907,6 +2099,9 @@ async function findReadmeViaPathsInfo(branch = currentBranch.value) {
     );
     return (data || []).find((entry) => entry && entry.type === "file") || null;
   } catch (err) {
+    // A failed header probe is retryable through the Card's README error
+    // state; only an empty successful response means the README is absent.
+    if (isCompositeHeader.value) throw err;
     console.debug("README paths-info probe failed:", err);
     return null;
   }
@@ -2227,7 +2422,10 @@ watch(fileSearchQuery, () => {
   }
   fileSearchDebounceHandle = setTimeout(() => {
     fileSearchDebounceHandle = null;
-    if (activeTab.value === "files" || activeTab.value === "card") {
+    if (
+      !props.detailView &&
+      (activeTab.value === "files" || activeTab.value === "card")
+    ) {
       loadFileTree({ resetPagination: true });
     }
   }, FILE_SEARCH_DEBOUNCE_MS);
@@ -2237,6 +2435,12 @@ let tabLoadId = 0;
 
 async function loadActiveTab() {
   const requestId = ++tabLoadId;
+  // The shared header needs README metadata on every repository route.
+  // Load it independently so neither the tree nor detail content waits for it.
+  if (isCompositeHeader.value && readmeBranch !== currentBranch.value) {
+    void loadReadme();
+  }
+  if (props.detailView) return;
   const tab = activeTab.value;
   if (["files", "card", "metadata"].includes(tab)) {
     const context = getFileTreeContext();
@@ -2248,6 +2452,7 @@ async function loadActiveTab() {
     }
     if (requestId !== tabLoadId) return;
     if (
+      !isCompositeHeader.value &&
       ["card", "metadata"].includes(tab) &&
       readmeBranch !== currentBranch.value
     ) {
@@ -2260,7 +2465,7 @@ async function loadActiveTab() {
 
 // Route pages share this instance; only a changed resource context reloads.
 watch(
-  () => [props.tab, props.branch, props.currentPath],
+  () => [props.tab, props.branch, props.currentPath, props.detailView],
   ([, branch], [, previousBranch]) => {
     currentBranch.value = branch;
     if (branch !== previousBranch) {
@@ -2280,15 +2485,119 @@ watch(
       commits.value = [];
       commitsLoading.value = false;
     }
+    if (
+      (!props.detailView || isCompositeHeader.value) &&
+      repoInfoResource.status.value === "idle"
+    ) {
+      loadRepoInfo();
+    }
     loadActiveTab();
   },
 );
 
 // Lifecycle
 onMounted(async () => {
+  if (props.detailView && !isCompositeHeader.value) return;
   // The tab's own data does not depend on repo info: load both at once
   const info = loadRepoInfo();
 
   await Promise.all([info, loadActiveTab()]);
 });
 </script>
+
+<style scoped>
+.repository-page {
+  min-width: 0;
+}
+.repository-file-list {
+  border: 1px solid var(--site-border);
+  border-radius: 8px;
+}
+.repository-storage-size {
+  color: var(--site-muted);
+  font-size: 13px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.repository-branch-select {
+  width: 132px;
+  min-width: 132px;
+  flex: none;
+}
+.repository-branch-select :deep(.el-select__wrapper) {
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: var(--site-card);
+  box-shadow: 0 0 0 1px var(--site-border) inset;
+}
+.repository-branch-select :deep(.el-select__wrapper:hover) {
+  background: var(--site-hover);
+}
+.repository-branch-select :deep(.el-select__prefix),
+.repository-branch-select :deep(.el-select__caret) {
+  color: var(--site-muted);
+}
+.repository-branch-select :deep(.el-select__selected-item) {
+  color: var(--site-card-text);
+  font-weight: 600;
+  font-size: 13px;
+}
+.repository-branch-select :deep(.el-select__caret) {
+  font-size: 12px;
+}
+.repository-file-filter :deep(.el-input__wrapper) {
+  min-height: 34px;
+  border-radius: 8px;
+}
+.repository-upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  margin: 0;
+  padding: 7px 12px;
+  border: 1px solid var(--site-border);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.repository-history-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+.repository-history-navigation a,
+.repository-history-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.repository-history-navigation a {
+  color: var(--site-link);
+}
+.repository-history-navigation a:hover {
+  text-decoration: underline;
+}
+.repository-history-branch {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--site-muted);
+}
+.repository-content {
+  width: 100%;
+  max-width: none;
+  margin: 0 auto;
+  padding: 24px;
+}
+@media (max-width: 767px) {
+  .repository-content {
+    padding: 20px 16px;
+  }
+}
+</style>

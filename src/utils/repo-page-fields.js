@@ -24,6 +24,6 @@ const EXTRA_FIELDS = {
 // older backend refuses them with a 400, and the page then asks again with CORE_REPO_FIELDS.
 export function repoPageFields(repoType) {
   const fields = [...CORE_REPO_FIELDS, "storage", "createdBy"];
-  if (repoType !== "space") fields.splice(4, 0, "downloads");
+  if (repoType !== "space") fields.splice(4, 0, "downloads", "usedStorage");
   return [...fields, ...(EXTRA_FIELDS[repoType] || [])];
 }

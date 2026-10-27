@@ -83,8 +83,17 @@ describe("RepoViewer asks repo info for the fields of its kind", () => {
       http.get("/api/:type/acme/thing/tree/:branch", () =>
         jsonResponse([{ type: "file", path: "README.md", size: 9, oid: "r" }]),
       ),
-      http.post("/api/:type/acme/thing/paths-info/:branch", () =>
-        jsonResponse([]),
+      http.post(
+        "/api/:type/acme/thing/paths-info/:branch",
+        async ({ request }) => {
+          const form = new URLSearchParams(await request.text());
+          return jsonResponse(
+            form.get("expand") === "false" &&
+              form.getAll("paths").includes("README.md")
+              ? [{ type: "file", path: "README.md", size: 9, oid: "r" }]
+              : [],
+          );
+        },
       ),
       http.get(
         "/:type/acme/thing/resolve/:branch/README.md",
@@ -122,8 +131,13 @@ describe("RepoViewer asks repo info for the fields of its kind", () => {
     const model = mountViewer("model");
     await flushPromises();
 
-    expect(space.text()).not.toMatch(/downloads/);
-    expect(model.text()).toMatch(/7 downloads/);
+    expect(space.text()).not.toMatch(/downloads/i);
+    expect(model.get('[aria-label="Repository info"]').text()).toMatch(
+      /Downloads:\s*7/,
+    );
+    expect(model.get('[aria-label="Repository header"]').text()).not.toMatch(
+      /downloads/i,
+    );
   });
 
   it("asks again with the fields every repository has when the backend refuses an option", async () => {

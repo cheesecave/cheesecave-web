@@ -260,6 +260,9 @@ describe("RepoViewer failure states", () => {
   it("shows a README that could not be read, and ignores one that was abandoned", async () => {
     server.use(
       http.get(BASE, () => jsonResponse(info())),
+      http.post(`${BASE}/paths-info/:branch`, () =>
+        jsonResponse([{ type: "file", path: "README.md", size: 9, oid: "r" }]),
+      ),
       http.get(`${BASE}/tree/:branch`, () =>
         jsonResponse([{ type: "file", path: "README.md", size: 9, oid: "r" }]),
       ),
@@ -291,6 +294,9 @@ describe("RepoViewer failure states", () => {
   it("keeps a README that is only front matter readable, as a blank page", async () => {
     server.use(
       http.get(BASE, () => jsonResponse(info())),
+      http.post(`${BASE}/paths-info/:branch`, () =>
+        jsonResponse([{ type: "file", path: "README.md", size: 9, oid: "r" }]),
+      ),
       http.get(`${BASE}/tree/:branch`, () =>
         jsonResponse([{ type: "file", path: "README.md", size: 9, oid: "r" }]),
       ),

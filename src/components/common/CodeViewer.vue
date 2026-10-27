@@ -1,7 +1,8 @@
 <!-- src/components/common/CodeViewer.vue -->
 <template>
-  <div class="code-viewer">
+  <div class="code-viewer" :class="{ 'code-viewer-bare': bare }">
     <div
+      v-if="!bare"
       class="flex items-center justify-between mb-3 pb-3 border-b border-gray-200 dark:border-gray-700"
     >
       <div class="flex items-center gap-2 min-w-0 flex-1">
@@ -98,6 +99,7 @@ hljs.registerLanguage("css", css);
 hljs.registerLanguage("sql", sql);
 
 const props = defineProps({
+  bare: { type: Boolean, default: false },
   code: {
     type: String,
     required: true,
@@ -173,6 +175,11 @@ onMounted(() => {
   border-radius: 6px;
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
+}
+
+.code-viewer-bare .code-container {
+  border: 0;
+  border-radius: 0;
 }
 
 .dark .code-container {

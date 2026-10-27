@@ -122,7 +122,7 @@ const sizeCategory = computed(
     class="metadata-header bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 mb-4"
   >
     <div
-      class="flex flex-wrap items-center gap-2"
+      class="metadata-tags flex flex-wrap items-center gap-2"
       :class="{ 'metadata-header-open': anyOpen }"
     >
       <!-- Pipeline Tag (Models) -->
@@ -338,6 +338,28 @@ const sizeCategory = computed(
 <style scoped>
 .metadata-header {
   border: 1px solid var(--el-border-color-lighter);
+}
+.metadata-tags > a,
+.metadata-tags > button,
+.metadata-tags :deep(.el-tag__content) {
+  display: inline-flex;
+  align-items: center;
+}
+.metadata-tags :deep(.el-tag) {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  height: var(--repository-tag-height, 24px);
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+}
+.metadata-tags [class*="i-carbon-"] {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  font-size: 14px;
+  line-height: 1;
 }
 .metadata-header-more {
   padding: 0;

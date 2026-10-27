@@ -2,11 +2,19 @@
 <template>
   <div
     class="app-shell w-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors flex flex-col"
-    :class="{ 'workspace-shell': isWorkspaceHome }"
+    :class="{
+      'workspace-shell': isWorkspaceHome,
+      'repository-shell': isRepositoryView,
+    }"
   >
     <SessionBanner class="shrink-0" />
-    <TheHeader class="shrink-0" :expanded="authStore.isAuthenticated" />
+    <TheHeader
+      v-if="!isRepositoryView"
+      class="shrink-0"
+      :expanded="authStore.isAuthenticated"
+    />
     <PageScrollArea>
+      <TheHeader v-if="isRepositoryView" class="shrink-0" repository />
       <main class="site-main flex-1 min-w-0">
         <RouterView v-slot="{ Component, route }">
           <RouteBoundary :route-key="route.path">
@@ -16,7 +24,7 @@
           </RouteBoundary>
         </RouterView>
       </main>
-      <TheFooter v-if="!isWorkspaceHome" />
+      <TheFooter v-if="!isWorkspaceHome && !isRepositoryPage" />
     </PageScrollArea>
   </div>
 </template>
@@ -29,10 +37,16 @@ import TheFooter from "@/components/layout/TheFooter.vue";
 import PageScrollArea from "@/components/layout/PageScrollArea.vue";
 import { computed } from "vue";
 import { useAuthStore } from "@/stores/auth";
-import { getRouteViewKey } from "@/utils/repo-view-routes";
+import {
+  getRouteViewKey,
+  isCompositeRepositoryRoute,
+  isRepositoryRoute,
+} from "@/utils/repo-view-routes";
 
 const route = useRoute();
 const authStore = useAuthStore();
+const isRepositoryView = computed(() => isCompositeRepositoryRoute(route));
+const isRepositoryPage = computed(() => isRepositoryRoute(route));
 const isWorkspaceHome = computed(
   () => authStore.isAuthenticated && route.path === "/",
 );
@@ -60,6 +74,9 @@ function getRouteKey(route) {
 .site-main {
   min-height: calc(100vh - var(--site-header-height));
   min-height: calc(100dvh - var(--site-header-height));
+}
+.repository-shell .site-main {
+  min-height: 0;
 }
 @media (max-width: 767px) {
   .app-shell {
