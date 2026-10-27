@@ -38,6 +38,7 @@ function commit(id, title, author) {
 
 function installHandlers(extraInfo = {}, repoType = "dataset") {
   const base = `/api/${repoType}s/open-media-lab/big-repo`;
+  const commitRequests = [];
   server.use(
     http.get("/api/users/open-media-lab/type", () =>
       jsonResponse({ type: "org" }),
@@ -52,12 +53,16 @@ function installHandlers(extraInfo = {}, repoType = "dataset") {
     }),
     http.get(`${base}/tree/:branch`, () => jsonResponse([])),
     http.post(`${base}/paths-info/:branch`, () => jsonResponse([])),
-    http.get(`${base}/commits/:branch`, () =>
-      jsonResponse([
+    http.get(`${base}/commits/:branch`, ({ request, params }) => {
+      commitRequests.push({
+        branch: params.branch,
+        limit: new URL(request.url).searchParams.get("limit"),
+      });
+      return jsonResponse([
         commit("c1", "First change", "alice"),
         commit("c2", "Second change", "bob"),
-      ]),
-    ),
+      ]);
+    }),
     http.get("/api/site-config", () =>
       jsonResponse({ capabilities: { repository_operations: {} } }),
     ),
@@ -68,6 +73,7 @@ function installHandlers(extraInfo = {}, repoType = "dataset") {
       jsonResponse({ can_write: false, commits: {} }),
     ),
   );
+  return commitRequests;
 }
 
 function mountViewer(tab = "card", props = {}) {
@@ -117,7 +123,7 @@ describe("RepoViewer real links", () => {
     installHandlers();
   });
 
-  it("makes the four tabs links to their own URLs", async () => {
+  it("makes the card, Files and Metadata tabs links to their own URLs", async () => {
     const wrapper = mountViewer();
     await ready(wrapper);
     const tabs = wrapper
@@ -126,13 +132,11 @@ describe("RepoViewer real links", () => {
     expect(tabs.map((tab) => tab.text())).toEqual([
       "Dataset Card",
       "Files",
-      "Commits",
       "Metadata",
     ]);
     expect(tabs.map((tab) => tab.attributes("href"))).toEqual([
       PAGE,
       `${PAGE}/tree/main`,
-      `${PAGE}/commits/main`,
       `${PAGE}?tab=metadata`,
     ]);
     expect(wrapper.find(".repo-tabs button").exists()).toBe(false);
@@ -141,7 +145,7 @@ describe("RepoViewer real links", () => {
   it.each([
     ["card", "Dataset Card"],
     ["files", "Files"],
-    ["commits", "Commits"],
+    ["commits", "Files"],
     ["metadata", "Metadata"],
   ])("marks only the open tab (%s) as current", async (tab, label) => {
     const wrapper = mountViewer(tab);
@@ -152,21 +156,22 @@ describe("RepoViewer real links", () => {
     expect(current.map((link) => link.text())).toEqual([label]);
   });
 
-  it("shows Commits as unavailable, not as a link, for a repository from another source", async () => {
-    installHandlers({ _source: "huggingface" });
-    const wrapper = mountViewer();
+  it("keeps unavailable external history in Files rather than a top-level tab", async () => {
+    const commitRequests = installHandlers({ _source: "huggingface" });
+    const wrapper = mountViewer("files");
     await ready(wrapper);
-    const commits = wrapper
-      .findAll(".repo-tabs [aria-disabled='true']")
-      .filter((item) => item.text() === "Commits");
-    expect(commits).toHaveLength(1);
-    expect(commits[0].element.tagName).toBe("SPAN");
-    expect(commits[0].attributes("title")).toContain("huggingface");
+    const history = wrapper.get(
+      'section[aria-label="Latest commit"] [aria-disabled="true"]',
+    );
+    expect(history.text()).toContain("History");
+    expect(history.element.tagName).not.toBe("A");
+    expect(wrapper.get(".repo-tabs").text()).not.toContain("Commits");
     expect(wrapper.findAll(".repo-tabs a").map((tab) => tab.text())).toEqual([
       "Dataset Card",
       "Files",
       "Metadata",
     ]);
+    expect(commitRequests).toEqual([]);
   });
 
   it.each([
@@ -197,7 +202,10 @@ describe("RepoViewer real links", () => {
   ])(
     "links a %s from %s to its repository on that source",
     async (repoType, source, sourceUrl, expectedUrl) => {
-      installHandlers({ _source: source, _source_url: sourceUrl }, repoType);
+      const commitRequests = installHandlers(
+        { _source: source, _source_url: sourceUrl },
+        repoType,
+      );
       const wrapper = mountViewer("files", { repoType });
       await ready(wrapper);
       const link = wrapper.get(
@@ -209,6 +217,64 @@ describe("RepoViewer real links", () => {
       expect(link.attributes("rel").split(/\s+/)).toEqual(
         expect.arrayContaining(["noopener", "noreferrer"]),
       );
+      const history = wrapper.get('section[aria-label="Latest commit"] a');
+      expect(history.text()).toBe("History");
+      expect(history.attributes("href")).toBe(`${expectedUrl}/commits/main`);
+      expect(history.attributes("target")).toBe("_blank");
+      expect(commitRequests).toEqual([]);
+      wrapper.unmount();
+    },
+  );
+
+  it.each([
+    ["model", 1776765600],
+    ["dataset", "2026-04-21T10:00:00.000000Z"],
+  ])(
+    "links the latest %s commit title, author, SHA and date without loading the full history",
+    async (repoType, date) => {
+      const commitRequests = [];
+      const operations = vi.fn(() => jsonResponse({}));
+      installHandlers({}, repoType);
+      const base = `/api/${repoType}s/open-media-lab/big-repo`;
+      const page = `/${repoType}s/open-media-lab/big-repo`;
+      const commitId = "abcdef1234567890";
+      server.use(
+        http.get(`${base}/commits/:branch`, ({ request, params }) => {
+          commitRequests.push({
+            branch: params.branch,
+            limit: new URL(request.url).searchParams.get("limit"),
+          });
+          return jsonResponse([
+            { ...commit(commitId, "Improve metadata", "alice"), date },
+          ]);
+        }),
+        http.post(`${base}/commits/unavailable-files`, operations),
+        http.post(`${base}/commits/:branch/operations`, operations),
+      );
+      const wrapper = mountViewer("files", { repoType, branch: "dev" });
+      await vi.waitFor(() =>
+        expect(
+          wrapper.find('section[aria-label="Latest commit"]').text(),
+        ).toContain("Improve metadata"),
+      );
+      const summary = wrapper.get('section[aria-label="Latest commit"]');
+      expect(summary.get('a[href="/alice"]').text()).toBe("alice");
+      const detailLinks = summary.findAll(
+        `a[href='${page}/commit/${commitId}']`,
+      );
+      expect(detailLinks).toHaveLength(3);
+      expect(detailLinks.map((link) => link.text())).toEqual(
+        expect.arrayContaining(["Improve metadata", "abcdef1"]),
+      );
+      const dateLink = detailLinks.find(
+        (link) => !["Improve metadata", "abcdef1"].includes(link.text()),
+      );
+      expect(dateLink.text()).toMatch(/ago$/);
+      expect(summary.get(`a[href='${page}/commits/dev']`).text()).toBe(
+        "History",
+      );
+      expect(commitRequests).toEqual([{ branch: "dev", limit: "1" }]);
+      expect(operations).not.toHaveBeenCalled();
       wrapper.unmount();
     },
   );
@@ -255,10 +321,31 @@ describe("RepoViewer real links", () => {
     await flushPromises();
     const tabs = wrapper.get('nav[aria-label="Repository sections"]');
     expect(tabs.get(`a[href='${PAGE}/tree/dev']`).text()).toBe("Files");
-    expect(tabs.get(`a[href='${PAGE}/commits/dev']`).text()).toBe("Commits");
+    expect(
+      wrapper
+        .get(
+          `section[aria-label='Latest commit'] a[href='${PAGE}/commits/dev']`,
+        )
+        .text(),
+    ).toBe("History");
     expect(wrapper.get(`a[href='${PAGE}/upload/dev']`).text()).toBe(
       "Upload Files",
     );
+    wrapper.unmount();
+  });
+
+  it("keeps Files active while viewing history and links back to the current branch", async () => {
+    const wrapper = mountViewer("commits", { branch: "dev" });
+    await ready(wrapper);
+    expect(wrapper.get('.repo-tabs a[aria-current="page"]').text()).toBe(
+      "Files",
+    );
+    const back = wrapper
+      .findAll("a")
+      .find((link) => link.text() === "Back to Files");
+    expect(back).toBeDefined();
+    expect(back.attributes("href")).toBe(`${PAGE}/tree/dev`);
+    expect(wrapper.findAll('[data-testid="repo-commit-row"]')).toHaveLength(2);
     wrapper.unmount();
   });
 

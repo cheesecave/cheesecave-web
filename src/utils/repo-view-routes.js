@@ -9,6 +9,11 @@ const REPO_VIEW_ROUTES = new Map([
 const ROOT_TABS = new Set(["card", "metadata"]);
 const loadRepoViewer = () => import("../components/repo/RepoViewer.vue");
 
+/** Repository chrome also applies to file details, settings and editing routes. */
+export function isRepositoryRoute(route) {
+  return /^\/(?:models|datasets)\/[^/]+\/[^/]+(?:\/|$)/.test(route.path || "");
+}
+
 /** Only the shared model/dataset viewer uses the combined site and repository header. */
 export function isCompositeRepositoryRoute(route) {
   return (

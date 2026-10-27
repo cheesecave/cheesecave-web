@@ -24,7 +24,7 @@
           </RouteBoundary>
         </RouterView>
       </main>
-      <TheFooter v-if="!isWorkspaceHome" />
+      <TheFooter v-if="!isWorkspaceHome && !isRepositoryPage" />
     </PageScrollArea>
   </div>
 </template>
@@ -40,11 +40,13 @@ import { useAuthStore } from "@/stores/auth";
 import {
   getRouteViewKey,
   isCompositeRepositoryRoute,
+  isRepositoryRoute,
 } from "@/utils/repo-view-routes";
 
 const route = useRoute();
 const authStore = useAuthStore();
 const isRepositoryView = computed(() => isCompositeRepositoryRoute(route));
+const isRepositoryPage = computed(() => isRepositoryRoute(route));
 const isWorkspaceHome = computed(
   () => authStore.isAuthenticated && route.path === "/",
 );

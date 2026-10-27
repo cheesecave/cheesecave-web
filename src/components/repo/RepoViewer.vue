@@ -14,7 +14,7 @@
       :likes-count="likesCount"
       :liking="likingInProgress"
       :tabs="headerTabs"
-      :active-tab="activeTab"
+      :active-tab="activeTab === 'commits' ? 'files' : activeTab"
       @copy="copyRepoId"
       @clone="showCloneDialog = true"
       @download="downloadRepo"
@@ -442,7 +442,19 @@
           </div>
 
           <!-- File List -->
-          <div class="divide-y divide-gray-200 dark:divide-gray-700">
+          <div
+            class="divide-y divide-gray-200 dark:divide-gray-700"
+            :class="{ 'repository-file-list': isCompositeHeader }"
+          >
+            <RepoLatestCommit
+              v-if="isCompositeHeader"
+              :repo-type="repoType"
+              :namespace="namespace"
+              :name="name"
+              :branch="currentBranch"
+              :external="isExternalRepo"
+              :source-url="sourceRepoUrl"
+            />
             <div v-if="filesLoading" class="py-12 text-center">
               <el-icon class="is-loading" :size="40">
                 <div class="i-carbon-circle-dash" />
@@ -467,6 +479,7 @@
             <template v-else>
               <!-- Header Row (desktop only) -->
               <div
+                v-if="!isCompositeHeader"
                 class="hidden md:grid md:grid-cols-[auto_minmax(0,1.4fr)_minmax(0,2fr)_120px_110px] gap-3 py-2 px-2 text-sm font-medium text-gray-600 dark:text-gray-400 border-b"
               >
                 <div></div>
@@ -613,6 +626,16 @@
         </div>
 
         <div v-if="activeTab === 'commits'">
+          <div v-if="isCompositeHeader" class="repository-history-navigation">
+            <RouterLink :to="tabTarget('files')">
+              <span class="i-carbon-arrow-left" aria-hidden="true" />
+              Back to Files
+            </RouterLink>
+            <span class="repository-history-branch">
+              <span class="i-carbon-branch" aria-hidden="true" />
+              {{ currentBranch }}
+            </span>
+          </div>
           <!-- External Repo Warning -->
           <div v-if="isExternalRepo" class="card text-center py-12">
             <div
@@ -993,6 +1016,8 @@ import { resolveRepoTreeEntryPath } from "@/utils/repo-paths";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import MetadataHeader from "@/components/repo/metadata/MetadataHeader.vue";
 import RepositoryHeader from "@/components/repo/RepositoryHeader.vue";
+import RepoLatestCommit from "@/components/repo/RepoLatestCommit.vue";
+import { externalRepoUrl } from "@/utils/external-repo";
 import LinkButton from "@/components/common/LinkButton.vue";
 import ModelInfoCard from "@/components/repo/metadata/ModelInfoCard.vue";
 import {
@@ -1451,7 +1476,18 @@ const repoTabs = computed(() => [
 ]);
 
 const headerTabs = computed(() =>
-  repoTabs.value.map((item) => ({ ...item, to: tabTarget(item.key) })),
+  repoTabs.value
+    .filter((item) => item.key !== "commits")
+    .map((item) => ({ ...item, to: tabTarget(item.key) })),
+);
+
+const sourceRepoUrl = computed(() =>
+  repoInfo.value
+    ? externalRepoUrl(
+        { ...repoInfo.value, id: `${props.namespace}/${props.name}` },
+        props.repoType,
+      )
+    : null,
 );
 
 const tabClass = (active) => [
@@ -2341,6 +2377,35 @@ onMounted(async () => {
 <style scoped>
 .repository-page {
   min-width: 0;
+}
+.repository-file-list {
+  border: 1px solid var(--site-border);
+  border-radius: 8px;
+}
+.repository-history-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+.repository-history-navigation a,
+.repository-history-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.repository-history-navigation a {
+  color: var(--site-link);
+}
+.repository-history-navigation a:hover {
+  text-decoration: underline;
+}
+.repository-history-branch {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--site-muted);
 }
 .repository-content {
   width: 100%;

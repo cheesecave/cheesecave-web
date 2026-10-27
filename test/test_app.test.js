@@ -1,7 +1,9 @@
-import { mount } from "@vue/test-utils";
+import { enableAutoUnmount, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { defineComponent, h, nextTick, ref } from "vue";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+enableAutoUnmount(afterEach);
 
 const mountCounts = {
   repoViewer: 0,
@@ -137,6 +139,46 @@ describe("App shell", () => {
     wrapper.unmount();
   });
 
+  it("hides the footer on every model or dataset repository route while keeping discovery and Spaces unchanged", async () => {
+    const wrapper = mount(App, {
+      global: { components: { RouterView: RouterViewStub } },
+    });
+    for (const type of ["model", "dataset"]) {
+      for (const suffix of [
+        "",
+        "/tree/main",
+        "/commits/main",
+        "/blob/main/README.md",
+        "/commit/abc123",
+        "/settings",
+        "/upload/main",
+        "/edit/main/README.md",
+      ]) {
+        routeState.value = { path: `/${type}s/team/demo${suffix}` };
+        await nextTick();
+        expect(
+          wrapper.find('[data-footer="true"]').exists(),
+          routeState.value.path,
+        ).toBe(false);
+      }
+    }
+    for (const path of [
+      "/models",
+      "/datasets",
+      "/models/new",
+      "/datasets/new",
+      "/spaces/team/demo",
+      "/spaces/team/demo/tree/main",
+      "/spaces/team/demo/settings",
+      "/organizations/team",
+    ]) {
+      routeState.value = { path };
+      await nextTick();
+      expect(wrapper.find('[data-footer="true"]').exists(), path).toBe(true);
+    }
+    wrapper.unmount();
+  });
+
   it("renders the layout and reuses repo views for the same repository", async () => {
     mountCounts.repoViewer = 0;
     routeState.value = {
@@ -152,7 +194,7 @@ describe("App shell", () => {
     });
 
     expect(wrapper.find('[data-header="true"]').exists()).toBe(true);
-    expect(wrapper.find('[data-footer="true"]').exists()).toBe(true);
+    expect(wrapper.find('[data-footer="true"]').exists()).toBe(false);
     expect(mountCounts.repoViewer).toBe(1);
 
     routeState.value = {
@@ -212,7 +254,7 @@ describe("App shell", () => {
     wrapper.unmount();
   });
 
-  it("uses the workspace header on every authenticated page and hides the footer only at home", async () => {
+  it("uses the workspace header on every authenticated page and hides the footer at home and repository pages", async () => {
     routeState.value = { path: "/" };
     const auth = useAuthStore();
     auth.user = { username: "mai_lin" };
@@ -224,20 +266,20 @@ describe("App shell", () => {
     ).toBe("true");
     expect(wrapper.find('[data-footer="true"]').exists()).toBe(false);
 
-    for (const path of [
-      "/models",
-      "/datasets",
-      "/spaces",
-      "/organizations",
-      "/settings",
-      "/models/mai_lin/lineart-caption-base/tree/main",
+    for (const [path, footerVisible] of [
+      ["/models", true],
+      ["/datasets", true],
+      ["/spaces", true],
+      ["/organizations", true],
+      ["/settings", true],
+      ["/models/mai_lin/lineart-caption-base/tree/main", false],
     ]) {
       routeState.value = { path };
       await nextTick();
       expect(
         wrapper.get('[data-header="true"]').attributes("data-expanded"),
       ).toBe("true");
-      expect(wrapper.find('[data-footer="true"]').exists()).toBe(true);
+      expect(wrapper.find('[data-footer="true"]').exists()).toBe(footerVisible);
     }
 
     auth.user = null;
@@ -245,7 +287,7 @@ describe("App shell", () => {
     expect(
       wrapper.get('[data-header="true"]').attributes("data-expanded"),
     ).toBe("false");
-    expect(wrapper.find('[data-footer="true"]').exists()).toBe(true);
+    expect(wrapper.find('[data-footer="true"]').exists()).toBe(false);
 
     auth.user = { username: "mai_lin" };
     await nextTick();

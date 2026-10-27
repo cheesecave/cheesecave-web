@@ -109,8 +109,12 @@ describe("RepoViewer loading on a big repository", () => {
           });
         },
       ),
-      http.get(`${BASE}/commits/:branch`, async ({ params }) => {
-        seen.push({ what: "commits", branch: params.branch });
+      http.get(`${BASE}/commits/:branch`, async ({ params, request }) => {
+        const latest = new URL(request.url).searchParams.get("limit") === "1";
+        seen.push({
+          what: latest ? "latest-commit" : "commits",
+          branch: params.branch,
+        });
         if (gates.has(`commits:${params.branch}`)) {
           await gates.get(`commits:${params.branch}`).promise;
         }
@@ -163,7 +167,7 @@ describe("RepoViewer loading on a big repository", () => {
     );
     expect(
       header.get('nav[aria-label="Repository sections"]').findAll("a"),
-    ).toHaveLength(4);
+    ).toHaveLength(3);
 
     infoGate.resolve();
     await flushPromises();
@@ -188,7 +192,7 @@ describe("RepoViewer loading on a big repository", () => {
     const heading = wrapper.get("h1").element;
     const sidebar = wrapper.get("aside").element;
     const tabs = wrapper.findAll(".repo-tabs a").map((link) => link.element);
-    expect(tabs).toHaveLength(4);
+    expect(tabs).toHaveLength(3);
     const gate = deferred();
     gates.set("commits:main", gate);
 
@@ -270,6 +274,7 @@ describe("RepoViewer loading on a big repository", () => {
   );
 
   it("retains the separate repository card and tabs for Spaces", async () => {
+    const spaceCommits = vi.fn(() => jsonResponse([]));
     server.use(
       http.get("/api/spaces/open-media-lab/big-repo", () =>
         jsonResponse({
@@ -284,6 +289,10 @@ describe("RepoViewer loading on a big repository", () => {
       http.post("/api/spaces/open-media-lab/big-repo/paths-info/main", () =>
         jsonResponse([]),
       ),
+      http.get(
+        "/api/spaces/open-media-lab/big-repo/commits/:branch",
+        spaceCommits,
+      ),
     );
     const wrapper = mountViewer("files", { repoType: "space" });
     await flushPromises();
@@ -293,8 +302,165 @@ describe("RepoViewer loading on a big repository", () => {
     expect(wrapper.get(".card.repo-header").find(".repo-tabs").exists()).toBe(
       false,
     );
+    expect(wrapper.find('section[aria-label="Latest commit"]').exists()).toBe(
+      false,
+    );
+    expect(spaceCommits).not.toHaveBeenCalled();
     wrapper.unmount();
   });
+
+  it("keeps files and the History link available while the latest commit is pending", async () => {
+    const gate = deferred();
+    let requested = false;
+    server.use(
+      http.get(`${BASE}/commits/:branch`, async () => {
+        requested = true;
+        await gate.promise;
+        return jsonResponse({
+          commits: [
+            {
+              id: "ready123",
+              title: "Summary ready",
+              author: "alice",
+              date: 1,
+            },
+          ],
+          hasMore: false,
+        });
+      }),
+    );
+    const wrapper = mountViewer("files");
+    await vi.waitFor(() => expect(requested).toBe(true));
+    await vi.waitFor(() =>
+      expect(
+        wrapper
+          .find(
+            "a[href='/datasets/open-media-lab/big-repo/blob/main/README.md']",
+          )
+          .exists(),
+      ).toBe(true),
+    );
+    const summary = wrapper.get('section[aria-label="Latest commit"]');
+    expect(summary.find('[role="status"]').exists()).toBe(true);
+    expect(
+      summary
+        .get("a[href='/datasets/open-media-lab/big-repo/commits/main']")
+        .text(),
+    ).toBe("History");
+    gate.resolve();
+    await vi.waitFor(() => expect(summary.text()).toContain("Summary ready"));
+    expect(
+      wrapper
+        .find("a[href='/datasets/open-media-lab/big-repo/blob/main/README.md']")
+        .exists(),
+    ).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("retries a failed latest-commit summary locally without hiding or reloading the files", async () => {
+    let attempts = 0;
+    server.use(
+      http.get(`${BASE}/commits/:branch`, () => {
+        attempts += 1;
+        return attempts === 1
+          ? new HttpResponse("Summary temporarily unavailable", { status: 503 })
+          : jsonResponse({
+              commits: [
+                {
+                  id: "retry123",
+                  title: "Recovered summary",
+                  author: "alice",
+                  date: 1,
+                },
+              ],
+              hasMore: false,
+            });
+      }),
+    );
+    const wrapper = mountViewer("files");
+    await vi.waitFor(() =>
+      expect(
+        wrapper
+          .find('section[aria-label="Latest commit"] [role="alert"]')
+          .exists(),
+      ).toBe(true),
+    );
+    const summary = wrapper.get('section[aria-label="Latest commit"]');
+    expect(
+      summary
+        .get("a[href='/datasets/open-media-lab/big-repo/commits/main']")
+        .text(),
+    ).toBe("History");
+    expect(
+      wrapper
+        .find("a[href='/datasets/open-media-lab/big-repo/blob/main/README.md']")
+        .exists(),
+    ).toBe(true);
+    await summary.get('[data-testid="error-action-retry"]').trigger("click");
+    await vi.waitFor(() =>
+      expect(summary.text()).toContain("Recovered summary"),
+    );
+    expect(summary.find('[role="alert"]').exists()).toBe(false);
+    expect(attempts).toBe(2);
+    expect(seen.filter(({ what }) => what === "tree")).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it.each([200, 503])(
+    "ignores a previous branch's delayed latest-commit response (%s)",
+    async (oldStatus) => {
+      const oldGate = deferred();
+      const requested = [];
+      let oldReturned = false;
+      server.use(
+        http.get(`${BASE}/commits/:branch`, async ({ params }) => {
+          requested.push(params.branch);
+          if (params.branch === "old") {
+            await oldGate.promise;
+            oldReturned = true;
+            if (oldStatus !== 200)
+              return new HttpResponse("Old branch unavailable", {
+                status: oldStatus,
+              });
+          }
+          return jsonResponse({
+            commits: [
+              {
+                id: `${params.branch}1234`,
+                title: `Latest on ${params.branch}`,
+                author: "alice",
+                date: 1,
+              },
+            ],
+            hasMore: false,
+          });
+        }),
+      );
+      const wrapper = mountViewer("files", { branch: "old" });
+      await vi.waitFor(() => expect(requested).toEqual(["old"]));
+      await wrapper.setProps({ branch: "new" });
+      await vi.waitFor(() =>
+        expect(
+          wrapper.find('section[aria-label="Latest commit"]').text(),
+        ).toContain("Latest on new"),
+      );
+      const summary = wrapper.get('section[aria-label="Latest commit"]');
+      expect(
+        summary
+          .get("a[href='/datasets/open-media-lab/big-repo/commits/new']")
+          .text(),
+      ).toBe("History");
+      oldGate.resolve();
+      await vi.waitFor(() => expect(oldReturned).toBe(true));
+      await flushPromises();
+      await flushPromises();
+      expect(summary.text()).toContain("Latest on new");
+      expect(summary.text()).not.toContain("Latest on old");
+      expect(summary.find('[role="alert"]').exists()).toBe(false);
+      expect(requested).toEqual(["old", "new"]);
+      wrapper.unmount();
+    },
+  );
 
   it("keeps directory breadcrumbs in Files and repository navigation in the full-width Viewer", async () => {
     const wrapper = mountViewer("files", { currentPath: "nested" });
@@ -442,8 +608,9 @@ describe("RepoViewer loading on a big repository", () => {
         seen.push({ what: "empty-tree" });
         return jsonResponse([]);
       }),
-      http.get(`${BASE}/commits/main`, () => {
-        seen.push({ what: "empty-commits" });
+      http.get(`${BASE}/commits/main`, ({ request }) => {
+        const latest = new URL(request.url).searchParams.get("limit") === "1";
+        seen.push({ what: latest ? "empty-latest-commit" : "empty-commits" });
         return jsonResponse({ commits: [], hasMore: false });
       }),
     );
@@ -454,6 +621,18 @@ describe("RepoViewer loading on a big repository", () => {
       ).toHaveLength(1),
     );
     await flushPromises();
+    await vi.waitFor(() =>
+      expect(
+        wrapper.find('section[aria-label="Latest commit"]').text(),
+      ).toContain("No commits yet"),
+    );
+    expect(
+      wrapper
+        .get(
+          "section[aria-label='Latest commit'] a[href='/datasets/open-media-lab/big-repo/commits/main']",
+        )
+        .text(),
+    ).toBe("History");
     await wrapper.setProps({ tab: "commits" });
     await vi.waitFor(() => expect(wrapper.text()).toContain("No commits yet"));
     await wrapper.setProps({ tab: "files" });
