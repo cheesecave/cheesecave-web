@@ -133,6 +133,25 @@ function expectHistoryAboveSummary(wrapper, history) {
   ).toBeTruthy();
 }
 
+function expectLikesBesideRepositoryName(wrapper) {
+  const identity = wrapper.get(".repository-identity");
+  const name = identity.get(".repository-name");
+  const likes = identity.get(".repository-like");
+  const copy = identity.get(".repository-copy");
+  expect(
+    name.element.compareDocumentPosition(likes.element) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(
+    likes.element.compareDocumentPosition(copy.element) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(wrapper.find(".repository-actions .repository-like").exists()).toBe(
+    false,
+  );
+  return likes;
+}
+
 describe("RepoViewer real links", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -160,6 +179,38 @@ describe("RepoViewer real links", () => {
     ]);
     expect(wrapper.find(".repo-tabs button").exists()).toBe(false);
   });
+
+  it.each([
+    ["model", "Model"],
+    ["dataset", "Dataset"],
+  ])(
+    "prefixes the %s title while preserving its real links and placing visitor likes beside the name",
+    async (repoType, label) => {
+      installHandlers({}, repoType);
+      const wrapper = mountViewer("files", { repoType });
+      await ready(wrapper);
+      const heading = wrapper.get(".repository-identity h1");
+      expect(heading.text().replace(/\s+/g, "")).toBe(
+        `${label}:open-media-lab/big-repo`,
+      );
+      expect(heading.get(`a[href='/${repoType}s']`).text()).toBe(`${label}:`);
+      expect(heading.get(".repository-owner").attributes("href")).toBe(
+        "/organizations/open-media-lab",
+      );
+      expect(heading.get(".repository-name").attributes("href")).toBe(
+        `/${repoType}s/open-media-lab/big-repo`,
+      );
+      expect(wrapper.get(".repository-summary").text()).not.toContain(label);
+      expect(
+        wrapper.find(".repository-summary .repository-kind").exists(),
+      ).toBe(false);
+      const likes = expectLikesBesideRepositoryName(wrapper);
+      expect(likes.attributes("aria-label")).toBe("Repository likes");
+      expect(likes.element.tagName).toBe("SPAN");
+      expect(likes.text()).toBe("3 likes");
+      wrapper.unmount();
+    },
+  );
 
   it("shows the real commit count in History without counting the latest summary rows", async () => {
     server.use(
@@ -474,6 +525,7 @@ describe("RepoViewer real links", () => {
     await ready(wrapper);
     const header = wrapper.get('[aria-label="Repository header"]');
     const like = header.get('button[aria-label="Like repository"]');
+    expect(expectLikesBesideRepositoryName(wrapper).element).toBe(like.element);
     expect(like.attributes("aria-pressed")).toBe("false");
     expect(like.text()).toContain("4");
     await like.trigger("click");

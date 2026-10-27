@@ -267,7 +267,7 @@ describe("RepoViewer loading on a big repository", () => {
     expect(seen.map((s) => s.what)).toEqual(["info", "tree"]);
     const header = wrapper.get('[aria-label="Repository header"]');
     expect(header.get("h1").text().replace(/\s+/g, "")).toBe(
-      "open-media-lab/big-repo",
+      "Dataset:open-media-lab/big-repo",
     );
     expect(
       header.get('nav[aria-label="Repository sections"]').findAll("a"),
@@ -528,7 +528,9 @@ describe("RepoViewer loading on a big repository", () => {
       const wrapper = mountViewer("files", { repoType });
       await vi.waitFor(() =>
         expect(
-          wrapper.get(".repo-composite-header h1 a").attributes("href"),
+          wrapper
+            .get(".repo-composite-header h1 .repository-owner")
+            .attributes("href"),
         ).toBe(ownerHref),
       );
       const header = wrapper.get(".repo-composite-header").element;
@@ -539,7 +541,9 @@ describe("RepoViewer loading on a big repository", () => {
         expect(wrapper.find(".card.repo-header").exists()).toBe(false);
         expect(
           wrapper.get(".repo-composite-header h1").text().replace(/\s+/g, ""),
-        ).toBe("open-media-lab/big-repo");
+        ).toBe(
+          `${repoType === "model" ? "Model" : "Dataset"}:open-media-lab/big-repo`,
+        );
         expect(
           wrapper
             .get(".repo-composite-header h1")

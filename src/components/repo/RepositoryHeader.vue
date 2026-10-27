@@ -55,51 +55,64 @@ const tabIcons = {
             class="repository-type-icon"
             aria-hidden="true"
           />
-          <h1>
-            <RouterLink :to="namespaceLink" class="repository-owner">{{
-              namespace
-            }}</RouterLink>
-            <span class="repository-slash" aria-hidden="true">/</span>
-            <RouterLink :to="repoPath" class="repository-name">{{
-              name
-            }}</RouterLink>
-          </h1>
-          <button
-            type="button"
-            class="repository-copy"
-            title="Copy repository ID"
-            aria-label="Copy repository ID"
-            @click="$emit('copy')"
-          >
-            <span class="i-carbon-copy" aria-hidden="true" />
-          </button>
+          <div class="repository-title-group">
+            <h1>
+              <RouterLink :to="`/${repoType}s`" class="repository-title-type"
+                >{{ typeLabel }}:</RouterLink
+              >
+              <RouterLink :to="namespaceLink" class="repository-owner">{{
+                namespace
+              }}</RouterLink>
+              <span class="repository-slash" aria-hidden="true">/</span>
+              <RouterLink :to="repoPath" class="repository-name">{{
+                name
+              }}</RouterLink>
+            </h1>
+            <template v-if="repoInfo">
+              <button
+                v-if="signedIn"
+                type="button"
+                class="repository-like"
+                :class="{ 'is-liked': liked }"
+                :aria-label="liked ? 'Unlike repository' : 'Like repository'"
+                :aria-pressed="liked"
+                :disabled="liking"
+                @click="$emit('like')"
+              >
+                <span
+                  :class="
+                    liked ? 'i-carbon-favorite-filled' : 'i-carbon-favorite'
+                  "
+                  aria-hidden="true"
+                />
+                <span>Like</span
+                ><span class="repository-like-count">{{ likesCount }}</span>
+              </button>
+              <span
+                v-else
+                class="repository-like"
+                aria-label="Repository likes"
+              >
+                <span class="i-carbon-favorite" aria-hidden="true" />
+                <span>{{ likesCount }} likes</span>
+              </span>
+            </template>
+            <button
+              type="button"
+              class="repository-copy"
+              title="Copy repository ID"
+              aria-label="Copy repository ID"
+              @click="$emit('copy')"
+            >
+              <span class="i-carbon-copy" aria-hidden="true" />
+            </button>
+          </div>
         </div>
         <div
           v-if="repoInfo"
           class="repository-actions"
           aria-label="Repository actions"
         >
-          <button
-            v-if="signedIn"
-            type="button"
-            class="repository-like"
-            :class="{ 'is-liked': liked }"
-            :aria-label="liked ? 'Unlike repository' : 'Like repository'"
-            :aria-pressed="liked"
-            :disabled="liking"
-            @click="$emit('like')"
-          >
-            <span
-              :class="liked ? 'i-carbon-favorite-filled' : 'i-carbon-favorite'"
-              aria-hidden="true"
-            />
-            <span>Like</span
-            ><span class="repository-like-count">{{ likesCount }}</span>
-          </button>
-          <span v-else class="repository-like" aria-label="Repository likes">
-            <span class="i-carbon-favorite" aria-hidden="true" />
-            <span>{{ likesCount }} likes</span>
-          </span>
           <el-button @click="$emit('download')">
             <span class="i-carbon-document-download" aria-hidden="true" />
             Download
@@ -113,9 +126,6 @@ const tabIcons = {
         </div>
       </div>
       <div class="repository-summary">
-        <RouterLink :to="`/${repoType}s`" class="repository-kind">{{
-          typeLabel
-        }}</RouterLink>
         <template v-if="repoInfo">
           <span class="repository-visibility">
             <span
@@ -205,12 +215,20 @@ const tabIcons = {
 }
 .repository-identity {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
+  min-width: 0;
+}
+.repository-title-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   min-width: 0;
 }
 .repository-type-icon {
   flex-shrink: 0;
+  margin-top: 3px;
   font-size: 28px;
   color: var(--site-muted);
 }
@@ -229,6 +247,11 @@ h1 {
 .repository-owner {
   color: var(--site-link);
   font-weight: 400;
+}
+.repository-title-type {
+  color: var(--site-muted);
+  font-weight: 400;
+  white-space: nowrap;
 }
 .repository-name {
   color: var(--site-card-text);
@@ -268,6 +291,7 @@ h1 a:hover,
 .repository-like {
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
   gap: 6px;
   min-height: 34px;
   margin: 0;
@@ -315,7 +339,6 @@ button.repository-like:hover {
   color: var(--site-muted);
   font-size: 13px;
 }
-.repository-kind,
 .repository-visibility,
 .repository-stat,
 .repository-source {
@@ -323,15 +346,11 @@ button.repository-like:hover {
   align-items: center;
   gap: 6px;
 }
-.repository-kind,
 .repository-visibility {
   border: 1px solid var(--site-border);
   border-radius: 6px;
   padding: 2px 7px;
   font-size: 12px;
-}
-.repository-kind {
-  color: var(--site-link);
 }
 .repository-header-inner :deep(.metadata-header) {
   background: transparent;
@@ -396,7 +415,7 @@ button:focus-visible {
     justify-content: center;
   }
   .repository-actions :deep(.el-button),
-  .repository-actions > .repository-like {
+  .repository-like {
     min-height: 40px;
   }
   .repository-actions > :last-child:nth-child(odd) {
