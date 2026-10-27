@@ -342,12 +342,6 @@ button.repository-like:hover {
   padding: 0;
   margin: 0;
 }
-.repository-header-inner :deep(.metadata-header a),
-.repository-header-inner :deep(.metadata-header button),
-.repository-header-inner :deep(.metadata-header .el-tag__content) {
-  display: inline-flex;
-  align-items: center;
-}
 .repository-navigation {
   display: flex;
   gap: 8px;
