@@ -1,6 +1,6 @@
 // On the organization pages, every control that goes to a page of its own is a link, so it opens in a
 // new tab: the Create Organization buttons, each organization card, the settings and storage buttons
-// and the member rows.
+// and the member avatars.
 
 import { h, reactive } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
@@ -32,9 +32,10 @@ vi.mock("@/stores/auth", () => ({
     canWriteToNamespace: () => true,
   }),
 }));
-vi.mock("@/utils/api", () => ({
+vi.mock("@/utils/api", async (original) => ({
+  ...(await original()),
   repoAPI: { listAllRepos: async () => ({ data: [], incomplete: [] }) },
-  orgAPI: mocks.orgAPI,
+  orgAPI: { ...(await original()).orgAPI, ...mocks.orgAPI },
   settingsAPI: { getOrgProfile: async () => ({ data: {} }) },
   socialAPI: {
     getFollowState: async () => ({
@@ -61,6 +62,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, "error").mockImplementation(() => {});
   mocks.fetchUserInfo.mockResolvedValue({
+    name: "alice",
     orgs: [{ name: "acme", roleInOrg: "admin" }],
   });
   mocks.orgAPI.get.mockResolvedValue({
@@ -68,7 +70,14 @@ beforeEach(() => {
   });
   mocks.orgAPI.listMembers.mockResolvedValue({ data: { members: MEMBERS } });
   server.use(
+    http.get("*/api/users/:name/type", () =>
+      jsonResponse({ type: "org", _source: "local" }),
+    ),
     http.get("*/org/:name", () => jsonResponse({ name: "acme" })),
+    http.get(
+      "*/spaces/:namespace/:name/resolve/main/README.md",
+      () => new HttpResponse(null, { status: 404 }),
+    ),
     http.get("*/api/quota/:name/public", () =>
       jsonResponse({
         can_see_private: true,
@@ -96,7 +105,6 @@ async function mountPage(component, params = {}) {
         ElTable: true,
         ElTableColumn: true,
         RouterLink: RouterLinkStub,
-        EntityAvatar: true,
         MarkdownViewer: true,
         SocialLinks: true,
         ElScrollbar: {
@@ -120,6 +128,15 @@ const link = (text) =>
   wrapper.findAll("a").find((item) => item.text().includes(text));
 const hasButton = (text) =>
   wrapper.findAll("button").some((item) => item.text().includes(text));
+function expectMemberAvatar(username) {
+  const member = wrapper.get(`a[aria-label="${username}"]`);
+  expect(member.attributes("href")).toBe(`/${username}`);
+  expect(member.attributes("title")).toBe(username);
+  expect(member.get("img").attributes("src")).toBe(
+    `/api/users/${username}/avatar`,
+  );
+  return member;
+}
 
 describe("organizations list", () => {
   it("links Create Organization to the form, as a button-looking link", async () => {
@@ -143,7 +160,7 @@ describe("organizations list", () => {
   });
 
   it("links the invitation to create a first organization", async () => {
-    mocks.fetchUserInfo.mockResolvedValue({ orgs: [] });
+    mocks.fetchUserInfo.mockResolvedValue({ name: "alice", orgs: [] });
     await mountPage(OrganizationList);
     expect(link("Create Your First Organization").attributes("href")).toBe(
       "/organizations/new",
@@ -164,17 +181,14 @@ describe("organization page", () => {
     expect(hasButton("Organization Settings")).toBe(false);
     expect(hasButton("View Details")).toBe(false);
 
-    const member = wrapper.get("a[href='/bob']");
-    expect(member.text()).toBe("bob");
-    expect(member.classes()).toContain("stretched-link");
-    const row = member.element.closest(".relative");
-    expect(row).not.toBeNull();
-    row.click();
+    const member = expectMemberAvatar("bob");
+    await member.trigger("click", { ctrlKey: true });
     expect(mocks.router.push).not.toHaveBeenCalled();
   });
 
   it("shows neither to someone who is not an admin of it", async () => {
     mocks.fetchUserInfo.mockResolvedValue({
+      name: "alice",
       orgs: [{ name: "acme", roleInOrg: "member" }],
     });
     await mountPage(OrganizationPage);
@@ -186,9 +200,6 @@ describe("organization page", () => {
 describe("organization models page", () => {
   it("links each member to their profile", async () => {
     await mountPage(OrganizationTypePage, { type: "models" });
-    const member = wrapper.get("a[href='/bob']");
-    expect(member.text()).toBe("bob");
-    expect(member.classes()).toContain("stretched-link");
-    expect(member.element.closest(".relative")).not.toBeNull();
+    expectMemberAvatar("bob");
   });
 });

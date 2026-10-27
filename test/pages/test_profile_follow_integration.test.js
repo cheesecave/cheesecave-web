@@ -31,7 +31,10 @@ vi.mock("@/stores/auth", () => ({
 vi.mock("@/utils/api", async (original) => ({
   ...(await original()),
   repoAPI: { listAllRepos: (...args) => mocks.listAllRepos(...args) },
-  orgAPI: { listMembers: async () => ({ data: { members: [] } }) },
+  orgAPI: {
+    ...(await original()).orgAPI,
+    listMembers: async () => ({ data: { members: [] } }),
+  },
   settingsAPI: {
     whoamiV2: async () => ({ data: { orgs: [] } }),
     getOrgProfile: async () => ({ data: { description: "Our team" } }),
@@ -125,7 +128,7 @@ describe("local profile Follow integration", () => {
       expect(avatar.props()).toMatchObject({
         username: "bob",
         isOrg: mode === "org",
-        size: mode === "org" ? 80 : "large",
+        size: "large",
       });
       expect(avatar.get("img").attributes("src")).toBe(
         `/api/${mode === "org" ? "organizations" : "users"}/bob/avatar`,
