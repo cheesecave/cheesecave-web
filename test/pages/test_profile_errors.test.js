@@ -29,7 +29,8 @@ vi.mock("@/stores/auth", () => ({
     token: null,
   }),
 }));
-vi.mock("@/utils/api", () => ({
+vi.mock("@/utils/api", async (original) => ({
+  ...(await original()),
   repoAPI: { listAllRepos: (...args) => mocks.listAllRepos(...args) },
   orgAPI: { listMembers: async () => ({ data: { members: [] } }) },
   settingsAPI: {
@@ -71,6 +72,9 @@ beforeEach(() => {
   });
   mocks.listAllRepos.mockResolvedValue({ data: [], incomplete: [] });
   server.use(
+    http.get("*/api/users/:name/type", () =>
+      jsonResponse({ type: "user", _source: "local" }),
+    ),
     http.get("*/org/:name", ({ request }) =>
       mocks.mode === "user"
         ? jsonResponse({}, { status: 404 })
@@ -138,6 +142,13 @@ describe.each(["user", "org"])("%s profile failures", (mode) => {
   });
 
   it("switches to 'not found' when the retry learns the account does not exist", async () => {
+    if (mode === "user")
+      server.use(
+        http.get(
+          "*/api/users/:name/type",
+          () => new HttpResponse(null, { status: 404 }),
+        ),
+      );
     infoStatus = 503;
     await mountProfile(mode);
     infoStatus = 404;
@@ -163,8 +174,8 @@ describe.each(["user", "org"])("%s profile failures", (mode) => {
 
   it("says why the repositories could not be listed, instead of showing none", async () => {
     let up = false;
-    mocks.listAllRepos.mockImplementation(async () => {
-      if (!up) throw httpFailure(500);
+    mocks.listAllRepos.mockImplementation(async (type) => {
+      if (!up && (mode === "org" || type === "model")) throw httpFailure(500);
       return { data: [], incomplete: [] };
     });
     await mountProfile(mode);
@@ -183,4 +194,47 @@ describe.each(["user", "org"])("%s profile failures", (mode) => {
     await mountProfile(mode);
     expect(wrapper.find('[data-testid="error-state"]').exists()).toBe(false);
   });
+});
+
+describe("independent user profile lookup failures", () => {
+  it.each([200, 503])(
+    "keeps successful content and local retry when profile is missing but identity returns %s",
+    async (identityStatus) => {
+      infoStatus = 404;
+      server.use(
+        http.get("*/api/users/:name/type", () =>
+          identityStatus === 200
+            ? jsonResponse({ type: "user", _source: "local" })
+            : new HttpResponse(null, { status: identityStatus }),
+        ),
+      );
+      mocks.listAllRepos.mockResolvedValue({
+        data: [{ id: "bob/available-model", tags: [] }],
+        incomplete: [],
+      });
+      await mountProfile("user");
+      await vi.waitFor(() =>
+        expect(wrapper.find(".profile-card").exists()).toBe(true),
+      );
+      expect(wrapper.text()).toContain("available-model");
+      const profileError = wrapper
+        .get(".profile-card")
+        .findAll('[data-testid="error-state"]')[0];
+      expect(profileError.exists()).toBe(true);
+      const listed = mocks.listAllRepos.mock.calls.length;
+      infoStatus = 200;
+      await profileError
+        .get('[data-testid="error-action-retry"]')
+        .trigger("click");
+      await vi.waitFor(() =>
+        expect(wrapper.get(".profile-card").text()).toContain("Bob"),
+      );
+      expect(mocks.listAllRepos.mock.calls.length).toBe(listed);
+      expect(wrapper.text()).toContain("available-model");
+      if (identityStatus === 503)
+        expect(wrapper.get(".profile-card").text()).toContain(
+          "Service unavailable",
+        );
+    },
+  );
 });

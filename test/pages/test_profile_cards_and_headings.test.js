@@ -31,7 +31,8 @@ vi.mock("@/stores/auth", () => ({
     token: null,
   }),
 }));
-vi.mock("@/utils/api", () => ({
+vi.mock("@/utils/api", async (original) => ({
+  ...(await original()),
   repoAPI: { listAllRepos: (...args) => mocks.listAllRepos(...args) },
   orgAPI: { listMembers: async () => ({ data: { members: [] } }) },
   settingsAPI: {
@@ -79,6 +80,9 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   mocks.listAllRepos.mockResolvedValue({ data: [], incomplete: [] });
   server.use(
+    http.get("*/api/users/:name/type", () =>
+      jsonResponse({ type: "user", _source: "local" }),
+    ),
     http.get("*/org/:name", () =>
       mocks.mode === "user"
         ? jsonResponse({}, { status: 404 })
@@ -220,5 +224,51 @@ describe.each(PAGES)("%s", (_name, component, mode, params) => {
         link.html(),
       ).toBeTruthy();
     }
+  });
+});
+
+describe("user overview navigation", () => {
+  it("links to each complete repository list without nesting a button in the link", async () => {
+    mocks.listAllRepos.mockImplementation(async (type) => ({
+      data: Array.from({ length: 7 }, (_, index) =>
+        repo(type, `repository-${index + 1}`, false),
+      ),
+      incomplete: [],
+    }));
+    await mountPage(UserOverview, "user", {});
+
+    for (const type of ["models", "datasets", "spaces"]) {
+      const links = wrapper
+        .findAll("a")
+        .filter((link) => link.text().startsWith(`Show all 7 ${type}`));
+      expect(
+        links,
+        `the complete ${type} list has one named link`,
+      ).toHaveLength(1);
+      expect(links[0].attributes("href")).toBe(`/bob/${type}`);
+      expect(links[0].find("button").exists()).toBe(false);
+      expect(links[0].element.querySelector("a")).toBeNull();
+    }
+  });
+
+  it("offers a real homepage link when the user does not exist", async () => {
+    server.use(
+      http.get("*/api/users/:name/type", () =>
+        jsonResponse({}, { status: 404 }),
+      ),
+      http.get("*/api/users/:name/profile", () =>
+        jsonResponse({}, { status: 404 }),
+      ),
+    );
+    await mountPage(UserOverview, "user", {});
+
+    expect(wrapper.get("h1").text()).toBe("User Not Found");
+    const homepage = wrapper
+      .findAll("a, button")
+      .filter((control) => control.text() === "Go to Homepage");
+    expect(homepage).toHaveLength(1);
+    expect(homepage[0].element.tagName).toBe("A");
+    expect(homepage[0].attributes("href")).toBe("/");
+    expect(homepage[0].find("button").exists()).toBe(false);
   });
 });

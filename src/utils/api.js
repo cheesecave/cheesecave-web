@@ -70,6 +70,12 @@ axios.interceptors.response.use(onResponse, onFailure);
 // bare axios waits forever by default
 axios.defaults.timeout = 30000;
 
+export function getLocalProfileType(username) {
+  return api.get(`/api/users/${encodeURIComponent(username)}/type`, {
+    params: { fallback: false },
+  });
+}
+
 export const socialAPI = {
   getFollowState: (username) =>
     api.get(`/api/users/${encodeURIComponent(username)}/follow`),

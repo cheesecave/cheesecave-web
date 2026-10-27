@@ -1,18 +1,8 @@
 <!-- src/pages/[username]/[type].vue -->
 <template>
-  <div class="container-main">
-    <!-- Loading State -->
-    <div v-if="loading" class="text-center py-20">
-      <div
-        class="inline-block animate-spin rounded-full h-16 w-16 border-4 border-gray-300 border-t-blue-600 mb-4"
-      ></div>
-      <p class="text-xl text-gray-600 dark:text-gray-400">
-        Loading repositories...
-      </p>
-    </div>
-
+  <div class="container-main profile-page">
     <!-- User Not Found -->
-    <div v-else-if="userNotFound" class="text-center py-20">
+    <div v-if="userNotFound" class="text-center py-20">
       <div
         class="i-carbon-user-avatar-filled text-8xl text-gray-300 dark:text-gray-600 mb-6 inline-block"
       />
@@ -23,27 +13,103 @@
         }}</span
         >" does not exist.
       </p>
-      <el-button type="primary" @click="$router.push('/')">
+      <LinkButton type="primary" to="/">
         <div class="i-carbon-home mr-2" />
         Go to Homepage
-      </el-button>
+      </LinkButton>
     </div>
 
-    <div v-else class="grid grid-cols-[280px_1fr] gap-6">
+    <div v-else class="profile-layout">
       <!-- Sidebar -->
-      <aside class="space-y-4">
-        <div class="card">
-          <div class="flex items-center gap-3 mb-4">
-            <div class="i-carbon-user-avatar text-5xl text-gray-400" />
-            <div>
-              <h2 class="text-xl font-bold">{{ username }}</h2>
-              <p class="text-sm text-gray-600 dark:text-gray-400">User</p>
+      <aside class="min-w-0 space-y-4 lg:self-start">
+        <div class="card profile-card">
+          <ProfileViewToggle
+            v-if="isOwnProfile"
+            :visitor-view="visitorView"
+            @toggle="toggleVisitorView"
+          />
+          <div class="profile-identity">
+            <EntityAvatar
+              :username="username"
+              :name="userInfo?.full_name || username"
+              :avatar-url="userInfo?.avatar_url"
+              :version="userInfo?.avatar_updated_at"
+              size="large"
+              class="profile-avatar"
+              :alt="`${username} avatar`"
+            />
+            <div class="min-w-0">
+              <h2 class="text-2xl font-bold leading-tight">{{ username }}</h2>
+              <p class="mt-1 text-base text-gray-600 dark:text-gray-400">
+                {{ userInfo?.full_name || "User" }}
+              </p>
             </div>
           </div>
 
-          <div class="space-y-2 text-sm">
+          <p
+            v-if="profileLoading || (profileMissing && identityLoading)"
+            role="status"
+            class="mt-4 text-sm text-gray-500 dark:text-gray-400"
+          >
+            Loading user profile...
+          </p>
+          <ErrorState
+            v-if="
+              profileError &&
+              (!profileMissing || (!identityLoading && !isOrganization))
+            "
+            :error="profileError"
+            :context="errorContext('user profile')"
+            mode="inline-panel"
+            :retrying="profileLoading"
+            :retry="loadProfile"
+          >
+            <template v-if="profileMissing" #actions>
+              <el-button
+                data-testid="error-action-retry"
+                :loading="profileLoading"
+                @click="loadProfile"
+                >Try again</el-button
+              >
+            </template>
+          </ErrorState>
+          <ErrorState
+            v-if="identityError"
+            :error="identityError"
+            :context="errorContext('user identity')"
+            mode="inline-panel"
+            :retrying="identityLoading"
+            :retry="reloadIdentity"
+          />
+          <ProfileOwnerActions
+            v-if="localUserReady"
+            :username="username"
+            :visitor-view="visitorView"
+          />
+
+          <div class="space-y-3 text-sm">
+            <p
+              v-if="userInfo?.bio"
+              class="text-gray-700 dark:text-gray-300 whitespace-pre-wrap"
+            >
+              {{ userInfo.bio }}
+            </p>
+            <a
+              v-if="userInfo?.website"
+              :href="userInfo.website"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="flex items-center gap-2 min-w-0 text-blue-600 dark:text-blue-400 hover:underline"
+              title="Website"
+            >
+              <span class="i-carbon-link shrink-0" aria-hidden="true" />
+              <span class="truncate">{{
+                userInfo.website.replace(/^https?:\/\//, "")
+              }}</span>
+            </a>
             <div
-              class="flex items-center gap-2 text-gray-600 dark:text-gray-400"
+              v-if="userInfo?.created_at"
+              class="flex items-center gap-2 text-gray-600 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-gray-700"
             >
               <div class="i-carbon-calendar" />
               Joined {{ formatDate(userInfo?.created_at) }}
@@ -52,117 +118,74 @@
         </div>
 
         <!-- Stats Summary / Tab Navigation -->
-        <div class="card">
+        <div class="card profile-panel">
           <h3 class="font-semibold mb-3">Repositories</h3>
           <div class="space-y-1">
             <RouterLink
-              :to="`/${username}`"
-              :class="[
-                'flex items-center justify-between px-3 py-2 rounded cursor-pointer transition-colors block',
-                !currentType
-                  ? 'bg-gray-100 dark:bg-gray-700'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-700',
-              ]"
+              :to="profileLink(`/${username}`)"
+              class="profile-nav-link"
             >
               <div class="flex items-center gap-2 text-sm">
                 <div class="i-carbon-grid text-gray-500 dark:text-gray-400" />
-                <span :class="!currentType ? 'font-semibold' : ''"
-                  >Overview</span
-                >
+                <span>Overview</span>
               </div>
             </RouterLink>
 
             <RouterLink
-              :to="`/${username}/models`"
-              :class="[
-                'flex items-center justify-between px-3 py-2 rounded cursor-pointer transition-colors block',
-                currentType === 'models'
-                  ? 'bg-blue-50 dark:bg-blue-900/30'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-700',
-              ]"
+              :to="profileLink(`/${username}/models`)"
+              class="profile-nav-link"
+              :class="{ 'profile-nav-link-active': currentType === 'models' }"
+              :aria-current="currentType === 'models' ? 'page' : undefined"
             >
               <div class="flex items-center gap-2 text-sm">
                 <div class="i-carbon-model text-blue-500" />
-                <span
-                  :class="
-                    currentType === 'models'
-                      ? 'font-semibold text-blue-600 dark:text-blue-400'
-                      : ''
-                  "
+                <span :class="{ 'font-semibold': currentType === 'models' }"
                   >Models</span
                 >
               </div>
               <span
-                :class="[
-                  'text-sm font-semibold',
-                  currentType === 'models'
-                    ? 'text-blue-600 dark:text-blue-400'
-                    : 'text-gray-600 dark:text-gray-400',
-                ]"
+                v-if="repoLoaded.model"
+                class="text-sm font-semibold text-gray-600 dark:text-gray-400"
               >
                 {{ getCount("model") }}
               </span>
             </RouterLink>
 
             <RouterLink
-              :to="`/${username}/datasets`"
-              :class="[
-                'flex items-center justify-between px-3 py-2 rounded cursor-pointer transition-colors block',
-                currentType === 'datasets'
-                  ? 'bg-green-50 dark:bg-green-900/30'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-700',
-              ]"
+              :to="profileLink(`/${username}/datasets`)"
+              class="profile-nav-link"
+              :class="{ 'profile-nav-link-active': currentType === 'datasets' }"
+              :aria-current="currentType === 'datasets' ? 'page' : undefined"
             >
               <div class="flex items-center gap-2 text-sm">
                 <div class="i-carbon-data-table text-green-500" />
-                <span
-                  :class="
-                    currentType === 'datasets'
-                      ? 'font-semibold text-green-700 dark:text-green-400'
-                      : ''
-                  "
+                <span :class="{ 'font-semibold': currentType === 'datasets' }"
                   >Datasets</span
                 >
               </div>
               <span
-                :class="[
-                  'text-sm font-semibold',
-                  currentType === 'datasets'
-                    ? 'text-green-700 dark:text-green-400'
-                    : 'text-gray-600 dark:text-gray-400',
-                ]"
+                v-if="repoLoaded.dataset"
+                class="text-sm font-semibold text-gray-600 dark:text-gray-400"
               >
                 {{ getCount("dataset") }}
               </span>
             </RouterLink>
 
             <RouterLink
-              :to="`/${username}/spaces`"
-              :class="[
-                'flex items-center justify-between px-3 py-2 rounded cursor-pointer transition-colors block',
-                currentType === 'spaces'
-                  ? 'bg-purple-50 dark:bg-purple-900/30'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-700',
-              ]"
+              :to="profileLink(`/${username}/spaces`)"
+              class="profile-nav-link"
+              :class="{ 'profile-nav-link-active': currentType === 'spaces' }"
+              :aria-current="currentType === 'spaces' ? 'page' : undefined"
             >
               <div class="flex items-center gap-2 text-sm">
                 <div class="i-carbon-application text-purple-500" />
-                <span
-                  :class="
-                    currentType === 'spaces'
-                      ? 'font-semibold text-purple-600 dark:text-purple-400'
-                      : ''
-                  "
+                <span :class="{ 'font-semibold': currentType === 'spaces' }"
                   >Spaces</span
                 >
               </div>
               <span
-                :class="[
-                  'text-sm font-semibold',
-                  currentType === 'spaces'
-                    ? 'text-purple-600 dark:text-purple-400'
-                    : 'text-gray-600 dark:text-gray-400',
-                ]"
+                v-if="repoLoaded.space"
+                class="text-sm font-semibold text-gray-600 dark:text-gray-400"
               >
                 {{ getCount("space") }}
               </span>
@@ -172,44 +195,30 @@
       </aside>
 
       <!-- Main Content -->
-      <main>
-        <!-- The profile could not be looked up: say so, and keep the rest -->
-        <ErrorState
-          v-if="profileError"
-          :error="profileError"
-          :context="errorContext('user')"
-          mode="inline-panel"
-          :retrying="lookupRetrying"
-          :retry="reloadLookup"
-        />
-
-        <!-- The repositories could not be listed: say so, not "no repositories" -->
-        <ErrorState
-          v-if="reposError"
-          :error="reposError"
-          :context="errorContext('repositories')"
-          mode="inline-panel"
-          :retry="loadRepos"
-        />
-
+      <main class="min-w-0 profile-repositories">
         <!-- A source was left out: the lists are right, but not everything -->
-        <IncompleteNotice v-if="!reposError" :sources="incompleteSources" />
+        <IncompleteNotice :sources="incompleteSources" />
 
         <!-- Models Tab -->
-        <div v-if="!reposError && repoType === 'model'">
-          <div class="flex items-center justify-between mb-6">
-            <div class="flex items-center gap-3">
-              <div class="i-carbon-model text-blue-500 text-3xl" />
-              <h1 class="text-3xl font-bold">All Models</h1>
-              <el-tag type="info" size="large">{{ getCount("model") }}</el-tag>
+        <div v-if="repoType === 'model'">
+          <div class="profile-section-header">
+            <div class="profile-section-title">
+              <div
+                class="i-carbon-model text-blue-500 text-xl"
+                aria-hidden="true"
+              />
+              <h1>All Models</h1>
+              <span v-if="repoLoaded.model" class="profile-count">{{
+                getCount("model")
+              }}</span>
             </div>
 
-            <div class="flex gap-3">
+            <div class="profile-list-controls">
               <el-select
                 aria-label="Sort models"
                 v-model="selectedSort"
                 placeholder="Sort by"
-                style="width: 200px"
+                class="profile-sort"
               >
                 <el-option
                   v-for="option in sortOptions"
@@ -223,7 +232,7 @@
                 aria-label="Search models"
                 v-model="searchQuery"
                 placeholder="Search models..."
-                style="width: 300px"
+                class="profile-search"
                 clearable
               >
                 <template #prefix>
@@ -233,8 +242,27 @@
             </div>
           </div>
 
-          <div v-if="filteredRepos.length > 0" class="grid grid-cols-2 gap-4">
+          <p
+            v-if="repoLoading.model"
+            role="status"
+            class="py-8 text-gray-500 dark:text-gray-400"
+          >
+            Loading models...
+          </p>
+          <ErrorState
+            v-else-if="repoErrors.model"
+            :error="repoErrors.model"
+            :context="errorContext('models')"
+            mode="inline-panel"
+            :retrying="repoLoading.model"
+            :retry="() => loadRepoType('model')"
+          />
+          <div
+            v-else-if="filteredRepos.length > 0"
+            class="profile-repository-grid"
+          >
             <ProfileRepoCard
+              class="profile-repo-card"
               v-for="repo in filteredRepos"
               :key="repo.id"
               :repo="repo"
@@ -243,7 +271,7 @@
           </div>
 
           <div
-            v-else
+            v-else-if="repoLoaded.model"
             class="text-center py-20 text-gray-500 dark:text-gray-400"
           >
             <div class="i-carbon-search text-6xl mb-4 inline-block" />
@@ -252,22 +280,25 @@
         </div>
 
         <!-- Datasets Tab -->
-        <div v-if="!reposError && repoType === 'dataset'">
-          <div class="flex items-center justify-between mb-6">
-            <div class="flex items-center gap-3">
-              <div class="i-carbon-data-table text-green-500 text-3xl" />
-              <h1 class="text-3xl font-bold">All Datasets</h1>
-              <el-tag type="success" size="large">{{
+        <div v-if="repoType === 'dataset'">
+          <div class="profile-section-header">
+            <div class="profile-section-title">
+              <div
+                class="i-carbon-data-table text-green-500 text-xl"
+                aria-hidden="true"
+              />
+              <h1>All Datasets</h1>
+              <span v-if="repoLoaded.dataset" class="profile-count">{{
                 getCount("dataset")
-              }}</el-tag>
+              }}</span>
             </div>
 
-            <div class="flex gap-3">
+            <div class="profile-list-controls">
               <el-select
                 aria-label="Sort datasets"
                 v-model="selectedSort"
                 placeholder="Sort by"
-                style="width: 200px"
+                class="profile-sort"
               >
                 <el-option
                   v-for="option in sortOptions"
@@ -281,7 +312,7 @@
                 aria-label="Search datasets"
                 v-model="searchQuery"
                 placeholder="Search datasets..."
-                style="width: 300px"
+                class="profile-search"
                 clearable
               >
                 <template #prefix>
@@ -291,8 +322,27 @@
             </div>
           </div>
 
-          <div v-if="filteredRepos.length > 0" class="grid grid-cols-2 gap-4">
+          <p
+            v-if="repoLoading.dataset"
+            role="status"
+            class="py-8 text-gray-500 dark:text-gray-400"
+          >
+            Loading datasets...
+          </p>
+          <ErrorState
+            v-else-if="repoErrors.dataset"
+            :error="repoErrors.dataset"
+            :context="errorContext('datasets')"
+            mode="inline-panel"
+            :retrying="repoLoading.dataset"
+            :retry="() => loadRepoType('dataset')"
+          />
+          <div
+            v-else-if="filteredRepos.length > 0"
+            class="profile-repository-grid"
+          >
             <ProfileRepoCard
+              class="profile-repo-card"
               v-for="repo in filteredRepos"
               :key="repo.id"
               :repo="repo"
@@ -301,7 +351,7 @@
           </div>
 
           <div
-            v-else
+            v-else-if="repoLoaded.dataset"
             class="text-center py-20 text-gray-500 dark:text-gray-400"
           >
             <div class="i-carbon-search text-6xl mb-4 inline-block" />
@@ -310,22 +360,25 @@
         </div>
 
         <!-- Spaces Tab -->
-        <div v-if="!reposError && repoType === 'space'">
-          <div class="flex items-center justify-between mb-6">
-            <div class="flex items-center gap-3">
-              <div class="i-carbon-application text-purple-500 text-3xl" />
-              <h1 class="text-3xl font-bold">All Spaces</h1>
-              <el-tag type="warning" size="large">{{
+        <div v-if="repoType === 'space'">
+          <div class="profile-section-header">
+            <div class="profile-section-title">
+              <div
+                class="i-carbon-application text-purple-500 text-xl"
+                aria-hidden="true"
+              />
+              <h1>All Spaces</h1>
+              <span v-if="repoLoaded.space" class="profile-count">{{
                 getCount("space")
-              }}</el-tag>
+              }}</span>
             </div>
 
-            <div class="flex gap-3">
+            <div class="profile-list-controls">
               <el-select
                 aria-label="Sort spaces"
                 v-model="selectedSort"
                 placeholder="Sort by"
-                style="width: 200px"
+                class="profile-sort"
               >
                 <el-option
                   v-for="option in sortOptions"
@@ -339,7 +392,7 @@
                 aria-label="Search spaces"
                 v-model="searchQuery"
                 placeholder="Search spaces..."
-                style="width: 300px"
+                class="profile-search"
                 clearable
               >
                 <template #prefix>
@@ -349,8 +402,27 @@
             </div>
           </div>
 
-          <div v-if="filteredRepos.length > 0" class="grid grid-cols-2 gap-4">
+          <p
+            v-if="repoLoading.space"
+            role="status"
+            class="py-8 text-gray-500 dark:text-gray-400"
+          >
+            Loading spaces...
+          </p>
+          <ErrorState
+            v-else-if="repoErrors.space"
+            :error="repoErrors.space"
+            :context="errorContext('spaces')"
+            mode="inline-panel"
+            :retrying="repoLoading.space"
+            :retry="() => loadRepoType('space')"
+          />
+          <div
+            v-else-if="filteredRepos.length > 0"
+            class="profile-repository-grid"
+          >
             <ProfileRepoCard
+              class="profile-repo-card"
               v-for="repo in filteredRepos"
               :key="repo.id"
               :repo="repo"
@@ -359,7 +431,7 @@
           </div>
 
           <div
-            v-else
+            v-else-if="repoLoaded.space"
             class="text-center py-20 text-gray-500 dark:text-gray-400"
           >
             <div class="i-carbon-search text-6xl mb-4 inline-block" />
@@ -372,8 +444,14 @@
 </template>
 
 <script setup>
-import { repoAPI, orgAPI } from "@/utils/api";
+import { repoAPI } from "@/utils/api";
 import ProfileRepoCard from "@/components/profile/ProfileRepoCard.vue";
+import EntityAvatar from "@/components/common/EntityAvatar.vue";
+import LinkButton from "@/components/common/LinkButton.vue";
+import ProfileOwnerActions from "@/components/profile/ProfileOwnerActions.vue";
+import ProfileViewToggle from "@/components/profile/ProfileViewToggle.vue";
+import { useProfileView } from "@/composables/useProfileView";
+import { useUserProfileIdentity } from "@/composables/useUserProfileIdentity";
 import axios from "axios";
 import ErrorState from "@/components/common/ErrorState.vue";
 import IncompleteNotice from "@/components/common/IncompleteNotice.vue";
@@ -392,18 +470,44 @@ const router = useRouter();
 const username = computed(() => route.params.username);
 const currentType = computed(() => route.params.type); // 'models', 'datasets', or 'spaces'
 
-const loading = ref(true);
 // Why the profile / the repository lists could not be loaded (AppError)
 const errorContext = useErrorContext();
 const profileError = ref(null);
-const lookupRetrying = ref(false);
-const reposError = ref(null);
+const profileLoading = ref(true);
+const profileMissing = ref(false);
+let profileRequest = 0;
+let pageActive = true;
+const repoTypes = ["model", "dataset", "space"];
+const repoLoading = reactive({ model: true, dataset: true, space: true });
+const repoLoaded = reactive({ model: false, dataset: false, space: false });
+const repoErrors = reactive({ model: null, dataset: null, space: null });
+const repoRequests = { model: 0, dataset: 0, space: 0 };
 const { sources: incompleteSources, record: recordIncomplete } =
   useIncompleteSources();
-const userNotFound = ref(false);
 const userInfo = ref(null);
 const repos = ref({ model: [], dataset: [], space: [] });
 const searchQuery = ref("");
+const {
+  localUserReady,
+  isOrganization,
+  identityLoading,
+  identityError,
+  identityMissing,
+  reloadIdentity,
+} = useUserProfileIdentity(
+  username,
+  computed(() => `/organizations/${username.value}/${currentType.value}`),
+);
+const userNotFound = computed(
+  () => profileMissing.value && identityMissing.value,
+);
+const {
+  isOwnProfile,
+  visitorView,
+  toggleVisitorView,
+  profileLink,
+  visibleRepos,
+} = useProfileView(username, localUserReady);
 
 // Map route type to API type
 const repoType = computed(() => {
@@ -413,14 +517,25 @@ const repoType = computed(() => {
   return "model";
 });
 
-const selectedSort = ref(
-  getRepoSortPreference({
-    scope: "user",
-    repoType: repoType.value,
-    allowedValues: ["recent", "updated", "downloads", "likes"],
-    fallback: "recent",
-  }),
+const selectedSorts = reactive(
+  Object.fromEntries(
+    repoTypes.map((type) => [
+      type,
+      getRepoSortPreference({
+        scope: "user",
+        repoType: type,
+        allowedValues: ["recent", "updated", "downloads", "likes"],
+        fallback: "recent",
+      }),
+    ]),
+  ),
 );
+const selectedSort = computed({
+  get: () => selectedSorts[repoType.value],
+  set: (value) => {
+    selectedSorts[repoType.value] = value;
+  },
+});
 
 const sortOptions = [
   { label: "Recently Created", value: "recent" },
@@ -431,7 +546,7 @@ const sortOptions = [
 
 const filteredRepos = computed(() => {
   const query = searchQuery.value.toLowerCase();
-  const allRepos = repos.value[repoType.value] || [];
+  const allRepos = visibleRepos(repos.value[repoType.value]);
 
   if (!query) return allRepos;
 
@@ -444,175 +559,140 @@ const filteredRepos = computed(() => {
 });
 
 function getCount(type) {
-  return repos.value[type]?.length || 0;
+  return visibleRepos(repos.value[type]).length;
 }
 
 function formatDate(date) {
   return formatRelativeTime(date, "never");
 }
 
-async function checkIfOrganization() {
-  try {
-    // Only check local org (no fallback)
-    await axios.get(`/org/${username.value}`, {
-      params: { fallback: false },
-    });
-    // Found local org - redirect
-    router.replace(`/organizations/${username.value}/${currentType.value}`);
-    return true;
-  } catch (err) {
-    // Not a local org - continue as user
-    return false;
-  }
-}
-
-async function checkUserExists() {
+async function loadProfile() {
+  const request = ++profileRequest;
+  profileLoading.value = true;
+  profileError.value = null;
+  profileMissing.value = false;
   try {
     // Check if user exists by calling profile endpoint (WITH fallback to check all sources)
     const { data } = await axios.get(`/api/users/${username.value}/profile`, {
       params: { fallback: true },
     });
+    if (!pageActive || request !== profileRequest) return;
     userInfo.value = data;
-    return true;
   } catch (err) {
+    if (!pageActive || request !== profileRequest) return;
     if (err.response?.status === 404) {
-      // User doesn't exist in local or any fallback source
-      userNotFound.value = true;
-      return false;
+      // Only a matching local identity miss confirms the whole user is absent.
+      profileMissing.value = true;
+      profileError.value = decodeError(err);
+      return;
     }
     // Anything else (network, server): say what happened, but do not stop the page
     console.error("Failed to check user existence:", err);
     const decoded = decodeError(err);
     // the page is still worth showing: only this part is missing
     if (decoded.kind !== KIND.CANCELLED) profileError.value = decoded;
-    return true;
+  } finally {
+    if (pageActive && request === profileRequest) profileLoading.value = false;
   }
 }
 
-async function loadRepos() {
-  reposError.value = null;
+async function loadRepoType(type) {
+  const request = ++repoRequests[type];
+  repoLoading[type] = true;
+  repoLoaded[type] = false;
+  repoErrors[type] = null;
+  recordIncomplete(type, []);
   try {
-    const [models, datasets, spaces] = await Promise.all([
-      repoAPI.listAllRepos("model", {
-        author: username.value,
-        sort:
-          repoType.value === "model"
-            ? selectedSort.value
-            : getRepoSortPreference({
-                scope: "user",
-                repoType: "model",
-                allowedValues: ["recent", "updated", "downloads", "likes"],
-                fallback: "recent",
-              }),
-      }),
-      repoAPI.listAllRepos("dataset", {
-        author: username.value,
-        sort:
-          repoType.value === "dataset"
-            ? selectedSort.value
-            : getRepoSortPreference({
-                scope: "user",
-                repoType: "dataset",
-                allowedValues: ["recent", "updated", "downloads", "likes"],
-                fallback: "recent",
-              }),
-      }),
-      repoAPI.listAllRepos("space", {
-        author: username.value,
-        sort:
-          repoType.value === "space"
-            ? selectedSort.value
-            : getRepoSortPreference({
-                scope: "user",
-                repoType: "space",
-                allowedValues: ["recent", "updated", "downloads", "likes"],
-                fallback: "recent",
-              }),
-      }),
-    ]);
-
-    recordIncomplete("model", models.incomplete);
-    recordIncomplete("dataset", datasets.incomplete);
-    recordIncomplete("space", spaces.incomplete);
-    repos.value = {
-      model: models.data,
-      dataset: datasets.data,
-      space: spaces.data,
-    };
+    const { data, incomplete } = await repoAPI.listAllRepos(type, {
+      author: username.value,
+      sort: selectedSorts[type],
+    });
+    if (!pageActive || request !== repoRequests[type]) return;
+    repos.value[type] = data;
+    recordIncomplete(type, incomplete);
+    repoLoaded[type] = true;
   } catch (err) {
-    console.error("Failed to load repos:", err);
+    if (!pageActive || request !== repoRequests[type]) return;
+    console.error(`Failed to load user ${type}s:`, err);
+    repos.value[type] = [];
     const decoded = decodeError(err);
-    if (decoded.kind !== KIND.CANCELLED) reposError.value = decoded;
+    if (decoded.kind !== KIND.CANCELLED) repoErrors[type] = decoded;
+  } finally {
+    if (pageActive && request === repoRequests[type]) repoLoading[type] = false;
   }
 }
 
-// Reload when sort changes
-watch(selectedSort, () => {
-  setRepoSortPreference({
-    scope: "user",
-    repoType: repoType.value,
-    value: selectedSort.value,
-  });
-
-  if (!loading.value && !userNotFound.value) {
-    loadRepos();
-  }
-});
+// Sorting one list must not restart the independent lists or their counts.
+for (const type of repoTypes) {
+  watch(
+    () => selectedSorts[type],
+    (value) => {
+      setRepoSortPreference({ scope: "user", repoType: type, value });
+      if (pageActive && !userNotFound.value) void loadRepoType(type);
+    },
+  );
+}
 
 // Reset search when type changes
 watch(currentType, () => {
   searchQuery.value = "";
 });
 
-watch(repoType, (type) => {
-  selectedSort.value = getRepoSortPreference({
-    scope: "user",
-    repoType: type,
-    allowedValues: ["recent", "updated", "downloads", "likes"],
-    fallback: "recent",
-  });
-});
-
-async function reloadLookup() {
-  lookupRetrying.value = true;
-  profileError.value = null;
-  try {
-    await checkUserExists();
-  } finally {
-    lookupRetrying.value = false;
+function load() {
+  // Validate type parameter (must be models, datasets, or spaces).
+  if (!["models", "datasets", "spaces"].includes(currentType.value)) {
+    router.replace(`/${username.value}`);
+    return;
   }
-}
-
-async function load() {
-  try {
-    loading.value = true;
-    profileError.value = null;
-    userNotFound.value = false;
-
-    // Validate type parameter (must be models, datasets, or spaces)
-    if (!["models", "datasets", "spaces"].includes(currentType.value)) {
-      // Invalid type - redirect to user index page
-      router.replace(`/${username.value}`);
-      return;
-    }
-
-    // Check if this is actually a local organization
-    const isOrg = await checkIfOrganization();
-    if (isOrg) return; // Already redirected
-
-    // Check if user exists (loads profile with fallback=true)
-    const userExists = await checkUserExists();
-    if (!userExists) {
-      // userNotFound already set to true
-      return;
-    }
-
-    // User exists - load repos
-    await loadRepos();
-  } finally {
-    loading.value = false;
-  }
+  void loadProfile();
+  for (const type of repoTypes) void loadRepoType(type);
 }
 
 onMounted(load);
+onBeforeUnmount(() => {
+  pageActive = false;
+});
 </script>
+
+<style scoped src="@/styles/profile.css" />
+
+<style scoped>
+.profile-repositories {
+  container-type: inline-size;
+}
+
+.profile-list-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: min(100%, 536px);
+  min-width: 0;
+  margin-left: auto;
+}
+
+.profile-list-controls .profile-sort {
+  flex: 1 1 200px;
+  width: 200px;
+  min-width: 0;
+  margin-left: 0;
+}
+
+.profile-list-controls .profile-search {
+  flex: 1 1 260px;
+  width: 260px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.profile-repository-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+@container (min-width: 600px) {
+  .profile-repository-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+</style>

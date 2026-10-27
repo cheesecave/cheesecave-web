@@ -1,18 +1,8 @@
 <!-- src/pages/[username]/index.vue -->
 <template>
-  <div class="container-main">
-    <!-- Loading State -->
-    <div v-if="loading" class="text-center py-20">
-      <div
-        class="inline-block animate-spin rounded-full h-16 w-16 border-4 border-gray-300 border-t-blue-600 mb-4"
-      ></div>
-      <p class="text-xl text-gray-600 dark:text-gray-400">
-        Loading user profile...
-      </p>
-    </div>
-
+  <div class="container-main profile-page">
     <!-- User Not Found -->
-    <div v-else-if="userNotFound" class="text-center py-20">
+    <div v-if="userNotFound" class="text-center py-20">
       <div
         class="i-carbon-user-avatar-filled text-8xl text-gray-300 dark:text-gray-600 mb-6 inline-block"
       />
@@ -23,28 +13,47 @@
         }}</span
         >" does not exist.
       </p>
-      <el-button type="primary" @click="$router.push('/')">
+      <LinkButton type="primary" to="/">
         <div class="i-carbon-home mr-2" />
         Go to Homepage
-      </el-button>
+      </LinkButton>
     </div>
 
-    <div v-else>
-      <div class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
+    <div v-else-if="!isOrganization">
+      <div class="profile-layout">
         <!-- Sidebar -->
-        <aside class="space-y-4 lg:sticky lg:top-4 lg:self-start">
-          <div class="card">
-            <div class="flex items-center gap-3 mb-4">
+        <aside class="min-w-0 space-y-4 lg:self-start">
+          <div
+            class="card profile-card"
+            :aria-busy="loading || identityLoading"
+          >
+            <ProfileViewToggle
+              v-if="isOwnProfile"
+              :visitor-view="visitorView"
+              @toggle="toggleVisitorView"
+            />
+            <div class="profile-identity">
               <EntityAvatar
                 :username="username"
                 :name="username"
-                :size="80"
+                size="large"
+                class="profile-avatar"
                 :alt="`${username} avatar`"
               />
 
-              <div>
-                <h1 class="text-xl font-bold">{{ username }}</h1>
-                <p class="text-sm text-gray-600 dark:text-gray-400">
+              <div class="min-w-0">
+                <h1 class="text-2xl font-bold leading-tight">{{ username }}</h1>
+                <p
+                  v-if="loading"
+                  role="status"
+                  class="mt-1 text-sm text-gray-500"
+                >
+                  Loading user profile...
+                </p>
+                <p
+                  v-else
+                  class="mt-1 text-base text-gray-600 dark:text-gray-400"
+                >
                   {{ profileInfo?.full_name || "User" }}
                 </p>
                 <!-- External Source Badge -->
@@ -60,7 +69,45 @@
               </div>
             </div>
 
-            <FollowControls v-if="!isExternalUser" :username="username" />
+            <ErrorState
+              v-if="
+                profileError &&
+                (!profileMissing || (!identityLoading && !isOrganization))
+              "
+              :error="profileError"
+              :context="errorContext('user profile')"
+              mode="inline-panel"
+              :retrying="loading"
+              :retry="reloadLookup"
+            >
+              <template v-if="profileMissing" #actions>
+                <el-button
+                  data-testid="error-action-retry"
+                  :disabled="loading"
+                  @click="reloadLookup"
+                >
+                  Try again
+                </el-button>
+              </template>
+            </ErrorState>
+            <ErrorState
+              v-if="identityError"
+              :error="identityError"
+              :context="errorContext('account')"
+              mode="inline-panel"
+              :retrying="identityLoading"
+              :retry="reloadIdentity"
+            />
+            <ProfileOwnerActions
+              v-if="localUserReady"
+              :username="username"
+              :visitor-view="visitorView"
+            />
+            <FollowControls
+              v-if="localUserReady"
+              :username="username"
+              :visitor-view="visitorView"
+            />
             <div v-if="profileInfo" class="space-y-3 text-sm">
               <!-- Bio -->
               <p
@@ -121,7 +168,7 @@
                 </div>
 
                 <!-- Links Column (90% width) -->
-                <div class="flex flex-col gap-2 flex-1">
+                <div class="flex flex-col gap-2 flex-1 min-w-0">
                   <!-- Website Link -->
                   <a
                     v-if="profileInfo.website"
@@ -201,107 +248,126 @@
           </div>
 
           <!-- Storage Quota Card -->
-          <div v-if="quotaInfo" class="card">
+          <div
+            v-if="quotaLoading || quotaError || quotaInfo"
+            class="card profile-panel"
+            :aria-busy="quotaLoading"
+            role="region"
+            aria-label="Storage usage"
+          >
             <h3 class="font-semibold mb-3 flex items-center gap-2">
               <div class="i-carbon-data-base text-gray-500" />
               Storage Usage
             </h3>
 
-            <!-- Public Storage -->
-            <div class="mb-4">
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-sm text-gray-600 dark:text-gray-400"
-                  >Public</span
-                >
-                <span class="text-sm font-mono">
-                  {{ formatBytes(quotaInfo.public_used_bytes) }}
-                  <span
-                    v-if="quotaInfo.public_quota_bytes !== null"
-                    class="text-gray-400"
+            <p v-if="quotaLoading" role="status" class="text-sm text-gray-500">
+              Loading storage usage...
+            </p>
+            <ErrorState
+              v-else-if="quotaError"
+              :error="quotaError"
+              :context="errorContext('storage usage')"
+              mode="inline-panel"
+              :retrying="quotaLoading"
+              :retry="loadQuotaInfo"
+            />
+            <template v-else-if="quotaInfo">
+              <!-- Public Storage -->
+              <div class="mb-4">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-sm text-gray-600 dark:text-gray-400"
+                    >Public</span
                   >
-                    / {{ formatBytes(quotaInfo.public_quota_bytes) }}
+                  <span class="text-sm font-mono">
+                    {{ formatBytes(quotaInfo.public_used_bytes) }}
+                    <span
+                      v-if="quotaInfo.public_quota_bytes !== null"
+                      class="text-gray-400"
+                    >
+                      / {{ formatBytes(quotaInfo.public_quota_bytes) }}
+                    </span>
+                    <span v-else class="text-gray-400">/ Unlimited</span>
                   </span>
-                  <span v-else class="text-gray-400">/ Unlimited</span>
-                </span>
+                </div>
+                <el-progress
+                  v-if="quotaInfo.public_quota_bytes !== null"
+                  :percentage="
+                    Math.min(100, quotaInfo.public_percentage_used || 0)
+                  "
+                  :status="getQuotaStatus(quotaInfo.public_percentage_used)"
+                  :show-text="false"
+                />
+                <div
+                  v-else
+                  class="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full"
+                ></div>
               </div>
-              <el-progress
-                v-if="quotaInfo.public_quota_bytes !== null"
-                :percentage="
-                  Math.min(100, quotaInfo.public_percentage_used || 0)
-                "
-                :status="getQuotaStatus(quotaInfo.public_percentage_used)"
-                :show-text="false"
-              />
-              <div
-                v-else
-                class="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full"
-              ></div>
-            </div>
 
-            <!-- Private Storage (only if user has permission) -->
-            <div v-if="quotaInfo.can_see_private" class="mb-2">
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-sm text-gray-600 dark:text-gray-400"
-                  >Private</span
-                >
-                <span class="text-sm font-mono">
-                  {{ formatBytes(quotaInfo.private_used_bytes) }}
-                  <span
-                    v-if="quotaInfo.private_quota_bytes !== null"
-                    class="text-gray-400"
+              <!-- Private Storage (only if user has permission) -->
+              <div v-if="quotaInfo.can_see_private && !publicOnly" class="mb-2">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-sm text-gray-600 dark:text-gray-400"
+                    >Private</span
                   >
-                    / {{ formatBytes(quotaInfo.private_quota_bytes) }}
+                  <span class="text-sm font-mono">
+                    {{ formatBytes(quotaInfo.private_used_bytes) }}
+                    <span
+                      v-if="quotaInfo.private_quota_bytes !== null"
+                      class="text-gray-400"
+                    >
+                      / {{ formatBytes(quotaInfo.private_quota_bytes) }}
+                    </span>
+                    <span v-else class="text-gray-400">/ Unlimited</span>
                   </span>
-                  <span v-else class="text-gray-400">/ Unlimited</span>
-                </span>
+                </div>
+                <el-progress
+                  v-if="quotaInfo.private_quota_bytes !== null"
+                  :percentage="
+                    Math.min(100, quotaInfo.private_percentage_used || 0)
+                  "
+                  :status="getQuotaStatus(quotaInfo.private_percentage_used)"
+                  :show-text="false"
+                />
+                <div
+                  v-else
+                  class="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full"
+                ></div>
               </div>
-              <el-progress
-                v-if="quotaInfo.private_quota_bytes !== null"
-                :percentage="
-                  Math.min(100, quotaInfo.private_percentage_used || 0)
-                "
-                :status="getQuotaStatus(quotaInfo.private_percentage_used)"
-                :show-text="false"
-              />
-              <div
-                v-else
-                class="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full"
-              ></div>
-            </div>
 
-            <!-- Total -->
-            <div class="pt-2 border-t border-gray-200 dark:border-gray-700">
-              <div class="flex justify-between items-center">
-                <span class="text-sm font-semibold">Total</span>
-                <span class="text-sm font-mono font-semibold">
-                  {{ formatBytes(quotaInfo.total_used_bytes) }}
-                </span>
+              <!-- Total -->
+              <div class="pt-2 border-t border-gray-200 dark:border-gray-700">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm font-semibold">Total</span>
+                  <span class="text-sm font-mono font-semibold">
+                    {{
+                      formatBytes(
+                        publicOnly
+                          ? quotaInfo.public_used_bytes
+                          : quotaInfo.total_used_bytes,
+                      )
+                    }}
+                  </span>
+                </div>
               </div>
-            </div>
 
-            <!-- View Details Button (only for users with write permission) -->
-            <div v-if="quotaInfo.can_see_private" class="mt-4">
-              <LinkButton
-                size="small"
-                :to="`/${username}/storage`"
-                class="w-full"
-              >
-                <div class="i-carbon-chart-bar inline-block mr-1" />
-                View Details
-              </LinkButton>
-            </div>
+              <!-- View Details Button (only for users with write permission) -->
+              <div v-if="quotaInfo.can_see_private && !publicOnly" class="mt-4">
+                <LinkButton :to="`/${username}/storage`" class="w-full">
+                  <div class="i-carbon-chart-bar inline-block mr-1" />
+                  View Details
+                </LinkButton>
+              </div>
+            </template>
           </div>
 
           <!-- Stats Summary / Tab Navigation -->
-          <div class="card">
+          <div class="card profile-panel">
             <h3 class="font-semibold mb-3">Repositories</h3>
             <div class="space-y-1">
               <RouterLink
-                :to="`/${username}`"
-                :class="[
-                  'flex items-center justify-between px-3 py-2 rounded cursor-pointer transition-colors block',
-                  'bg-gray-100 dark:bg-gray-700',
-                ]"
+                :to="profileLink(`/${username}`)"
+                class="profile-nav-link profile-nav-link-active"
+                aria-current="page"
               >
                 <div class="flex items-center gap-2 text-sm">
                   <div class="i-carbon-grid text-gray-500 dark:text-gray-400" />
@@ -310,17 +376,15 @@
               </RouterLink>
 
               <RouterLink
-                :to="`/${username}/models`"
-                :class="[
-                  'flex items-center justify-between px-3 py-2 rounded cursor-pointer transition-colors block',
-                  'hover:bg-gray-100 dark:hover:bg-gray-700',
-                ]"
+                :to="profileLink(`/${username}/models`)"
+                class="profile-nav-link"
               >
                 <div class="flex items-center gap-2 text-sm">
                   <div class="i-carbon-model text-blue-500" />
                   <span>Models</span>
                 </div>
                 <span
+                  v-if="!repoLoading.model && !repoErrors.model"
                   class="text-sm font-semibold text-gray-600 dark:text-gray-400"
                 >
                   {{ getCount("model") }}
@@ -328,17 +392,15 @@
               </RouterLink>
 
               <RouterLink
-                :to="`/${username}/datasets`"
-                :class="[
-                  'flex items-center justify-between px-3 py-2 rounded cursor-pointer transition-colors block',
-                  'hover:bg-gray-100 dark:hover:bg-gray-700',
-                ]"
+                :to="profileLink(`/${username}/datasets`)"
+                class="profile-nav-link"
               >
                 <div class="flex items-center gap-2 text-sm">
                   <div class="i-carbon-data-table text-green-500" />
                   <span>Datasets</span>
                 </div>
                 <span
+                  v-if="!repoLoading.dataset && !repoErrors.dataset"
                   class="text-sm font-semibold text-gray-600 dark:text-gray-400"
                 >
                   {{ getCount("dataset") }}
@@ -346,17 +408,15 @@
               </RouterLink>
 
               <RouterLink
-                :to="`/${username}/spaces`"
-                :class="[
-                  'flex items-center justify-between px-3 py-2 rounded cursor-pointer transition-colors block',
-                  'hover:bg-gray-100 dark:hover:bg-gray-700',
-                ]"
+                :to="profileLink(`/${username}/spaces`)"
+                class="profile-nav-link"
               >
                 <div class="flex items-center gap-2 text-sm">
                   <div class="i-carbon-application text-purple-500" />
                   <span>Spaces</span>
                 </div>
                 <span
+                  v-if="!repoLoading.space && !repoErrors.space"
                   class="text-sm font-semibold text-gray-600 dark:text-gray-400"
                 >
                   {{ getCount("space") }}
@@ -367,71 +427,105 @@
         </aside>
 
         <!-- Main Content -->
-        <main class="space-y-8">
+        <main class="min-w-0 space-y-8">
           <!-- User Card (from Username/Username space repo if exists) -->
-          <section v-if="userCard" class="card">
-            <div class="markdown-body">
-              <MarkdownViewer :content="userCard" />
+          <section
+            v-if="
+              userCardLoading ||
+              userCardError ||
+              visibleUserCard ||
+              (publicOnly &&
+                userCard &&
+                (profileSpaceVisibilityLoading || profileSpaceError))
+            "
+            class="card profile-panel"
+            :aria-busy="
+              userCardLoading || (publicOnly && profileSpaceVisibilityLoading)
+            "
+            aria-label="Profile README"
+          >
+            <p
+              v-if="
+                userCardLoading || (publicOnly && profileSpaceVisibilityLoading)
+              "
+              role="status"
+              class="text-sm text-gray-500"
+            >
+              Loading profile README...
+            </p>
+            <ErrorState
+              v-else-if="userCardError"
+              :error="userCardError"
+              :context="errorContext('profile README')"
+              mode="inline-panel"
+              :retrying="userCardLoading"
+              :retry="loadUserCard"
+            />
+            <ErrorState
+              v-else-if="publicOnly && profileSpaceError"
+              :error="profileSpaceError"
+              :context="errorContext('profile README visibility')"
+              mode="inline-panel"
+              :retrying="profileSpaceVisibilityLoading"
+              :retry="loadProfileSpaceVisibility"
+            />
+            <div v-else class="markdown-body">
+              <MarkdownViewer :content="visibleUserCard" />
             </div>
           </section>
 
-          <!-- The profile could not be looked up: say so, and keep the rest -->
-          <ErrorState
-            v-if="profileError"
-            :error="profileError"
-            :context="errorContext('user')"
-            mode="inline-panel"
-            :retrying="lookupRetrying"
-            :retry="reloadLookup"
-          />
-
-          <!-- The repositories could not be listed: say so, not "no models" -->
-          <ErrorState
-            v-if="reposError"
-            :error="reposError"
-            :context="errorContext('repositories')"
-            mode="inline-panel"
-            :retry="reloadRepos"
-          />
-
           <!-- A source was left out: the lists are right, but not everything -->
-          <IncompleteNotice v-if="!reposError" :sources="incompleteSources" />
+          <IncompleteNotice :sources="incompleteSources" />
 
           <!-- Models Section -->
-          <section v-if="!reposError" class="mb-8">
-            <div
-              class="flex items-center justify-between gap-3 flex-wrap mb-4 pb-3 border-b-2 border-blue-500"
-            >
-              <div class="flex items-center gap-2">
-                <div class="i-carbon-model text-blue-500 text-xl md:text-2xl" />
-                <h2 class="text-xl md:text-2xl font-bold">Models</h2>
+          <section class="mb-8" :aria-busy="repoLoading.model">
+            <div class="profile-section-header">
+              <div class="profile-section-title">
+                <div
+                  class="i-carbon-model text-blue-500 text-xl"
+                  aria-hidden="true"
+                />
+                <h2>Models</h2>
+                <span
+                  v-if="!repoLoading.model && !repoErrors.model"
+                  class="profile-count"
+                  >{{ getCount("model") }}</span
+                >
               </div>
-              <div class="flex items-center gap-3 ml-auto shrink-0">
-                <div class="w-56 sm:w-64 lg:w-72 shrink-0">
-                  <el-select
-                    aria-label="Sort models"
-                    v-model="selectedSorts.model"
-                    placeholder="Sort repositories"
-                    class="w-full"
-                  >
-                    <el-option
-                      v-for="option in sortOptions"
-                      :key="option.value"
-                      :label="option.label"
-                      :value="option.value"
-                    />
-                  </el-select>
-                </div>
-                <el-tag type="info" size="large">{{
-                  getCount("model")
-                }}</el-tag>
-              </div>
+              <el-select
+                aria-label="Sort models"
+                v-model="selectedSorts.model"
+                placeholder="Sort repositories"
+                class="profile-sort"
+              >
+                <el-option
+                  v-for="option in sortOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
             </div>
 
-            <div v-if="getCount('model') > 0" class="space-y-4">
+            <p
+              v-if="repoLoading.model"
+              role="status"
+              class="py-12 text-center text-gray-500 dark:text-gray-400"
+            >
+              Loading models...
+            </p>
+            <ErrorState
+              v-else-if="repoErrors.model"
+              :error="repoErrors.model"
+              :context="errorContext('models')"
+              mode="inline-panel"
+              :retry="() => loadRepoType('model')"
+            />
+            <div v-else-if="getCount('model') > 0" class="space-y-4">
               <!-- Grid of repos (2 per row, max 3 rows = 6 repos) -->
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <ProfileRepoCard
+                  class="profile-repo-card"
                   v-for="repo in displayedRepos('model')"
                   :key="repo.id"
                   :repo="repo"
@@ -440,15 +534,14 @@
               </div>
 
               <!-- Show More button -->
-              <RouterLink
+              <LinkButton
                 v-if="hasMoreRepos('model')"
-                :to="`/${username}/models`"
-                class="block mt-4"
+                :to="profileLink(`/${username}/models`)"
+                class="w-full mt-4"
               >
-                <el-button class="w-full">
-                  Show all {{ getCount("model") }} models →
-                </el-button>
-              </RouterLink>
+                Show all {{ getCount("model") }} models
+                <span class="i-carbon-arrow-right ml-2" aria-hidden="true" />
+              </LinkButton>
             </div>
 
             <div
@@ -461,42 +554,54 @@
           </section>
 
           <!-- Datasets Section -->
-          <section v-if="!reposError" class="mb-8">
-            <div
-              class="flex items-center justify-between gap-3 flex-wrap mb-4 pb-3 border-b-2 border-green-500"
-            >
-              <div class="flex items-center gap-2">
+          <section class="mb-8" :aria-busy="repoLoading.dataset">
+            <div class="profile-section-header">
+              <div class="profile-section-title">
                 <div
-                  class="i-carbon-data-table text-green-500 text-xl md:text-2xl"
+                  class="i-carbon-data-table text-green-500 text-xl"
+                  aria-hidden="true"
                 />
-                <h2 class="text-xl md:text-2xl font-bold">Datasets</h2>
+                <h2>Datasets</h2>
+                <span
+                  v-if="!repoLoading.dataset && !repoErrors.dataset"
+                  class="profile-count"
+                  >{{ getCount("dataset") }}</span
+                >
               </div>
-              <div class="flex items-center gap-3 ml-auto shrink-0">
-                <div class="w-56 sm:w-64 lg:w-72 shrink-0">
-                  <el-select
-                    aria-label="Sort datasets"
-                    v-model="selectedSorts.dataset"
-                    placeholder="Sort repositories"
-                    class="w-full"
-                  >
-                    <el-option
-                      v-for="option in sortOptions"
-                      :key="option.value"
-                      :label="option.label"
-                      :value="option.value"
-                    />
-                  </el-select>
-                </div>
-                <el-tag type="success" size="large">{{
-                  getCount("dataset")
-                }}</el-tag>
-              </div>
+              <el-select
+                aria-label="Sort datasets"
+                v-model="selectedSorts.dataset"
+                placeholder="Sort repositories"
+                class="profile-sort"
+              >
+                <el-option
+                  v-for="option in sortOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
             </div>
 
-            <div v-if="getCount('dataset') > 0" class="space-y-4">
+            <p
+              v-if="repoLoading.dataset"
+              role="status"
+              class="py-12 text-center text-gray-500 dark:text-gray-400"
+            >
+              Loading datasets...
+            </p>
+            <ErrorState
+              v-else-if="repoErrors.dataset"
+              :error="repoErrors.dataset"
+              :context="errorContext('datasets')"
+              mode="inline-panel"
+              :retry="() => loadRepoType('dataset')"
+            />
+            <div v-else-if="getCount('dataset') > 0" class="space-y-4">
               <!-- Grid of repos (2 per row, max 3 rows = 6 repos) -->
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <ProfileRepoCard
+                  class="profile-repo-card"
                   v-for="repo in displayedRepos('dataset')"
                   :key="repo.id"
                   :repo="repo"
@@ -505,15 +610,14 @@
               </div>
 
               <!-- Show More button -->
-              <RouterLink
+              <LinkButton
                 v-if="hasMoreRepos('dataset')"
-                :to="`/${username}/datasets`"
-                class="block mt-4"
+                :to="profileLink(`/${username}/datasets`)"
+                class="w-full mt-4"
               >
-                <el-button class="w-full">
-                  Show all {{ getCount("dataset") }} datasets →
-                </el-button>
-              </RouterLink>
+                Show all {{ getCount("dataset") }} datasets
+                <span class="i-carbon-arrow-right ml-2" aria-hidden="true" />
+              </LinkButton>
             </div>
 
             <div
@@ -526,42 +630,54 @@
           </section>
 
           <!-- Spaces Section -->
-          <section v-if="!reposError">
-            <div
-              class="flex items-center justify-between gap-3 flex-wrap mb-4 pb-3 border-b-2 border-purple-500"
-            >
-              <div class="flex items-center gap-2">
+          <section :aria-busy="repoLoading.space">
+            <div class="profile-section-header">
+              <div class="profile-section-title">
                 <div
-                  class="i-carbon-application text-purple-500 text-xl md:text-2xl"
+                  class="i-carbon-application text-purple-500 text-xl"
+                  aria-hidden="true"
                 />
-                <h2 class="text-xl md:text-2xl font-bold">Spaces</h2>
+                <h2>Spaces</h2>
+                <span
+                  v-if="!repoLoading.space && !repoErrors.space"
+                  class="profile-count"
+                  >{{ getCount("space") }}</span
+                >
               </div>
-              <div class="flex items-center gap-3 ml-auto shrink-0">
-                <div class="w-56 sm:w-64 lg:w-72 shrink-0">
-                  <el-select
-                    aria-label="Sort spaces"
-                    v-model="selectedSorts.space"
-                    placeholder="Sort repositories"
-                    class="w-full"
-                  >
-                    <el-option
-                      v-for="option in sortOptions"
-                      :key="option.value"
-                      :label="option.label"
-                      :value="option.value"
-                    />
-                  </el-select>
-                </div>
-                <el-tag type="warning" size="large">{{
-                  getCount("space")
-                }}</el-tag>
-              </div>
+              <el-select
+                aria-label="Sort spaces"
+                v-model="selectedSorts.space"
+                placeholder="Sort repositories"
+                class="profile-sort"
+              >
+                <el-option
+                  v-for="option in sortOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
             </div>
 
-            <div v-if="getCount('space') > 0" class="space-y-4">
+            <p
+              v-if="repoLoading.space"
+              role="status"
+              class="py-12 text-center text-gray-500 dark:text-gray-400"
+            >
+              Loading spaces...
+            </p>
+            <ErrorState
+              v-else-if="repoErrors.space"
+              :error="repoErrors.space"
+              :context="errorContext('spaces')"
+              mode="inline-panel"
+              :retry="() => loadRepoType('space')"
+            />
+            <div v-else-if="getCount('space') > 0" class="space-y-4">
               <!-- Grid of repos (2 per row, max 3 rows = 6 repos) -->
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <ProfileRepoCard
+                  class="profile-repo-card"
                   v-for="repo in displayedRepos('space')"
                   :key="repo.id"
                   :repo="repo"
@@ -570,15 +686,14 @@
               </div>
 
               <!-- Show More button -->
-              <RouterLink
+              <LinkButton
                 v-if="hasMoreRepos('space')"
-                :to="`/${username}/spaces`"
-                class="block mt-4"
+                :to="profileLink(`/${username}/spaces`)"
+                class="w-full mt-4"
               >
-                <el-button class="w-full">
-                  Show all {{ getCount("space") }} spaces →
-                </el-button>
-              </RouterLink>
+                Show all {{ getCount("space") }} spaces
+                <span class="i-carbon-arrow-right ml-2" aria-hidden="true" />
+              </LinkButton>
             </div>
 
             <div
@@ -603,6 +718,10 @@ import EntityAvatar from "@/components/common/EntityAvatar.vue";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import SocialLinks from "@/components/profile/SocialLinks.vue";
 import FollowControls from "@/components/profile/FollowControls.vue";
+import ProfileOwnerActions from "@/components/profile/ProfileOwnerActions.vue";
+import ProfileViewToggle from "@/components/profile/ProfileViewToggle.vue";
+import { useProfileView } from "@/composables/useProfileView";
+import { useUserProfileIdentity } from "@/composables/useUserProfileIdentity";
 import { formatRelativeTime } from "@/utils/datetime";
 import {
   getRepoSortPreference,
@@ -620,19 +739,31 @@ const router = useRouter();
 const username = computed(() => route.params.username);
 
 const loading = ref(true);
-const userInfo = ref(null);
 const profileInfo = ref(null);
 const repos = ref({ models: [], datasets: [], spaces: [] });
 const userCard = ref("");
-const userNotFound = ref(false);
+const profileSpacePublic = ref(null);
+const profileSpaceVisibilityLoading = ref(false);
+const profileSpaceError = ref(null);
+const userCardLoading = ref(true);
+const userCardError = ref(null);
+let userCardRequest = 0;
+let profileRequest = 0;
+let quotaRequest = 0;
+const profileMissing = ref(false);
 // Why the profile / the repository lists could not be loaded (AppError)
 const errorContext = useErrorContext();
 const profileError = ref(null);
-const lookupRetrying = ref(false);
-const reposError = ref(null);
+const repoTypes = ["model", "dataset", "space"];
+const repoLoading = reactive({ model: true, dataset: true, space: true });
+const repoErrors = reactive({ model: null, dataset: null, space: null });
+const repoRequests = { model: 0, dataset: 0, space: 0 };
+let pageActive = true;
 const { sources: incompleteSources, record: recordIncomplete } =
   useIncompleteSources();
 const quotaInfo = ref(null);
+const quotaLoading = ref(false);
+const quotaError = ref(null);
 const selectedSorts = reactive({
   model: getRepoSortPreference({
     scope: "user",
@@ -664,6 +795,7 @@ const sortOptions = [
 
 // External user detection (check both profile and repos)
 const isExternalUser = computed(() => {
+  if (localUserReady.value) return false;
   // Check profile first
   if (profileInfo.value?._source && profileInfo.value._source !== "local") {
     return true;
@@ -680,6 +812,37 @@ const isExternalUser = computed(() => {
   }
   return false;
 });
+
+const {
+  localUserReady,
+  isOrganization,
+  identityLoading,
+  identityError,
+  identityMissing,
+  reloadIdentity,
+} = useUserProfileIdentity(username, () => `/organizations/${username.value}`);
+const userNotFound = computed(
+  () => profileMissing.value && identityMissing.value,
+);
+const {
+  isOwnProfile,
+  visitorView,
+  publicOnly,
+  toggleVisitorView,
+  profileLink,
+  visibleRepos,
+} = useProfileView(username, localUserReady);
+const visibleUserCard = computed(() => {
+  if (!publicOnly.value) return userCard.value;
+  return profileSpacePublic.value === true ? userCard.value : "";
+});
+watch(
+  publicOnly,
+  (preview) => {
+    if (preview) void loadProfileSpaceVisibility();
+  },
+  { immediate: true },
+);
 
 const externalSourceName = computed(() => {
   // Try profile first
@@ -729,11 +892,11 @@ function getPluralKey(type) {
 }
 
 function getCount(type) {
-  return repos.value[getPluralKey(type)]?.length || 0;
+  return visibleRepos(repos.value[getPluralKey(type)]).length;
 }
 
 function displayedRepos(type) {
-  return (repos.value[getPluralKey(type)] || []).slice(0, MAX_DISPLAYED);
+  return visibleRepos(repos.value[getPluralKey(type)]).slice(0, MAX_DISPLAYED);
 }
 
 function hasMoreRepos(type) {
@@ -760,197 +923,152 @@ function getQuotaStatus(percentage) {
   return "success";
 }
 
-async function checkIfOrganization() {
-  try {
-    // Only check local org (no fallback)
-    const { data: localData } = await axios.get(`/org/${username.value}`, {
-      params: { fallback: false },
-    });
-
-    // Found local org - redirect
-    router.replace(`/organizations/${username.value}`);
-    return true;
-  } catch (err) {
-    // Not a local org - continue as user
-    return false;
-  }
-}
-
 async function checkUserExists() {
+  const request = ++profileRequest;
+  loading.value = true;
+  profileError.value = null;
+  profileMissing.value = false;
   try {
-    // Check if user exists by calling profile endpoint (WITH fallback to check all sources)
     const { data } = await axios.get(`/api/users/${username.value}/profile`, {
       params: { fallback: true },
     });
-    profileInfo.value = data;
-    return true;
+    if (pageActive && request === profileRequest) profileInfo.value = data;
   } catch (err) {
-    if (err.response?.status === 404) {
-      // User doesn't exist in local or any fallback source
-      userNotFound.value = true;
-      return false;
-    }
-    // Anything else (network, server): say what happened, but do not stop the page
-    console.error("Failed to check user existence:", err);
+    if (!pageActive || request !== profileRequest) return;
+    if (err.response?.status === 404) profileMissing.value = true;
     const decoded = decodeError(err);
-    // the page is still worth showing: only this part is missing
     if (decoded.kind !== KIND.CANCELLED) profileError.value = decoded;
-    return true;
-  }
-}
-
-async function loadUserData() {
-  reposError.value = null;
-  try {
-    const [models, datasets, spaces] = await Promise.all([
-      loadRepoType("model"),
-      loadRepoType("dataset"),
-      loadRepoType("space"),
-    ]);
-
-    repos.value = {
-      models,
-      datasets,
-      spaces,
-    };
-    return true;
-  } catch (err) {
-    // The user exists, so the lists are not "empty": show why they failed
-    console.error("Failed to load user repos:", err);
-    repos.value = { models: [], datasets: [], spaces: [] };
-    const decoded = decodeError(err);
-    if (decoded.kind !== KIND.CANCELLED) reposError.value = decoded;
-    return true;
+  } finally {
+    if (pageActive && request === profileRequest) loading.value = false;
   }
 }
 
 async function loadRepoType(type) {
-  const { data, incomplete } = await repoAPI.listAllRepos(type, {
-    author: username.value,
-    sort: selectedSorts[type],
-  });
-  recordIncomplete(type, incomplete);
-  return data;
+  const request = ++repoRequests[type];
+  repoLoading[type] = true;
+  repoErrors[type] = null;
+  recordIncomplete(type, []);
+  try {
+    const { data, incomplete } = await repoAPI.listAllRepos(type, {
+      author: username.value,
+      sort: selectedSorts[type],
+    });
+    if (!pageActive || request !== repoRequests[type]) return;
+    repos.value[getPluralKey(type)] = data;
+    recordIncomplete(type, incomplete);
+  } catch (err) {
+    if (!pageActive || request !== repoRequests[type]) return;
+    console.error(`Failed to load user ${getPluralKey(type)}:`, err);
+    repos.value[getPluralKey(type)] = [];
+    const decoded = decodeError(err);
+    if (decoded.kind !== KIND.CANCELLED) repoErrors[type] = decoded;
+  } finally {
+    if (pageActive && request === repoRequests[type]) {
+      repoLoading[type] = false;
+    }
+  }
 }
 
-watch(
-  () => selectedSorts.model,
-  async () => {
-    setRepoSortPreference({
-      scope: "user",
-      repoType: "model",
-      value: selectedSorts.model,
-    });
+for (const type of repoTypes) {
+  watch(
+    () => selectedSorts[type],
+    () => {
+      setRepoSortPreference({
+        scope: "user",
+        repoType: type,
+        value: selectedSorts[type],
+      });
+      if (pageActive && !userNotFound.value) void loadRepoType(type);
+    },
+  );
+}
 
-    if (!loading.value && !userNotFound.value) {
-      repos.value.models = await loadRepoType("model");
+async function loadProfileSpaceVisibility() {
+  if (profileSpaceVisibilityLoading.value || profileSpacePublic.value !== null)
+    return;
+  const namespace = username.value;
+  profileSpaceVisibilityLoading.value = true;
+  profileSpaceError.value = null;
+  try {
+    const { data } = await repoAPI.getInfo("space", namespace, namespace, [
+      "private",
+    ]);
+    if (pageActive && username.value === namespace)
+      profileSpacePublic.value = data.private === false;
+  } catch (err) {
+    if (!pageActive || username.value !== namespace) return;
+    if ([403, 404].includes(err.response?.status))
+      profileSpacePublic.value = false;
+    else {
+      const decoded = decodeError(err);
+      if (decoded.kind !== KIND.CANCELLED) profileSpaceError.value = decoded;
     }
-  },
-);
-
-watch(
-  () => selectedSorts.dataset,
-  async () => {
-    setRepoSortPreference({
-      scope: "user",
-      repoType: "dataset",
-      value: selectedSorts.dataset,
-    });
-
-    if (!loading.value && !userNotFound.value) {
-      repos.value.datasets = await loadRepoType("dataset");
-    }
-  },
-);
-
-watch(
-  () => selectedSorts.space,
-  async () => {
-    setRepoSortPreference({
-      scope: "user",
-      repoType: "space",
-      value: selectedSorts.space,
-    });
-
-    if (!loading.value && !userNotFound.value) {
-      repos.value.spaces = await loadRepoType("space");
-    }
-  },
-);
+  } finally {
+    if (pageActive && username.value === namespace)
+      profileSpaceVisibilityLoading.value = false;
+  }
+}
 
 async function loadUserCard() {
+  const request = ++userCardRequest;
+  userCardLoading.value = true;
+  userCardError.value = null;
   try {
-    // Try to fetch README from Username/Username space repo
     const url = `/spaces/${username.value}/${username.value}/resolve/main/README.md`;
     const response = await axios.get(url);
-    userCard.value = response.data;
+    if (pageActive && request === userCardRequest)
+      userCard.value = response.data;
   } catch (err) {
-    // No user card available - this is fine
+    if (!pageActive || request !== userCardRequest) return;
     userCard.value = "";
+    if (![401, 403, 404].includes(err.response?.status)) {
+      const decoded = decodeError(err);
+      if (decoded.kind !== KIND.CANCELLED) userCardError.value = decoded;
+    }
+  } finally {
+    if (pageActive && request === userCardRequest)
+      userCardLoading.value = false;
   }
 }
 
 async function loadQuotaInfo() {
+  const request = ++quotaRequest;
+  quotaLoading.value = true;
+  quotaError.value = null;
   try {
     const response = await axios.get(`/api/quota/${username.value}/public`, {
       withCredentials: true,
     });
-    quotaInfo.value = response.data;
+    if (pageActive && request === quotaRequest) quotaInfo.value = response.data;
   } catch (err) {
-    console.error("Failed to load quota info:", err);
-    // Don't show error to user - quota info is optional
-    quotaInfo.value = null;
-  }
-}
-
-async function reloadRepos() {
-  loading.value = true;
-  try {
-    await loadUserData();
-  } finally {
-    loading.value = false;
-  }
-}
-
-async function reloadLookup() {
-  lookupRetrying.value = true;
-  profileError.value = null;
-  try {
-    await checkUserExists();
-  } finally {
-    lookupRetrying.value = false;
-  }
-}
-
-async function load() {
-  try {
-    loading.value = true;
-    profileError.value = null;
-    userNotFound.value = false;
-
-    // Check if this is actually an organization
-    const isOrg = await checkIfOrganization();
-    if (isOrg) return; // Already redirected
-
-    // Check if user exists (loads profile with fallback=true)
-    const userExists = await checkUserExists();
-    if (!userExists) {
-      // userNotFound already set to true in checkUserExists
+    if (!pageActive || request !== quotaRequest) return;
+    if (err.response?.status === 404) {
+      quotaInfo.value = null;
       return;
     }
-
-    // User exists - load repos and other data
-    await loadUserData();
-    loadUserCard();
-
-    // Only load quota for local users (not external)
-    if (!isExternalUser.value) {
-      loadQuotaInfo();
-    }
+    const decoded = decodeError(err);
+    if (decoded.kind !== KIND.CANCELLED) quotaError.value = decoded;
   } finally {
-    loading.value = false;
+    if (pageActive && request === quotaRequest) quotaLoading.value = false;
   }
+}
+
+function reloadLookup() {
+  return checkUserExists();
+}
+
+function load() {
+  // Every content region starts independently of profile and namespace lookup.
+  void checkUserExists();
+  for (const type of repoTypes) void loadRepoType(type);
+  void loadUserCard();
+  void loadQuotaInfo();
 }
 
 onMounted(load);
+onBeforeUnmount(() => {
+  pageActive = false;
+});
 </script>
+
+<style scoped src="@/styles/profile.css" />

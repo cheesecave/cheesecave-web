@@ -146,6 +146,76 @@ describe("profile follow controls", () => {
     expect(wrapper.findAll(".follow-counts button")).toHaveLength(2);
   });
 
+  it("previews an unfollowed visitor button on the owner's profile without allowing writes", async () => {
+    mocks.getFollowState.mockResolvedValue({
+      data: { ...original, username: "alice", following: true },
+    });
+    await mountComponent(FollowControls, {
+      username: "alice",
+      visitorView: true,
+    });
+    const preview = button("Follow");
+    expect(preview).toBeDefined();
+    expect(preview.element.disabled).toBe(true);
+    expect(preview.attributes("aria-pressed")).toBe("false");
+    expect(preview.attributes("title")).toBe(
+      "Preview only. You cannot follow your own profile.",
+    );
+    await preview.trigger("click");
+    await wrapper.vm.toggleFollow();
+    expect(mocks.follow).not.toHaveBeenCalled();
+    expect(mocks.unfollow).not.toHaveBeenCalled();
+    expect(mocks.router.push).not.toHaveBeenCalled();
+
+    await button("3 followers").trigger("click");
+    await flushPromises();
+    expect(mocks.listFollowers).toHaveBeenCalledWith("alice", { limit: 20 });
+    await button("2 following").trigger("click");
+    await flushPromises();
+    expect(mocks.listFollowing).toHaveBeenCalledWith("alice", { limit: 20 });
+  });
+
+  it("switches the owner's visitor preview without reloading counts", async () => {
+    await mountComponent(FollowControls, { username: "alice" });
+    await wrapper.setProps({ visitorView: true });
+    expect(button("Follow")?.element.disabled).toBe(true);
+    await wrapper.setProps({ visitorView: false });
+    expect(wrapper.find(".follow-button").exists()).toBe(false);
+    expect(wrapper.get(".follow-counts").text()).toContain("3 followers");
+    expect(mocks.getFollowState).toHaveBeenCalledOnce();
+  });
+
+  it("keeps normal following available on another profile even when visitorView is set", async () => {
+    await mountComponent(FollowControls, {
+      username: "bob",
+      visitorView: true,
+    });
+    expect(button("Follow").element.disabled).toBe(false);
+    await button("Follow").trigger("click");
+    await flushPromises();
+    expect(mocks.follow).toHaveBeenCalledExactlyOnceWith("bob");
+    expect(button("Following").attributes("aria-pressed")).toBe("true");
+  });
+
+  it("keeps anonymous login behavior when visitorView is set", async () => {
+    Object.assign(mocks.auth, {
+      isAuthenticated: false,
+      username: null,
+      user: null,
+    });
+    await mountComponent(FollowControls, {
+      username: "bob",
+      visitorView: true,
+    });
+    expect(button("Follow").element.disabled).toBe(false);
+    await button("Follow").trigger("click");
+    expect(mocks.router.push).toHaveBeenCalledWith({
+      path: "/login",
+      query: { return: "/bob?sort=updated" },
+    });
+    expect(mocks.follow).not.toHaveBeenCalled();
+  });
+
   it("disables writes when the server reports this account cannot follow", async () => {
     mocks.getFollowState.mockResolvedValue({
       data: { ...original, can_follow: false },
