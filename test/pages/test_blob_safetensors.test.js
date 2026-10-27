@@ -79,7 +79,7 @@ afterEach(() => {
 });
 
 describe("blob page safetensors metadata", () => {
-  it("shows the model metadata in page flow even when the file exceeds the text preview limit", async () => {
+  it("keeps the large-file notice and download action with model metadata below the preview", async () => {
     const wrapper = open();
     await flushPromises();
     expect(wrapper.getComponent(FileMetadataPanel).props()).toMatchObject({
@@ -88,15 +88,17 @@ describe("blob page safetensors metadata", () => {
       pageMode: true,
       resolveUrl: `${window.location.origin}/models/mai_lin/private-vision-checkpoint/resolve/main/model-00001-of-00003.safetensors`,
     });
+    const preview = wrapper.get(".file-detail-content");
+    expect(preview.text()).toContain("File is 79.7 MB, too large to preview");
+    expect(preview.text()).toContain("Binary File");
+    expect(preview.get("button").text()).toContain("Download File");
+    expect(preview.find('[data-testid="model-metadata"]').exists()).toBe(false);
     expect(
-      wrapper
-        .get(".file-detail-content")
-        .find('[data-testid="model-metadata"]')
-        .exists(),
-    ).toBe(true);
+      preview.element.nextElementSibling.querySelector(
+        '[data-testid="model-metadata"]',
+      ),
+    ).not.toBeNull();
     expect(wrapper.get(".file-detail-stats").text()).toContain("79.7 MB");
-    expect(wrapper.text()).not.toContain("too large to preview");
-    expect(wrapper.text()).not.toContain("Binary File");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -121,7 +123,7 @@ describe("blob page safetensors metadata", () => {
     const wrapper = open();
     await flushPromises();
     expect(wrapper.findComponent(FileMetadataPanel).exists()).toBe(true);
-    expect(wrapper.text()).not.toContain("Binary File");
+    expect(wrapper.text()).toContain("This file type cannot be previewed");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 

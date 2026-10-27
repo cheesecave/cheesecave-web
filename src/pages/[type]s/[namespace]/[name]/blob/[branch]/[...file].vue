@@ -365,16 +365,6 @@
             :zip="zipTarget"
             :filename="fileName"
           />
-          <!-- Safetensors reads the header independently of the size lookup.
-             Its tensor tree grows with the page instead of a dialog viewport. -->
-          <div v-else-if="isSafetensors" class="file-metadata-preview">
-            <FileMetadataPanel
-              kind="safetensors"
-              :resolve-url="metadataResolveUrl"
-              :filename="fileName"
-              :page-mode="embedded"
-            />
-          </div>
           <!-- Parquet: the same metadata view as the file-list icon (rows,
              columns, row groups), range-read from the footer. -->
           <FileMetadataPanel
@@ -539,6 +529,16 @@
               Download File
             </el-button>
           </div>
+        </div>
+        <!-- Keep the binary preview notice above its readable header details.
+           The tensor tree grows with the page, independently of the size lookup. -->
+        <div v-if="isSafetensors" class="file-metadata-preview">
+          <FileMetadataPanel
+            kind="safetensors"
+            :resolve-url="metadataResolveUrl"
+            :filename="fileName"
+            :page-mode="embedded"
+          />
         </div>
       </div>
     </div>
