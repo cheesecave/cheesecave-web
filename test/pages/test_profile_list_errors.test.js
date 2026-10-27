@@ -29,7 +29,8 @@ vi.mock("@/stores/auth", () => ({
     token: null,
   }),
 }));
-vi.mock("@/utils/api", () => ({
+vi.mock("@/utils/api", async (original) => ({
+  ...(await original()),
   repoAPI: { listAllRepos: (...args) => mocks.listAllRepos(...args) },
   orgAPI: { listMembers: async () => ({ data: { members: [] } }) },
   settingsAPI: {
@@ -83,6 +84,9 @@ beforeEach(() => {
         ? jsonResponse({ full_name: "Bob", created_at: "2025-01-01T00:00:00Z" })
         : new HttpResponse(null, { status: infoStatus }),
     ),
+    http.get("*/api/users/:name/type", () =>
+      jsonResponse({ type: "user", _source: "local" }),
+    ),
     http.get("*/api/quota/:name/public", () => jsonResponse(null)),
     http.get("*/spaces/:namespace/:name/resolve/main/README.md", () =>
       jsonResponse({}, { status: 404 }),
@@ -113,7 +117,9 @@ async function mountProfile(mode) {
   });
   await flushPromises();
   await vi.waitFor(() =>
-    expect(wrapper.text()).not.toMatch(/Loading (user profile|organization)/),
+    expect(wrapper.text()).not.toMatch(
+      /Loading (user profile|organization|models|datasets|spaces)/,
+    ),
   );
   await flushPromises();
 }
@@ -139,6 +145,13 @@ describe.each(["user", "org"])("%s list page failures", (mode) => {
 
   it("switches to 'not found' when the retry learns the account does not exist", async () => {
     infoStatus = 503;
+    if (mode === "user") {
+      server.use(
+        http.get("*/api/users/:name/type", () =>
+          jsonResponse({}, { status: 404 }),
+        ),
+      );
+    }
     await mountProfile(mode);
     infoStatus = 404;
     await wrapper.get('[data-testid="error-action-retry"]').trigger("click");

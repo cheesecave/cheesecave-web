@@ -6,7 +6,10 @@ import { socialAPI } from "@/utils/api";
 import { getAuthIdentity } from "@/utils/auth-identity";
 import FollowListDialog from "./FollowListDialog.vue";
 
-const props = defineProps({ username: { type: String, required: true } });
+const props = defineProps({
+  username: { type: String, required: true },
+  visitorView: { type: Boolean, default: false },
+});
 const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
@@ -20,6 +23,10 @@ let version = 0;
 const identity = computed(() => getAuthIdentity(auth));
 const isSelf = computed(
   () => auth.isAuthenticated && auth.username === props.username,
+);
+const isVisitorPreview = computed(() => isSelf.value && props.visitorView);
+const isFollowing = computed(
+  () => !isVisitorPreview.value && Boolean(state.value?.following),
 );
 const followAllowed = computed(
   () => !auth.isAuthenticated || Boolean(state.value?.can_follow),
@@ -43,6 +50,7 @@ function login() {
   router.push({ path: "/login", query: { return: route.fullPath } });
 }
 async function toggleFollow() {
+  if (isVisitorPreview.value) return;
   if (writing.value || loading.value || !state.value || isSelf.value) return;
   if (!auth.isAuthenticated) {
     login();
@@ -105,19 +113,21 @@ onBeforeUnmount(() => version++);
       </button>
     </div>
     <el-button
-      v-if="!isSelf && state"
-      :type="state.following ? 'default' : 'primary'"
+      v-if="(!isSelf || isVisitorPreview) && state"
+      :type="isFollowing ? 'default' : 'primary'"
       :loading="writing"
-      :disabled="loading || writing || !followAllowed"
-      :aria-pressed="Boolean(state.following)"
+      :disabled="isVisitorPreview || loading || writing || !followAllowed"
+      :aria-pressed="isFollowing"
       :title="
-        !followAllowed
-          ? 'Following is unavailable for this account.'
-          : undefined
+        isVisitorPreview
+          ? 'Preview only. You cannot follow your own profile.'
+          : !followAllowed
+            ? 'Following is unavailable for this account.'
+            : undefined
       "
       class="follow-button"
       @click="toggleFollow"
-      >{{ state.following ? "Following" : "Follow" }}</el-button
+      >{{ isFollowing ? "Following" : "Follow" }}</el-button
     >
     <p v-if="loading" class="follow-status" role="status">
       Loading follow information…

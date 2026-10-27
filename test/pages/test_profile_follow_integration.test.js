@@ -28,7 +28,8 @@ vi.mock("@/stores/auth", () => ({
     token: null,
   }),
 }));
-vi.mock("@/utils/api", () => ({
+vi.mock("@/utils/api", async (original) => ({
+  ...(await original()),
   repoAPI: { listAllRepos: (...args) => mocks.listAllRepos(...args) },
   orgAPI: { listMembers: async () => ({ data: { members: [] } }) },
   settingsAPI: {
@@ -64,6 +65,11 @@ describe("local profile Follow integration", () => {
       },
     });
     server.use(
+      http.get("*/api/users/:name/type", () =>
+        mocks.missing || mocks.source !== "local"
+          ? jsonResponse({}, { status: 404 })
+          : jsonResponse({ type: mocks.mode, _source: "local" }),
+      ),
       http.get("*/org/:name", () =>
         mocks.mode === "user" || mocks.missing
           ? jsonResponse({}, { status: 404 })
@@ -119,7 +125,7 @@ describe("local profile Follow integration", () => {
       expect(avatar.props()).toMatchObject({
         username: "bob",
         isOrg: mode === "org",
-        size: 80,
+        size: mode === "org" ? 80 : "large",
       });
       expect(avatar.get("img").attributes("src")).toBe(
         `/api/${mode === "org" ? "organizations" : "users"}/bob/avatar`,

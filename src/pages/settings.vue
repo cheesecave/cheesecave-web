@@ -359,8 +359,24 @@ import { useErrorContext } from "@/composables/useErrorContext";
 
 const authStore = useAuthStore();
 const { user } = storeToRefs(authStore);
+const route = useRoute();
 
+const settingsTabs = new Set([
+  "profile",
+  "security",
+  "appearance",
+  "external-tokens",
+  "tokens",
+]);
 const activeTab = ref("profile");
+watch(
+  () => route.query.tab,
+  (tab) => {
+    activeTab.value =
+      typeof tab === "string" && settingsTabs.has(tab) ? tab : "profile";
+  },
+  { immediate: true },
+);
 // Why the profile did not load (AppError). The form is replaced by it and
 // saving is refused: a form of blanks would wipe the real profile.
 const errorContext = useErrorContext();

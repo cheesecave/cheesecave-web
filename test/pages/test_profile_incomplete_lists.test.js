@@ -28,7 +28,8 @@ vi.mock("@/stores/auth", () => ({
     token: null,
   }),
 }));
-vi.mock("@/utils/api", () => ({
+vi.mock("@/utils/api", async (original) => ({
+  ...(await original()),
   repoAPI: { listAllRepos: (...args) => mocks.listAllRepos(...args) },
   orgAPI: { listMembers: async () => ({ data: { members: [] } }) },
   settingsAPI: {
@@ -66,6 +67,9 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   mocks.listAllRepos.mockResolvedValue({ data: [], incomplete: [] });
   server.use(
+    http.get("*/api/users/:name/type", () =>
+      jsonResponse({ type: "user", _source: "local" }),
+    ),
     http.get("*/org/:name", () =>
       mocks.mode === "user"
         ? jsonResponse({}, { status: 404 })

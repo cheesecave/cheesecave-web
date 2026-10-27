@@ -25,7 +25,7 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@/errors/notify", () => ({ notifyError: mocks.notify }));
-vi.mock("vue-router", () => ({
+vi.mock("vue-router/auto", () => ({
   useRoute: () => ({ query: {}, params: {} }),
   useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
 }));
