@@ -192,7 +192,7 @@ const tabIcons = {
   border-bottom: 1px solid var(--site-border);
 }
 .repository-header-inner {
-  max-width: 1680px;
+  max-width: none;
   margin: 0 auto;
   padding: 24px 24px 0;
 }
