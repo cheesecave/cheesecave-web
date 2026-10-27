@@ -98,7 +98,7 @@
             v-if="canManage && !publicOnly"
             :to="`/organizations/${orgname}/settings`"
             class="profile-edit-button"
-            >Edit profile</LinkButton
+            >Organization Settings</LinkButton
           >
           <p
             v-if="detailsLoading"

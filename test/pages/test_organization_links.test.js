@@ -164,13 +164,13 @@ describe("organizations list", () => {
 describe("organization page", () => {
   it("links the settings and storage buttons and each member", async () => {
     await mountPage(OrganizationPage);
-    expect(link("Edit profile").attributes("href")).toBe(
+    expect(link("Organization Settings").attributes("href")).toBe(
       "/organizations/acme/settings",
     );
     expect(link("View Details").attributes("href")).toBe(
       "/organizations/acme/storage",
     );
-    expect(hasButton("Edit profile")).toBe(false);
+    expect(hasButton("Organization Settings")).toBe(false);
     expect(hasButton("View Details")).toBe(false);
 
     const member = wrapper.get("a[href='/bob']");
@@ -188,8 +188,8 @@ describe("organization page", () => {
       orgs: [{ name: "acme", roleInOrg: "member" }],
     });
     await mountPage(OrganizationPage);
-    expect(link("Edit profile")).toBeUndefined();
-    expect(hasButton("Edit profile")).toBe(false);
+    expect(link("Organization Settings")).toBeUndefined();
+    expect(hasButton("Organization Settings")).toBe(false);
   });
 });
 

@@ -123,7 +123,7 @@
               <LinkButton
                 :to="`/organizations/${orgname}/settings`"
                 class="w-full"
-                >Edit profile</LinkButton
+                >Organization Settings</LinkButton
               >
             </div>
             <FollowControls v-if="localOrgReady" :username="orgname" />

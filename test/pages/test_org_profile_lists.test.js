@@ -205,7 +205,7 @@ describe("organization repository list profile", () => {
   );
 
   it.each(["admin", "super-admin"])(
-    "offers %s one Edit profile link to the organization settings",
+    "offers %s one Organization Settings link to the organization settings",
     async (role) => {
       mocks.auth.fetchUserInfo.mockResolvedValue({
         name: "alice",
@@ -214,7 +214,7 @@ describe("organization repository list profile", () => {
       await mountPage();
       const edits = wrapper
         .findAll("aside a")
-        .filter((link) => link.text() === "Edit profile");
+        .filter((link) => link.text() === "Organization Settings");
       expect(edits).toHaveLength(1);
       expect(edits[0].attributes("href")).toBe("/organizations/acme/settings");
       expect(edits[0].find("button").exists()).toBe(false);
@@ -224,7 +224,7 @@ describe("organization repository list profile", () => {
     },
   );
 
-  it("lets an ordinary member preview public content without an Edit profile action", async () => {
+  it("lets an ordinary member preview public content without an Organization Settings action", async () => {
     mocks.auth.fetchUserInfo.mockResolvedValue({
       name: "alice",
       orgs: [{ name: "acme", roleInOrg: "member" }],
@@ -318,7 +318,7 @@ describe("organization repository list profile", () => {
     expect(wrapper.text()).toContain("acme/landscape-model");
     expect(wrapper.get("main .profile-count").text()).toBe("2");
     expect(wrapper.get('a[href="/organizations/acme/settings"]').text()).toBe(
-      "Edit profile",
+      "Organization Settings",
     );
     expect(mocks.listAllRepos).toHaveBeenCalledTimes(initialRequests);
     expect(mocks.auth.isAuthenticated).toBe(true);

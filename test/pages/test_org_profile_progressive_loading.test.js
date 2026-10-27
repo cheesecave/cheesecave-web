@@ -291,11 +291,11 @@ describe("organization profile independent regions", () => {
     expect(mocks.readme).toHaveBeenCalledOnce();
   });
 
-  it("shows a single Edit profile link and previews public content without waiting for Spaces", async () => {
+  it("shows a single Organization Settings link and previews public content without waiting for Spaces", async () => {
     mountPage();
     await flushPromises();
     const edit = wrapper.get('a[href="/organizations/acme/settings"]');
-    expect(edit.text()).toBe("Edit profile");
+    expect(edit.text()).toBe("Organization Settings");
     requests.model[0].resolve(page("public-model", "private-model"));
     await flushPromises();
     expect(repoSection("Models").text()).toContain("private-model");
