@@ -769,6 +769,14 @@ export const repoAPI = {
       .get(`/api/${type}s/${namespace}/${name}/commits/${branch}`, { params })
       .then(normalizeCommitListResponse),
 
+  // A separate request: counting a long history must not delay the file list
+  // or its latest-commit summary.
+  getCommitCount: (type, namespace, name, branch, config) =>
+    api.get(
+      `/api/${type}s/${namespace}/${name}/commit-count/${encodeURIComponent(branch)}`,
+      config,
+    ),
+
   /**
    * What a commit list page can mark: revert / reset proven unavailable
    * @param {string} type - Repository type

@@ -370,19 +370,32 @@
         <div v-if="activeTab === 'files'" class="card">
           <div
             class="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3"
-            :class="{ 'flex-wrap': isCompositeHeader }"
+            :class="{ 'flex-wrap repository-files-toolbar': isCompositeHeader }"
           >
             <div class="flex items-center gap-2 min-w-0">
               <el-select
                 aria-label="Branch"
                 v-model="currentBranch"
-                size="small"
+                :size="isCompositeHeader ? 'default' : 'small'"
                 class="w-full min-w-28 sm:w-37 sm:min-w-37 sm:flex-none"
+                :class="{ 'repository-branch-select': isCompositeHeader }"
                 @change="handleBranchChange"
               >
+                <template v-if="isCompositeHeader" #prefix>
+                  <span class="i-carbon-branch" aria-hidden="true" />
+                </template>
                 <el-option label="main" value="main" />
               </el-select>
               <span
+                v-if="isCompositeHeader"
+                class="repository-storage-size"
+                data-testid="repository-size"
+                aria-label="Repository storage used"
+                title="Repository storage used"
+                >{{ repositorySize }}</span
+              >
+              <span
+                v-else
                 class="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap"
                 data-testid="file-list-count"
               >
@@ -396,43 +409,41 @@
               class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
               :class="{ 'sm:ml-auto': isCompositeHeader }"
             >
-              <div v-if="isCompositeHeader" class="repository-files-history">
-                <RouterLink
-                  v-if="!isExternalRepo"
-                  :to="tabTarget('commits')"
-                  class="repository-history-link"
-                >
-                  <span class="i-carbon-time" aria-hidden="true" /> History
-                </RouterLink>
-                <a
-                  v-else-if="sourceHistoryUrl"
-                  :href="sourceHistoryUrl"
-                  class="repository-history-link"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <span class="i-carbon-time" aria-hidden="true" /> History
-                  <span class="i-carbon-launch" aria-hidden="true" />
-                </a>
-                <span
-                  v-else
-                  class="repository-history-link"
-                  aria-disabled="true"
-                >
-                  <span class="i-carbon-time" aria-hidden="true" /> History
-                </span>
-              </div>
+              <el-input
+                v-if="isCompositeHeader"
+                aria-label="Filter files by name prefix"
+                v-model="fileSearchQuery"
+                placeholder="Filter by name prefix..."
+                class="w-full sm:w-50 repository-file-filter"
+                clearable
+                data-testid="file-list-name-prefix"
+              >
+                <template #prefix>
+                  <div class="i-carbon-search" />
+                </template>
+              </el-input>
+              <RepoHistoryLink
+                v-if="isCompositeHeader"
+                :repo-type="repoType"
+                :namespace="namespace"
+                :name="name"
+                :branch="currentBranch"
+                :external="isExternalRepo"
+                :source-url="sourceHistoryUrl"
+              />
               <LinkButton
                 v-if="isOwner"
                 :to="`/${repoType}s/${namespace}/${name}/upload/${currentBranch}`"
-                size="small"
+                :size="isCompositeHeader ? 'default' : 'small'"
                 type="primary"
                 class="w-full sm:w-auto"
+                :class="{ 'repository-upload-button': isCompositeHeader }"
               >
                 <div class="i-carbon-cloud-upload inline-block mr-1" />
                 Upload Files
               </LinkButton>
               <el-input
+                v-if="!isCompositeHeader"
                 aria-label="Filter files by name prefix"
                 v-model="fileSearchQuery"
                 placeholder="Filter by name prefix..."
@@ -1064,6 +1075,7 @@ import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import MetadataHeader from "@/components/repo/metadata/MetadataHeader.vue";
 import RepositoryHeader from "@/components/repo/RepositoryHeader.vue";
 import RepoLatestCommit from "@/components/repo/RepoLatestCommit.vue";
+import RepoHistoryLink from "@/components/repo/RepoHistoryLink.vue";
 import { externalRepoUrl } from "@/utils/external-repo";
 import LinkButton from "@/components/common/LinkButton.vue";
 import ModelInfoCard from "@/components/repo/metadata/ModelInfoCard.vue";
@@ -1134,6 +1146,14 @@ const authStore = useAuthStore();
 
 // State
 const repoInfo = ref(null);
+const repositorySize = computed(() => {
+  const bytes = [
+    repoInfo.value?.usedStorage,
+    repoInfo.value?.storage?.used_bytes,
+  ].find((value) => Number.isFinite(value) && value >= 0);
+  if (bytes === undefined) return "Size unavailable";
+  return bytes === 0 ? "0 B" : formatSize(bytes);
+});
 const currentBranch = ref(props.branch);
 const fileTree = ref([]);
 const commits = ref([]);
@@ -2471,32 +2491,53 @@ onMounted(async () => {
   border: 1px solid var(--site-border);
   border-radius: 8px;
 }
-.repository-files-history {
-  display: flex;
-  justify-content: flex-end;
+.repository-storage-size {
+  color: var(--site-muted);
+  font-size: 13px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
-.repository-history-link {
+.repository-branch-select {
+  width: 132px;
+  min-width: 132px;
+  flex: none;
+}
+.repository-branch-select :deep(.el-select__wrapper) {
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: var(--site-hover);
+  box-shadow: 0 0 0 1px var(--site-border) inset;
+}
+.repository-branch-select :deep(.el-select__prefix),
+.repository-branch-select :deep(.el-select__caret) {
+  color: var(--site-muted);
+}
+.repository-branch-select :deep(.el-select__selected-item) {
+  color: var(--site-card-text);
+  font-weight: 600;
+  font-size: 13px;
+}
+.repository-branch-select :deep(.el-select__caret) {
+  font-size: 12px;
+}
+.repository-file-filter :deep(.el-input__wrapper) {
+  min-height: 34px;
+  border-radius: 8px;
+}
+.repository-upload-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  align-self: center;
-  flex-shrink: 0;
   gap: 6px;
-  padding: 6px 12px;
+  height: 34px;
+  margin: 0;
+  padding: 7px 12px;
   border: 1px solid var(--site-border);
-  border-radius: 999px;
-  background: var(--site-card);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
-  color: var(--site-link);
+  border-radius: 8px;
   font-size: 13px;
-  line-height: 20px;
+  line-height: 18px;
   white-space: nowrap;
-}
-.repository-history-link:hover {
-  background: var(--site-hover);
-}
-.repository-history-link[aria-disabled="true"] {
-  color: var(--site-muted);
 }
 .repository-history-navigation {
   display: flex;

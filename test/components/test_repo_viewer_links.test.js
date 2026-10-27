@@ -36,7 +36,11 @@ function commit(id, title, author) {
   };
 }
 
-function installHandlers(extraInfo = {}, repoType = "dataset") {
+function installHandlers(
+  extraInfo = {},
+  repoType = "dataset",
+  countRequests = [],
+) {
   const base = `/api/${repoType}s/open-media-lab/big-repo`;
   const commitRequests = [];
   server.use(
@@ -52,6 +56,10 @@ function installHandlers(extraInfo = {}, repoType = "dataset") {
       });
     }),
     http.get(`${base}/tree/:branch`, () => jsonResponse([])),
+    http.get(`${base}/commit-count/:branch`, ({ params }) => {
+      countRequests.push(params.branch);
+      return jsonResponse({ count: 2, head: "c1" });
+    }),
     http.post(`${base}/paths-info/:branch`, () => jsonResponse([])),
     http.get(`${base}/commits/:branch`, ({ request, params }) => {
       commitRequests.push({
@@ -117,7 +125,7 @@ async function ready(wrapper) {
 function expectHistoryAboveSummary(wrapper, history) {
   const summary = wrapper.get('section[aria-label="Latest commit"]');
   expect(history).toBeDefined();
-  expect(history.text()).toBe("History");
+  expect(history.text()).toMatch(/^History(?:\: \d+ commits?)?$/);
   expect(summary.element.contains(history.element)).toBe(false);
   expect(
     history.element.compareDocumentPosition(summary.element) &
@@ -153,6 +161,68 @@ describe("RepoViewer real links", () => {
     expect(wrapper.find(".repo-tabs button").exists()).toBe(false);
   });
 
+  it("shows the real commit count in History without counting the latest summary rows", async () => {
+    server.use(
+      http.get(`${BASE}/commit-count/main`, () =>
+        jsonResponse({ count: 37, head: "c1" }),
+      ),
+    );
+    const wrapper = mountViewer("files");
+    await ready(wrapper);
+    await vi.waitFor(() =>
+      expect(wrapper.get("a.repository-history-link").text()).toBe(
+        "History: 37 commits",
+      ),
+    );
+    expect(wrapper.get("a.repository-history-link").attributes("href")).toBe(
+      `${PAGE}/commits/main`,
+    );
+  });
+
+  it("shows total repository storage instead of the number or size of listed files", async () => {
+    installHandlers({ storage: { used_bytes: 5_000_000 } });
+    server.use(
+      http.get(`${BASE}/tree/main`, () =>
+        jsonResponse([
+          { type: "file", path: "tiny.txt", size: 7, oid: "tiny" },
+        ]),
+      ),
+    );
+    const wrapper = mountViewer("files");
+    await ready(wrapper);
+    await vi.waitFor(() => expect(wrapper.text()).toContain("tiny.txt"));
+    expect(wrapper.get('[data-testid="repository-size"]').text()).toBe(
+      "5.0 MB",
+    );
+    expect(wrapper.find('[data-testid="file-list-count"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it.each([
+    ["model", { usedStorage: 9_870_000_000, storage: undefined }, "9.9 GB"],
+    ["dataset", { usedStorage: 0, storage: { used_bytes: 900 } }, "0 B"],
+    [
+      "model",
+      { usedStorage: undefined, storage: undefined },
+      "Size unavailable",
+    ],
+  ])(
+    "shows public %s repository storage accurately (%j)",
+    async (repoType, info, expected) => {
+      installHandlers(info, repoType);
+      const wrapper = mountViewer("files", { repoType });
+      await ready(wrapper);
+      const size = wrapper.get('[data-testid="repository-size"]');
+      expect(size.text()).toBe(expected);
+      expect(size.attributes("aria-label")).toBe("Repository storage used");
+      expect(wrapper.find('[data-testid="file-list-count"]').exists()).toBe(
+        false,
+      );
+      wrapper.unmount();
+    },
+  );
+
   it.each([
     ["card", "Dataset Card"],
     ["files", "Files"],
@@ -168,7 +238,12 @@ describe("RepoViewer real links", () => {
   });
 
   it("keeps unavailable external history in Files rather than a top-level tab", async () => {
-    const commitRequests = installHandlers({ _source: "huggingface" });
+    const countRequests = [];
+    const commitRequests = installHandlers(
+      { _source: "huggingface" },
+      "dataset",
+      countRequests,
+    );
     const wrapper = mountViewer("files");
     await ready(wrapper);
     const history = wrapper
@@ -183,6 +258,7 @@ describe("RepoViewer real links", () => {
       "Metadata",
     ]);
     expect(commitRequests).toEqual([]);
+    expect(countRequests).toEqual([]);
   });
 
   it.each([
@@ -213,9 +289,11 @@ describe("RepoViewer real links", () => {
   ])(
     "links a %s from %s to its repository on that source",
     async (repoType, source, sourceUrl, expectedUrl) => {
+      const countRequests = [];
       const commitRequests = installHandlers(
         { _source: source, _source_url: sourceUrl },
         repoType,
+        countRequests,
       );
       const wrapper = mountViewer("files", { repoType });
       await ready(wrapper);
@@ -233,6 +311,7 @@ describe("RepoViewer real links", () => {
       expect(history.attributes("href")).toBe(`${expectedUrl}/commits/main`);
       expect(history.attributes("target")).toBe("_blank");
       expect(commitRequests).toEqual([]);
+      expect(countRequests).toEqual([]);
       wrapper.unmount();
     },
   );
@@ -317,6 +396,16 @@ describe("RepoViewer real links", () => {
       owner.findAll("a").find((item) => item.text() === text);
     expect(link("Settings").attributes("href")).toBe(`${PAGE}/settings`);
     expect(link("Upload Files").attributes("href")).toBe(`${PAGE}/upload/main`);
+    const filter = owner.get('input[aria-label="Filter files by name prefix"]');
+    const history = owner.get("a.repository-history-link");
+    expect(
+      filter.element.compareDocumentPosition(history.element) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      history.element.compareDocumentPosition(link("Upload Files").element) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(owner.findAll("button").map((b) => b.text())).not.toEqual(
       expect.arrayContaining(["Settings", "Upload Files"]),
     );

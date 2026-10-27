@@ -10,6 +10,7 @@ describe("the fields the repository page asks for", () => {
       "createdAt",
       "private",
       "downloads",
+      "usedStorage",
       "likes",
       "tags",
       "storage",
@@ -24,6 +25,7 @@ describe("the fields the repository page asks for", () => {
       "createdAt",
       "private",
       "downloads",
+      "usedStorage",
       "likes",
       "tags",
       "storage",
@@ -43,6 +45,7 @@ describe("the fields the repository page asks for", () => {
       "sdk",
     ]);
     expect(repoPageFields("space")).not.toContain("downloads");
+    expect(repoPageFields("space")).not.toContain("usedStorage");
   });
 
   it("asks only for what the kind of repository has: pipeline_tag, config and safetensors are a model's", () => {

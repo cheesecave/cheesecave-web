@@ -83,7 +83,7 @@ function expectHistoryAboveSummary(wrapper, branch) {
     `a[href='/datasets/open-media-lab/big-repo/commits/${branch}']`,
   );
   const summary = wrapper.get('section[aria-label="Latest commit"]');
-  expect(history.text()).toBe("History");
+  expect(history.text()).toMatch(/^History(?:\: \d+ commits?)?$/);
   expect(summary.element.contains(history.element)).toBe(false);
   expect(
     history.element.compareDocumentPosition(summary.element) &
@@ -197,6 +197,9 @@ describe("RepoViewer loading on a big repository", () => {
         ]);
       }),
       http.post(`${BASE}/paths-info/:branch`, () => jsonResponse([])),
+      http.get(`${BASE}/commit-count/:branch`, ({ params }) =>
+        jsonResponse({ count: 3, head: `commit-${params.branch}` }),
+      ),
       http.get(
         "/datasets/open-media-lab/big-repo/resolve/:branch/README.md",
         async ({ params }) => {
@@ -250,6 +253,7 @@ describe("RepoViewer loading on a big repository", () => {
         "likes",
         "tags",
         "storage",
+        "usedStorage",
       ]),
     );
     expect(info.expand).not.toContain("siblings");
@@ -363,6 +367,7 @@ describe("RepoViewer loading on a big repository", () => {
         }),
         http.get(`${base}/tree/:branch`, tabRequests),
         http.get(`${base}/commits/:branch`, tabRequests),
+        http.get(`${base}/commit-count/:branch`, tabRequests),
         http.post(`${base}/paths-info/:branch`, tabRequests),
         http.get(
           `/${repoType}s/open-media-lab/big-repo/resolve/:branch/README.md`,
@@ -431,6 +436,7 @@ describe("RepoViewer loading on a big repository", () => {
         http.get(base, unused),
         http.get(`${base}/tree/:branch`, unused),
         http.get(`${base}/commits/:branch`, unused),
+        http.get(`${base}/commit-count/:branch`, unused),
         http.post(`${base}/paths-info/:branch`, unused),
         http.get(
           "/spaces/open-media-lab/big-repo/resolve/:branch/README.md",
@@ -510,6 +516,10 @@ describe("RepoViewer loading on a big repository", () => {
         http.get(`/api/${repoType}s/open-media-lab/big-repo/commits/main`, () =>
           jsonResponse({ commits: [], hasMore: false }),
         ),
+        http.get(
+          `/api/${repoType}s/open-media-lab/big-repo/commit-count/main`,
+          () => jsonResponse({ count: 0, head: null }),
+        ),
         http.post(
           `/api/${repoType}s/open-media-lab/big-repo/paths-info/main`,
           () => jsonResponse([]),
@@ -571,6 +581,10 @@ describe("RepoViewer loading on a big repository", () => {
         "/api/spaces/open-media-lab/big-repo/commits/:branch",
         spaceCommits,
       ),
+      http.get(
+        "/api/spaces/open-media-lab/big-repo/commit-count/:branch",
+        spaceCommits,
+      ),
     );
     const wrapper = mountViewer("files", { repoType: "space" });
     await flushPromises();
@@ -584,8 +598,234 @@ describe("RepoViewer loading on a big repository", () => {
       false,
     );
     expect(spaceCommits).not.toHaveBeenCalled();
+    expect(wrapper.get('[data-testid="file-list-count"]').text()).toBe(
+      "0 files",
+    );
+    expect(wrapper.find('[data-testid="repository-size"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.find(".repository-history-link").exists()).toBe(false);
     wrapper.unmount();
   });
+
+  it("keeps files and the latest summary available while the independent commit count is pending", async () => {
+    const gate = deferred();
+    let requests = 0;
+    server.use(
+      http.get(`${BASE}/commit-count/main`, async () => {
+        requests += 1;
+        await gate.promise;
+        return jsonResponse({ count: 37, head: "commit-main" });
+      }),
+    );
+    const wrapper = mountViewer("files");
+    try {
+      await vi.waitFor(() => expect(requests).toBe(1));
+      await vi.waitFor(() =>
+        expect(
+          wrapper.get('section[aria-label="Latest commit"]').text(),
+        ).toContain("Commit on main"),
+      );
+      expect(
+        wrapper
+          .find(
+            "a[href='/datasets/open-media-lab/big-repo/blob/main/README.md']",
+          )
+          .exists(),
+      ).toBe(true);
+      expect(wrapper.get("a.repository-history-link").text()).toBe("History");
+      expect(wrapper.get("a.repository-history-link").attributes("href")).toBe(
+        "/datasets/open-media-lab/big-repo/commits/main",
+      );
+      gate.resolve();
+      await vi.waitFor(() =>
+        expect(wrapper.get("a.repository-history-link").text()).toBe(
+          "History: 37 commits",
+        ),
+      );
+      expect(seen.filter((request) => request.what === "tree")).toHaveLength(1);
+      expect(
+        seen.filter((request) => request.what === "latest-commit"),
+      ).toHaveLength(1);
+    } finally {
+      gate.resolve();
+      wrapper.unmount();
+    }
+  });
+
+  it("retries only a failed commit count while keeping History, the latest summary and files usable", async () => {
+    let attempts = 0;
+    server.use(
+      http.get(`${BASE}/commit-count/main`, () => {
+        attempts += 1;
+        return attempts === 1
+          ? new HttpResponse("Count temporarily unavailable", { status: 503 })
+          : jsonResponse({ count: 18, head: "commit-main" });
+      }),
+    );
+    const wrapper = mountViewer("files");
+    await vi.waitFor(() =>
+      expect(
+        wrapper.find('button[aria-label="Retry commit count"]').exists(),
+      ).toBe(true),
+    );
+    await vi.waitFor(() =>
+      expect(
+        wrapper.get('section[aria-label="Latest commit"]').text(),
+      ).toContain("Commit on main"),
+    );
+    expect(
+      wrapper
+        .find("a[href='/datasets/open-media-lab/big-repo/blob/main/README.md']")
+        .exists(),
+    ).toBe(true);
+    expect(wrapper.get("a.repository-history-link").text()).toBe("History");
+    const retry = wrapper.get('button[aria-label="Retry commit count"]');
+    expect(retry.attributes("title")).toBeTruthy();
+    await retry.trigger("click");
+    await vi.waitFor(() =>
+      expect(wrapper.get("a.repository-history-link").text()).toBe(
+        "History: 18 commits",
+      ),
+    );
+    expect(attempts).toBe(2);
+    expect(
+      wrapper.find('button[aria-label="Retry commit count"]').exists(),
+    ).toBe(false);
+    expect(seen.filter((request) => request.what === "tree")).toHaveLength(1);
+    expect(
+      seen.filter((request) => request.what === "latest-commit"),
+    ).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it("clears the displayed commit count immediately when switching to a pending branch", async () => {
+    const gate = deferred();
+    server.use(
+      http.get(`${BASE}/commit-count/dev`, async () => {
+        await gate.promise;
+        return jsonResponse({ count: 8, head: "commit-dev" });
+      }),
+    );
+    const wrapper = mountViewer("files");
+    try {
+      await vi.waitFor(() =>
+        expect(wrapper.get("a.repository-history-link").text()).toBe(
+          "History: 3 commits",
+        ),
+      );
+      await wrapper.setProps({ branch: "dev" });
+      expect(wrapper.get("a.repository-history-link").text()).toBe("History");
+      expect(wrapper.get("a.repository-history-link").attributes("href")).toBe(
+        "/datasets/open-media-lab/big-repo/commits/dev",
+      );
+      gate.resolve();
+      await vi.waitFor(() =>
+        expect(wrapper.get("a.repository-history-link").text()).toBe(
+          "History: 8 commits",
+        ),
+      );
+    } finally {
+      gate.resolve();
+      wrapper.unmount();
+    }
+  });
+
+  it.each([200, 503])(
+    "ignores an old branch's late commit count response (%s)",
+    async (status) => {
+      const gate = deferred();
+      const requested = [];
+      server.use(
+        http.get(`${BASE}/commit-count/:branch`, async ({ params }) => {
+          requested.push(params.branch);
+          if (params.branch === "main") {
+            await gate.promise;
+            return status === 200
+              ? jsonResponse({ count: 99, head: "old-main" })
+              : new HttpResponse("Old branch unavailable", { status });
+          }
+          return jsonResponse({ count: 8, head: "commit-dev" });
+        }),
+      );
+      const wrapper = mountViewer("files");
+      try {
+        await vi.waitFor(() => expect(requested).toEqual(["main"]));
+        await wrapper.setProps({ branch: "dev" });
+        await vi.waitFor(() =>
+          expect(wrapper.get("a.repository-history-link").text()).toBe(
+            "History: 8 commits",
+          ),
+        );
+        gate.resolve();
+        await flushPromises();
+        await flushPromises();
+        expect(wrapper.get("a.repository-history-link").text()).toBe(
+          "History: 8 commits",
+        );
+        expect(
+          wrapper.find('button[aria-label="Retry commit count"]').exists(),
+        ).toBe(false);
+        expect(requested).toEqual(["main", "dev"]);
+      } finally {
+        gate.resolve();
+        wrapper.unmount();
+      }
+    },
+  );
+
+  it("shows an empty repository's confirmed zero commits instead of treating it as unavailable", async () => {
+    server.use(
+      http.get(`${BASE}/commit-count/main`, () =>
+        jsonResponse({ count: 0, head: null }),
+      ),
+      http.get(`${BASE}/commits/main`, () =>
+        jsonResponse({ commits: [], hasMore: false }),
+      ),
+      http.get(`${BASE}/tree/main`, () => jsonResponse([])),
+    );
+    const wrapper = mountViewer("files");
+    await vi.waitFor(() =>
+      expect(wrapper.get("a.repository-history-link").text()).toBe(
+        "History: 0 commits",
+      ),
+    );
+    await vi.waitFor(() =>
+      expect(
+        wrapper.get('section[aria-label="Latest commit"]').text(),
+      ).toContain("No commits yet"),
+    );
+    expect(
+      wrapper.find('button[aria-label="Retry commit count"]').exists(),
+    ).toBe(false);
+    wrapper.unmount();
+  });
+
+  it.each([null, -1, 1.5, "3"])(
+    "does not present an invalid commit count (%j) as a real total",
+    async (count) => {
+      server.use(
+        http.get(`${BASE}/commit-count/main`, () =>
+          jsonResponse({ count, head: "commit-main" }),
+        ),
+      );
+      const wrapper = mountViewer("files");
+      await vi.waitFor(() =>
+        expect(
+          wrapper.find('button[aria-label="Retry commit count"]').exists(),
+        ).toBe(true),
+      );
+      expect(wrapper.get("a.repository-history-link").text()).toBe("History");
+      expect(
+        wrapper
+          .find(
+            "a[href='/datasets/open-media-lab/big-repo/blob/main/README.md']",
+          )
+          .exists(),
+      ).toBe(true);
+      wrapper.unmount();
+    },
+  );
 
   it("keeps files and the History link available while the latest commit is pending", async () => {
     const gate = deferred();

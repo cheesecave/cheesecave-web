@@ -61,6 +61,9 @@ describe("RepoViewer path handling", () => {
       http.get("/api/datasets/open-media-lab/:name/commits/main", () =>
         jsonResponse(cloneFixture(uiApiFixtures.repo.commitsHf.page1)),
       ),
+      http.get("/api/datasets/open-media-lab/:name/commit-count/:branch", () =>
+        jsonResponse({ count: 3, head: "head123" }),
+      ),
     );
   }
 
@@ -614,6 +617,12 @@ describe("RepoViewer path handling", () => {
     // with the numbered pager.
     const observed = [];
     server.use(
+      http.get("/api/datasets/open-media-lab/hierarchy-crawl-fixtures", () =>
+        jsonResponse({
+          ...repoInfoFor("hierarchy-crawl-fixtures"),
+          usedStorage: 5_000_000,
+        }),
+      ),
       http.get(
         "/api/datasets/open-media-lab/hierarchy-crawl-fixtures/tree/main/catalog",
         ({ request }) => {
@@ -658,9 +667,14 @@ describe("RepoViewer path handling", () => {
     expect(wrapper.find('[data-testid="file-list-load-more"]').exists()).toBe(
       true,
     );
-    // Count copy carries the "loaded" suffix while more is available.
-    expect(wrapper.find('[data-testid="file-list-count"]').text()).toContain(
-      "loaded",
+    // Repository storage stays independent of how many entries are loaded.
+    await vi.waitFor(() =>
+      expect(wrapper.get('[data-testid="repository-size"]').text()).toBe(
+        "5.0 MB",
+      ),
+    );
+    expect(wrapper.find('[data-testid="file-list-count"]').exists()).toBe(
+      false,
     );
 
     wrapper.unmount();
