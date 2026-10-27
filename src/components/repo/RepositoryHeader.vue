@@ -146,7 +146,9 @@ const tabIcons = {
         /></a>
         <span v-else class="repository-source">{{ repoInfo._source }}</span>
       </div>
-      <slot name="metadata" />
+      <div class="repository-metadata">
+        <slot name="metadata" />
+      </div>
       <nav
         class="repo-tabs repository-navigation"
         aria-label="Repository sections"
@@ -179,6 +181,7 @@ const tabIcons = {
 
 <style scoped>
 .repo-composite-header {
+  --repository-tag-height: 24px;
   background: var(--site-card);
   color: var(--site-card-text);
   border-bottom: 1px solid var(--site-border);
@@ -334,6 +337,9 @@ button.repository-like:hover {
 }
 .repository-visibility {
   color: var(--site-muted);
+}
+.repository-metadata {
+  min-height: var(--repository-tag-height);
 }
 .repository-header-inner :deep(.metadata-header) {
   background: transparent;

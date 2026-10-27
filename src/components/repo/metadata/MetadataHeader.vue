@@ -348,7 +348,7 @@ const sizeCategory = computed(
 .metadata-tags :deep(.el-tag) {
   box-sizing: border-box;
   flex-shrink: 0;
-  height: 24px;
+  height: var(--repository-tag-height, 24px);
   padding: 0 8px;
   font-size: 12px;
   font-weight: 500;

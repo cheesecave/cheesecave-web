@@ -89,7 +89,7 @@ describe("RepoViewer shows what the API knows next to what the README says", () 
       },
     });
   }
-  // info, then the file list, then the README: each waits for the one before
+  // Repo info, files and README load independently; wait for the README result.
   const settle = async (wrapper) => {
     await flushPromises();
     await vi.waitFor(
@@ -131,8 +131,18 @@ describe("RepoViewer shows what the API knows next to what the README says", () 
             : [{ type: "file", path: "README.md", size: 9, oid: "r" }],
         );
       }),
-      http.post("/api/:type/acme/thing/paths-info/:branch", () =>
-        jsonResponse([]),
+      http.post(
+        "/api/:type/acme/thing/paths-info/:branch",
+        async ({ request }) => {
+          const form = new URLSearchParams(await request.text());
+          if (form.get("expand") !== "false") return jsonResponse([]);
+          requests.push(["readme-probe"]);
+          return jsonResponse(
+            readme === null
+              ? []
+              : [{ type: "file", path: "README.md", size: 9, oid: "r" }],
+          );
+        },
       ),
       ...["models", "datasets", "spaces"].map((plural) =>
         http.get(`/${plural}/acme/thing/resolve/:branch/README.md`, () => {
@@ -294,13 +304,14 @@ describe("RepoViewer shows what the API knows next to what the README says", () 
     expect(panel).toEqual({ license: "mit" });
   });
 
-  it("asks nothing more of the server for it: one request for the info, one for the README, one for the files", async () => {
+  it("fetches info, README and files once, locating README with one root probe", async () => {
     const wrapper = mountViewer("model");
     await settle(wrapper);
 
     expect(requests.map(([what]) => what).sort()).toEqual([
       "info",
       "readme",
+      "readme-probe",
       "tree",
     ]);
     expect(requests.find(([what]) => what === "info")[1]).not.toContain(

@@ -72,6 +72,11 @@ import RepoViewer from "@/components/repo/RepoViewer.vue";
 
 const BASE = "/api/datasets/open-media-lab/big-repo";
 
+const headerTags = (wrapper) =>
+  wrapper
+    .findAll('[aria-label="Repository header"] [data-el-tag="true"]')
+    .map((tag) => tag.text());
+
 function deferred() {
   let resolve;
   const promise = new Promise((res) => (resolve = res));
@@ -111,7 +116,7 @@ function mountViewer(tab, props = {}) {
           props: ["content"],
           setup: (props) => () => h("article", props.content),
         }),
-        MetadataHeader: true,
+        MetadataHeader: false,
         DetailedMetadataPanel: true,
         ReferencedDatasetsCard: true,
         SidebarRelationshipsCard: true,
@@ -152,6 +157,386 @@ function mountCachedDetail(visible, branch = ref("main")) {
     },
   );
 }
+
+describe("repository header metadata on a direct route load", () => {
+  let requests;
+  let readmeGate;
+  let failReadme;
+  let treeGate;
+
+  const install = (repoType) => {
+    const base = `/api/${repoType}s/open-media-lab/big-repo`;
+    server.use(
+      http.get(base, () =>
+        jsonResponse({
+          id: "open-media-lab/big-repo",
+          tags: [],
+          private: false,
+        }),
+      ),
+      http.get("/api/users/open-media-lab/type", () =>
+        jsonResponse({ type: "org" }),
+      ),
+      http.get("/api/site-config", () => jsonResponse({})),
+      http.get(`${base}/tree/:branch`, async () => {
+        requests.push("tree");
+        if (treeGate) await treeGate.promise;
+        return jsonResponse([
+          { type: "file", path: "data.csv", size: 9, oid: "f" },
+        ]);
+      }),
+      http.get(`${base}/tree/:branch/nested`, () => {
+        requests.push("nested-tree");
+        return jsonResponse([
+          { type: "file", path: "nested/README.md", size: 9, oid: "nested" },
+        ]);
+      }),
+      http.post(`${base}/paths-info/:branch`, async ({ request }) => {
+        const form = new URLSearchParams(await request.text());
+        const paths = form.getAll("paths");
+        if (form.get("expand") === "false" && paths.includes("README.md")) {
+          requests.push("readme-probe");
+          return jsonResponse([
+            { type: "file", path: "README.md", size: 99, oid: "root" },
+          ]);
+        }
+        return jsonResponse([]);
+      }),
+      http.get(
+        `/${repoType}s/open-media-lab/big-repo/resolve/:branch/README.md`,
+        async ({ params }) => {
+          requests.push(`readme:${params.branch}`);
+          if (readmeGate) await readmeGate.promise;
+          if (failReadme)
+            return new HttpResponse("Unavailable", { status: 503 });
+          return new HttpResponse(
+            `---\nlicense: cc-by-4.0\nlanguage: en\ntask_categories:\n- token-classification\n---\n# Root ${params.branch}\n`,
+          );
+        },
+      ),
+      http.get(
+        `/${repoType}s/open-media-lab/big-repo/resolve/:branch/nested/README.md`,
+        () => {
+          requests.push("nested-readme");
+          return new HttpResponse("---\nlicense: mit\n---\n# Nested\n");
+        },
+      ),
+      http.get(`${base}/commits/:branch`, () => {
+        requests.push("commits");
+        return jsonResponse({
+          commits: [
+            { id: "abc123", title: "Latest change", author: "alice", date: 1 },
+          ],
+          hasMore: false,
+        });
+      }),
+      http.get(`${base}/commit-count/:branch`, () =>
+        jsonResponse({ count: 1, head: "abc123" }),
+      ),
+      http.post(`${base}/commits/unavailable-files`, () =>
+        jsonResponse({ commits: {} }),
+      ),
+    );
+  };
+
+  beforeEach(() => {
+    requests = [];
+    readmeGate = null;
+    treeGate = null;
+    failReadme = false;
+    setActivePinia(createPinia());
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it.each(
+    ["model", "dataset"].flatMap((repoType) =>
+      ["files", "commits", "blob", "commit"].map((view) => [repoType, view]),
+    ),
+  )(
+    "loads README tags when opening %s %s directly, without a prior Card visit",
+    async (repoType, view) => {
+      install(repoType);
+      const detail = ["blob", "commit"].includes(view);
+      const wrapper = mountViewer(detail ? "files" : view, {
+        repoType,
+        detailView: detail ? view : null,
+        detailKey: view,
+      });
+      try {
+        await vi.waitFor(() =>
+          expect(headerTags(wrapper)).toContain("CC BY 4.0"),
+        );
+        expect(headerTags(wrapper)).toContain("English");
+        if (repoType === "dataset")
+          expect(headerTags(wrapper)).toContain("token-classification");
+        expect(
+          requests.filter((request) => request === "readme:main"),
+        ).toHaveLength(1);
+        if (detail) {
+          expect(wrapper.get(`[data-detail-probe='${view}']`).text()).toContain(
+            "detail content",
+          );
+          expect(requests).not.toContain("tree");
+          expect(requests).not.toContain("commits");
+        }
+      } finally {
+        wrapper.unmount();
+      }
+    },
+  );
+
+  it.each(["model", "dataset"])(
+    "uses the root README for a direct %s subfolder load",
+    async (repoType) => {
+      install(repoType);
+      const wrapper = mountViewer("files", { repoType, currentPath: "nested" });
+      try {
+        await vi.waitFor(() =>
+          expect(headerTags(wrapper)).toContain("CC BY 4.0"),
+        );
+        expect(headerTags(wrapper)).not.toContain("MIT License");
+        expect(requests).toContain("nested-tree");
+        expect(requests).not.toContain("nested-readme");
+      } finally {
+        wrapper.unmount();
+      }
+    },
+  );
+
+  it("loads header tags without waiting for a slow file list", async () => {
+    install("dataset");
+    treeGate = deferred();
+    const wrapper = mountViewer("files");
+    try {
+      await vi.waitFor(() =>
+        expect(headerTags(wrapper)).toContain("CC BY 4.0"),
+      );
+      expect(wrapper.text()).not.toContain("data.csv");
+    } finally {
+      treeGate.resolve();
+      await flushPromises();
+      wrapper.unmount();
+    }
+  });
+
+  it.each(["files", "blob", "commit"])(
+    "keeps %s content visible while README is slow and after it fails",
+    async (view) => {
+      install("dataset");
+      readmeGate = deferred();
+      failReadme = true;
+      const detail = view !== "files";
+      const wrapper = mountViewer("files", {
+        detailView: detail ? view : null,
+        detailKey: view,
+      });
+      const assertContent = () => {
+        if (detail)
+          expect(wrapper.get(`[data-detail-probe='${view}']`).text()).toContain(
+            "detail content",
+          );
+        else expect(wrapper.text()).toContain("data.csv");
+      };
+      try {
+        await vi.waitFor(() => expect(requests).toContain("readme:main"));
+        await vi.waitFor(assertContent);
+        readmeGate.resolve();
+        await flushPromises();
+        await flushPromises();
+        assertContent();
+        expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+      } finally {
+        readmeGate.resolve();
+        await flushPromises();
+        wrapper.unmount();
+      }
+    },
+  );
+
+  it("keeps the metadata row mounted before README tags arrive and fills the same row", async () => {
+    install("dataset");
+    readmeGate = deferred();
+    const wrapper = mountViewer("files");
+    try {
+      const metadataRow = wrapper.get(".repository-metadata").element;
+      await vi.waitFor(() => expect(requests).toContain("readme:main"));
+      expect(headerTags(wrapper)).toEqual([]);
+      expect(wrapper.get(".repository-metadata").element).toBe(metadataRow);
+      readmeGate.resolve();
+      await vi.waitFor(() =>
+        expect(headerTags(wrapper)).toContain("CC BY 4.0"),
+      );
+      expect(wrapper.get(".repository-metadata").element).toBe(metadataRow);
+    } finally {
+      readmeGate.resolve();
+      await flushPromises();
+      wrapper.unmount();
+    }
+  });
+
+  it.each(["failed", "empty"])(
+    "retains the metadata row when README metadata is %s",
+    async (result) => {
+      install("dataset");
+      if (result === "failed") failReadme = true;
+      else {
+        server.use(
+          http.get(
+            "/datasets/open-media-lab/big-repo/resolve/:branch/README.md",
+            () => new HttpResponse("# Repository without metadata\n"),
+          ),
+        );
+      }
+      const wrapper = mountViewer("files");
+      try {
+        const metadataRow = wrapper.get(".repository-metadata").element;
+        await vi.waitFor(() => expect(wrapper.vm.readmeLoading).toBe(false));
+        expect(headerTags(wrapper)).toEqual([]);
+        expect(wrapper.get(".repository-metadata").element).toBe(metadataRow);
+        expect(wrapper.text()).toContain("data.csv");
+      } finally {
+        wrapper.unmount();
+      }
+    },
+  );
+
+  it("shares a pending README across tab, path and detail navigation", async () => {
+    install("dataset");
+    readmeGate = deferred();
+    const wrapper = mountViewer("files");
+    try {
+      await vi.waitFor(() => expect(requests).toContain("readme:main"));
+      await wrapper.setProps({ currentPath: "nested" });
+      await wrapper.setProps({ currentPath: "", tab: "commits" });
+      await wrapper.setProps({
+        tab: "files",
+        detailView: "blob",
+        detailKey: "blob",
+      });
+      readmeGate.resolve();
+      await vi.waitFor(() =>
+        expect(headerTags(wrapper)).toContain("CC BY 4.0"),
+      );
+      await wrapper.setProps({ detailView: null, detailKey: "", tab: "card" });
+      await vi.waitFor(() =>
+        expect(wrapper.find("article").text()).toContain("Root main"),
+      );
+      expect(
+        requests.filter((request) => request === "readme:main"),
+      ).toHaveLength(1);
+      expect(
+        requests.filter((request) => request === "readme-probe"),
+      ).toHaveLength(1);
+    } finally {
+      readmeGate.resolve();
+      await flushPromises();
+      wrapper.unmount();
+    }
+  });
+
+  it("does not fetch README for a Space Files page", async () => {
+    install("space");
+    const wrapper = mountViewer("files", { repoType: "space" });
+    try {
+      await vi.waitFor(() => expect(wrapper.text()).toContain("data.csv"));
+      expect(requests).not.toContain("readme-probe");
+      expect(requests).not.toContain("readme:main");
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
+  it.each(["files", "blob"])(
+    "ignores stale branch tags while opening %s on another branch",
+    async (view) => {
+      install("dataset");
+      const oldGate = deferred();
+      server.use(
+        http.get(
+          "/datasets/open-media-lab/big-repo/resolve/:branch/README.md",
+          async ({ params }) => {
+            requests.push(`readme:${params.branch}`);
+            if (params.branch === "old") await oldGate.promise;
+            const license = params.branch === "old" ? "cc-by-4.0" : "mit";
+            return new HttpResponse(
+              `---\nlicense: ${license}\n---\n# ${params.branch}\n`,
+            );
+          },
+        ),
+      );
+      const wrapper = mountViewer("files", {
+        branch: "old",
+        detailView: view === "blob" ? "blob" : null,
+        detailKey: view,
+      });
+      try {
+        await vi.waitFor(() => expect(requests).toContain("readme:old"));
+        await wrapper.setProps({ branch: "new" });
+        await vi.waitFor(() =>
+          expect(headerTags(wrapper)).toContain("MIT License"),
+        );
+        oldGate.resolve();
+        await flushPromises();
+        await flushPromises();
+        expect(headerTags(wrapper)).toContain("MIT License");
+        expect(headerTags(wrapper)).not.toContain("CC BY 4.0");
+        expect(
+          requests.filter((request) => request === "readme:new"),
+        ).toHaveLength(1);
+      } finally {
+        oldGate.resolve();
+        await flushPromises();
+        wrapper.unmount();
+      }
+    },
+  );
+
+  it("keeps Files usable after a README probe fails and retries the error on Card", async () => {
+    install("dataset");
+    let failProbe = true;
+    server.use(
+      http.post(`${BASE}/paths-info/:branch`, async ({ request }) => {
+        const form = new URLSearchParams(await request.text());
+        if (
+          form.get("expand") !== "false" ||
+          !form.getAll("paths").includes("README.md")
+        )
+          return jsonResponse([]);
+        requests.push("readme-probe");
+        if (failProbe) return new HttpResponse("Unavailable", { status: 503 });
+        return jsonResponse([
+          { type: "file", path: "README.md", size: 99, oid: "root" },
+        ]);
+      }),
+    );
+    const wrapper = mountViewer("files");
+    try {
+      await vi.waitFor(() => expect(wrapper.text()).toContain("data.csv"));
+      await vi.waitFor(() => expect(requests).toContain("readme-probe"));
+      await wrapper.setProps({ tab: "card" });
+      await vi.waitFor(() =>
+        expect(wrapper.find('[role="alert"]').exists()).toBe(true),
+      );
+      expect(wrapper.text()).not.toContain("No README.md found");
+      failProbe = false;
+      const retry = wrapper
+        .findAll("button")
+        .find((button) => /retry/i.test(button.text()));
+      expect(retry).toBeDefined();
+      await retry.trigger("click");
+      await vi.waitFor(() =>
+        expect(headerTags(wrapper)).toContain("CC BY 4.0"),
+      );
+      expect(wrapper.find("article").text()).toContain("Root main");
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+      expect(
+        requests.filter((request) => request === "readme-probe"),
+      ).toHaveLength(2);
+    } finally {
+      wrapper.unmount();
+    }
+  });
+});
 
 // The repository page's file list comes from the paginated tree; the
 // whole-repository sibling list in repo info grows with the repository
@@ -196,7 +581,15 @@ describe("RepoViewer loading on a big repository", () => {
           { type: "file", path: "nested/data.csv", size: 9, oid: "f" },
         ]);
       }),
-      http.post(`${BASE}/paths-info/:branch`, () => jsonResponse([])),
+      http.post(`${BASE}/paths-info/:branch`, async ({ request }) => {
+        const form = new URLSearchParams(await request.text());
+        return jsonResponse(
+          form.get("expand") === "false" &&
+            form.getAll("paths").includes("README.md")
+            ? [{ type: "file", path: "README.md", size: 9, oid: "r" }]
+            : [],
+        );
+      }),
       http.get(`${BASE}/commit-count/:branch`, ({ params }) =>
         jsonResponse({ count: 3, head: `commit-${params.branch}` }),
       ),
@@ -264,7 +657,8 @@ describe("RepoViewer loading on a big repository", () => {
     const wrapper = mountViewer("files");
     await flushPromises();
 
-    expect(seen.map((s) => s.what)).toEqual(["info", "tree"]);
+    expect(seen.filter((s) => s.what === "info")).toHaveLength(1);
+    expect(seen.filter((s) => s.what === "tree")).toHaveLength(1);
     const header = wrapper.get('[aria-label="Repository header"]');
     expect(header.get("h1").text().replace(/\s+/g, "")).toBe(
       "Dataset:open-media-lab/big-repo",
@@ -349,11 +743,14 @@ describe("RepoViewer loading on a big repository", () => {
     ["model", "blob"],
     ["dataset", "commit"],
   ])(
-    "renders %s %s details before header metadata without loading Files, README or history",
+    "renders %s %s details independently of header data without loading Files or history",
     async (repoType, detailView) => {
       const gate = deferred();
       let infoRequests = 0;
       const tabRequests = vi.fn(() => jsonResponse([]));
+      const readmeRequests = vi.fn(
+        () => new HttpResponse("---\nlicense: cc-by-4.0\n---\n# Repo\n"),
+      );
       const base = `/api/${repoType}s/open-media-lab/big-repo`;
       server.use(
         http.get(base, async () => {
@@ -368,10 +765,14 @@ describe("RepoViewer loading on a big repository", () => {
         http.get(`${base}/tree/:branch`, tabRequests),
         http.get(`${base}/commits/:branch`, tabRequests),
         http.get(`${base}/commit-count/:branch`, tabRequests),
-        http.post(`${base}/paths-info/:branch`, tabRequests),
+        http.post(`${base}/paths-info/:branch`, () =>
+          jsonResponse([
+            { type: "file", path: "README.md", size: 9, oid: "r" },
+          ]),
+        ),
         http.get(
           `/${repoType}s/open-media-lab/big-repo/resolve/:branch/README.md`,
-          tabRequests,
+          readmeRequests,
         ),
       );
       const wrapper = mountViewer("files", {
@@ -402,6 +803,11 @@ describe("RepoViewer loading on a big repository", () => {
         false,
       );
       expect(tabRequests).not.toHaveBeenCalled();
+      await vi.waitFor(() =>
+        expect(
+          wrapper.get('[aria-label="Repository header"]').text(),
+        ).toContain("CC BY 4.0"),
+      );
       gate.resolve();
       await vi.waitFor(() =>
         expect(wrapper.find('[aria-label="Repository actions"]').exists()).toBe(
@@ -423,6 +829,7 @@ describe("RepoViewer loading on a big repository", () => {
       );
       expect(infoRequests).toBe(1);
       expect(tabRequests).not.toHaveBeenCalled();
+      expect(readmeRequests).toHaveBeenCalledTimes(1);
       wrapper.unmount();
     },
   );

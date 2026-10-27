@@ -2028,13 +2028,15 @@ async function fetchReadme(branch, requestId) {
   readmeError.value = null;
   try {
     let readmeFile = fileTree.value.find(
-      (f) => f.type === "file" && f.path.toLowerCase().endsWith("readme.md"),
+      (f) =>
+        f.type === "file" &&
+        (isCompositeHeader.value
+          ? f.path.toLowerCase() === "readme.md"
+          : f.path.toLowerCase().endsWith("readme.md")),
     );
 
-    // Paginated tree may not contain README.md on the current page —
-    // probe the common variants directly via paths-info so the Card
-    // tab does not silently render "No README" when one exists later
-    // in the listing.
+    // Header metadata belongs to the repository root, even on a subfolder
+    // or detail route. Probe directly without waiting for a paginated tree.
     if (!readmeFile) {
       readmeFile = await findReadmeViaPathsInfo(branch);
     }
@@ -2080,7 +2082,7 @@ async function findReadmeViaPathsInfo(branch = currentBranch.value) {
   // README.md / readme.md / Readme.md cover the case-insensitive
   // variants seen in the wild. paths-info returns only the entries
   // that exist, so a single call is enough.
-  if (props.currentPath) return null;
+  if (props.currentPath && !isCompositeHeader.value) return null;
   try {
     const { data } = await repoAPI.getPathsInfo(
       props.repoType,
@@ -2092,6 +2094,9 @@ async function findReadmeViaPathsInfo(branch = currentBranch.value) {
     );
     return (data || []).find((entry) => entry && entry.type === "file") || null;
   } catch (err) {
+    // A failed header probe is retryable through the Card's README error
+    // state; only an empty successful response means the README is absent.
+    if (isCompositeHeader.value) throw err;
     console.debug("README paths-info probe failed:", err);
     return null;
   }
@@ -2425,6 +2430,11 @@ let tabLoadId = 0;
 
 async function loadActiveTab() {
   const requestId = ++tabLoadId;
+  // The shared header needs README metadata on every repository route.
+  // Load it independently so neither the tree nor detail content waits for it.
+  if (isCompositeHeader.value && readmeBranch !== currentBranch.value) {
+    void loadReadme();
+  }
   if (props.detailView) return;
   const tab = activeTab.value;
   if (["files", "card", "metadata"].includes(tab)) {
@@ -2437,6 +2447,7 @@ async function loadActiveTab() {
     }
     if (requestId !== tabLoadId) return;
     if (
+      !isCompositeHeader.value &&
       ["card", "metadata"].includes(tab) &&
       readmeBranch !== currentBranch.value
     ) {
