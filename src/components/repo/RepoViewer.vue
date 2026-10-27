@@ -367,7 +367,7 @@
           </div>
         </div>
 
-        <div v-if="activeTab === 'files'" class="card">
+        <div v-if="activeTab === 'files'" :class="{ card: !isCompositeHeader }">
           <div
             class="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3"
             :class="{ 'flex-wrap repository-files-toolbar': isCompositeHeader }"
