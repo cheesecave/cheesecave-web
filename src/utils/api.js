@@ -328,6 +328,9 @@ export const repoAPI = {
   discoverRepos: (type, params) =>
     api.get(`/api/${type}s/discover`, { params }),
 
+  listRefs: (type, namespace, name, config) =>
+    api.get(`/api/${type}s/${namespace}/${name}/refs`, config),
+
   /**
    * Get user overview with all repositories
    * @param {string} username - Username
@@ -771,6 +774,12 @@ export const repoAPI = {
     api
       .get(`/api/${type}s/${namespace}/${name}/commits/${branch}`, { params })
       .then(normalizeCommitListResponse),
+
+  getCommitDetail: (type, namespace, name, commitId, config) =>
+    api.get(
+      `/api/${type}s/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/commit/${encodeURIComponent(commitId)}`,
+      config,
+    ),
 
   // A separate request: counting a long history must not delay the file list
   // or its latest-commit summary.

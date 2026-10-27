@@ -42,6 +42,11 @@ const stubs = {
   RouterLink: RouterLinkStub,
   MarkdownViewer: { template: "<div data-stub=MarkdownViewer />" },
   CodeViewer: { template: "<div data-stub=CodeViewer />" },
+  RepositoryFileTree: {
+    props: ["repoType", "namespace", "name", "branch", "currentPath"],
+    template: "<nav data-stub='RepositoryFileTree'>{{ branch }}</nav>",
+  },
+  RepositoryFileCommit: true,
 };
 
 async function mountBlob({
@@ -125,17 +130,18 @@ describe("repository details embedded in the repository shell", () => {
     for (const wrapper of wrappers.splice(0)) wrapper.unmount();
   });
 
-  it("embeds a file with its own heading, path and a real link back to the parent folder", async () => {
+  it("embeds a file with its own heading and real repository and folder breadcrumbs", async () => {
     const wrapper = await mountBlob({ embedded: true, branch: "develop" });
     expect(wrapper.find("h1").exists()).toBe(false);
     expect(wrapper.get("h2").text()).toBe("a.txt");
     expect(namedLinks(wrapper, "Home")).toHaveLength(0);
     expect(namedLinks(wrapper, "Datasets")).toHaveLength(0);
+    expect(namedLinks(wrapper, "Back to Files")).toHaveLength(0);
     expect(
-      namedLinks(wrapper, "Back to Files").map((link) =>
-        link.attributes("href"),
+      namedLinks(wrapper.get(".file-detail-pathbar"), "demo")[0].attributes(
+        "href",
       ),
-    ).toEqual(["/datasets/acme/demo/tree/develop/notes"]);
+    ).toBe("/datasets/acme/demo/tree/develop");
     expect(namedLinks(wrapper, "notes")[0].attributes("href")).toBe(
       "/datasets/acme/demo/tree/develop/notes",
     );
@@ -181,9 +187,11 @@ describe("repository details embedded in the repository shell", () => {
       file: "a.txt",
       embedded: true,
     });
-    expect(namedLinks(wrapper, "Back to Files")[0].attributes("href")).toBe(
-      "/models/acme/demo/tree/main",
-    );
+    expect(
+      namedLinks(wrapper.get(".file-detail-pathbar"), "demo")[0].attributes(
+        "href",
+      ),
+    ).toBe("/models/acme/demo/tree/main");
   });
 
   it.each([

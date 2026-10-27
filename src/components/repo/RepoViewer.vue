@@ -36,7 +36,12 @@
         />
       </template>
     </RepositoryHeader>
-    <div v-if="detailView" :class="{ 'repository-content': isCompositeHeader }">
+    <div
+      v-if="detailView"
+      :class="{
+        'repository-content': isCompositeHeader && detailView !== 'blob',
+      }"
+    >
       <ErrorState
         v-if="isCompositeHeader && error"
         :error="error"
