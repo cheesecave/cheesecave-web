@@ -2566,7 +2566,7 @@ onMounted(async () => {
 }
 .repository-content {
   width: 100%;
-  max-width: 1680px;
+  max-width: none;
   margin: 0 auto;
   padding: 24px;
 }
