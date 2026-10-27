@@ -114,6 +114,17 @@ async function ready(wrapper) {
   await flushPromises();
 }
 
+function expectHistoryAboveSummary(wrapper, history) {
+  const summary = wrapper.get('section[aria-label="Latest commit"]');
+  expect(history).toBeDefined();
+  expect(history.text()).toBe("History");
+  expect(summary.element.contains(history.element)).toBe(false);
+  expect(
+    history.element.compareDocumentPosition(summary.element) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+}
+
 describe("RepoViewer real links", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -160,10 +171,10 @@ describe("RepoViewer real links", () => {
     const commitRequests = installHandlers({ _source: "huggingface" });
     const wrapper = mountViewer("files");
     await ready(wrapper);
-    const history = wrapper.get(
-      'section[aria-label="Latest commit"] [aria-disabled="true"]',
-    );
-    expect(history.text()).toContain("History");
+    const history = wrapper
+      .findAll('[aria-disabled="true"]')
+      .find((item) => item.text() === "History");
+    expectHistoryAboveSummary(wrapper, history);
     expect(history.element.tagName).not.toBe("A");
     expect(wrapper.get(".repo-tabs").text()).not.toContain("Commits");
     expect(wrapper.findAll(".repo-tabs a").map((tab) => tab.text())).toEqual([
@@ -217,8 +228,8 @@ describe("RepoViewer real links", () => {
       expect(link.attributes("rel").split(/\s+/)).toEqual(
         expect.arrayContaining(["noopener", "noreferrer"]),
       );
-      const history = wrapper.get('section[aria-label="Latest commit"] a');
-      expect(history.text()).toBe("History");
+      const history = wrapper.get(`a[href='${expectedUrl}/commits/main']`);
+      expectHistoryAboveSummary(wrapper, history);
       expect(history.attributes("href")).toBe(`${expectedUrl}/commits/main`);
       expect(history.attributes("target")).toBe("_blank");
       expect(commitRequests).toEqual([]);
@@ -230,7 +241,7 @@ describe("RepoViewer real links", () => {
     ["model", 1776765600],
     ["dataset", "2026-04-21T10:00:00.000000Z"],
   ])(
-    "links the latest %s commit title, author, SHA and date without loading the full history",
+    "links the latest %s commit title, author and SHA while keeping the date plain text",
     async (repoType, date) => {
       const commitRequests = [];
       const operations = vi.fn(() => jsonResponse({}));
@@ -260,19 +271,17 @@ describe("RepoViewer real links", () => {
       const summary = wrapper.get('section[aria-label="Latest commit"]');
       expect(summary.get('a[href="/alice"]').text()).toBe("alice");
       const detailLinks = summary.findAll(
-        `a[href='${page}/commit/${commitId}']`,
+        `a[href='${page}/commit/${commitId}?branch=dev']`,
       );
-      expect(detailLinks).toHaveLength(3);
+      expect(detailLinks).toHaveLength(2);
       expect(detailLinks.map((link) => link.text())).toEqual(
         expect.arrayContaining(["Improve metadata", "abcdef1"]),
       );
-      const dateLink = detailLinks.find(
-        (link) => !["Improve metadata", "abcdef1"].includes(link.text()),
-      );
-      expect(dateLink.text()).toMatch(/ago$/);
-      expect(summary.get(`a[href='${page}/commits/dev']`).text()).toBe(
-        "History",
-      );
+      const dateText = summary.get(".latest-commit-date");
+      expect(dateText.text()).toMatch(/ago$/);
+      expect(dateText.element.closest("a")).toBeNull();
+      const history = wrapper.get(`a[href='${page}/commits/dev']`);
+      expectHistoryAboveSummary(wrapper, history);
       expect(commitRequests).toEqual([{ branch: "dev", limit: "1" }]);
       expect(operations).not.toHaveBeenCalled();
       wrapper.unmount();
@@ -321,13 +330,10 @@ describe("RepoViewer real links", () => {
     await flushPromises();
     const tabs = wrapper.get('nav[aria-label="Repository sections"]');
     expect(tabs.get(`a[href='${PAGE}/tree/dev']`).text()).toBe("Files");
-    expect(
-      wrapper
-        .get(
-          `section[aria-label='Latest commit'] a[href='${PAGE}/commits/dev']`,
-        )
-        .text(),
-    ).toBe("History");
+    expectHistoryAboveSummary(
+      wrapper,
+      wrapper.get(`a[href='${PAGE}/commits/dev']`),
+    );
     expect(wrapper.get(`a[href='${PAGE}/upload/dev']`).text()).toBe(
       "Upload Files",
     );

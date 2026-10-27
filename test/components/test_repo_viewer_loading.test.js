@@ -1,7 +1,15 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { defineComponent, h } from "vue";
+import {
+  defineComponent,
+  h,
+  KeepAlive,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  ref,
+} from "vue";
 
 import { http, HttpResponse } from "@/testing/msw";
 import { ElementPlusStubs, RouterLinkStub } from "../helpers/vue";
@@ -11,9 +19,53 @@ import {
   uiApiFixtures,
 } from "../helpers/api-fixtures";
 import { server } from "../setup/msw-server";
+import { repoAPI } from "@/utils/api";
+
+const detailLifecycle = vi.hoisted(() => ({
+  mounted: vi.fn(),
+  unmounted: vi.fn(),
+}));
 
 vi.mock("vue-router/auto", () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
+}));
+
+vi.mock(
+  "@/pages/[type]s/[namespace]/[name]/blob/[branch]/[...file].vue",
+  () => ({
+    __esModule: true,
+    default: defineComponent({
+      props: { embedded: Boolean },
+      setup(props) {
+        onMounted(detailLifecycle.mounted);
+        onUnmounted(detailLifecycle.unmounted);
+        return () =>
+          h(
+            "article",
+            {
+              "data-detail-probe": "blob",
+              "data-embedded": String(props.embedded),
+            },
+            "File detail content",
+          );
+      },
+    }),
+  }),
+);
+vi.mock("@/pages/[type]s/[namespace]/[name]/commit/[commit_id].vue", () => ({
+  __esModule: true,
+  default: defineComponent({
+    props: { embedded: Boolean },
+    setup: (props) => () =>
+      h(
+        "article",
+        {
+          "data-detail-probe": "commit",
+          "data-embedded": String(props.embedded),
+        },
+        "Commit detail content",
+      ),
+  }),
 }));
 
 import RepoViewer from "@/components/repo/RepoViewer.vue";
@@ -24,6 +76,19 @@ function deferred() {
   let resolve;
   const promise = new Promise((res) => (resolve = res));
   return { promise, resolve };
+}
+
+function expectHistoryAboveSummary(wrapper, branch) {
+  const history = wrapper.get(
+    `a[href='/datasets/open-media-lab/big-repo/commits/${branch}']`,
+  );
+  const summary = wrapper.get('section[aria-label="Latest commit"]');
+  expect(history.text()).toBe("History");
+  expect(summary.element.contains(history.element)).toBe(false);
+  expect(
+    history.element.compareDocumentPosition(summary.element) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
 }
 
 function mountViewer(tab, props = {}) {
@@ -55,6 +120,39 @@ function mountViewer(tab, props = {}) {
   });
 }
 
+function mountCachedDetail(visible, branch = ref("main")) {
+  return mount(
+    defineComponent({
+      setup: () => () =>
+        h(KeepAlive, null, () =>
+          visible.value
+            ? h(RepoViewer, {
+                repoType: "dataset",
+                namespace: "open-media-lab",
+                name: "big-repo",
+                tab: "files",
+                branch: branch.value,
+                currentPath: "",
+                detailView: "blob",
+                detailKey:
+                  "/datasets/open-media-lab/big-repo/blob/main/README.md",
+              })
+            : null,
+        ),
+    }),
+    {
+      global: {
+        stubs: {
+          ...ElementPlusStubs,
+          ElTooltip: true,
+          RouterLink: RouterLinkStub,
+          MetadataHeader: true,
+        },
+      },
+    },
+  );
+}
+
 // The repository page's file list comes from the paginated tree; the
 // whole-repository sibling list in repo info grows with the repository
 // (#101), so the page asks only for its own fields.
@@ -64,6 +162,8 @@ describe("RepoViewer loading on a big repository", () => {
   const gates = new Map();
 
   beforeEach(() => {
+    detailLifecycle.mounted.mockClear();
+    detailLifecycle.unmounted.mockClear();
     seen.length = 0;
     infoGate = null;
     gates.clear();
@@ -183,6 +283,184 @@ describe("RepoViewer loading on a big repository", () => {
 
     expect(seen.filter((s) => s.what === "readme")).toHaveLength(1);
   });
+
+  it("unmounts cached repository details while away and remounts them under the same header on return", async () => {
+    const visible = ref(true);
+    const wrapper = mountCachedDetail(visible);
+    try {
+      await vi.waitFor(() => {
+        expect(detailLifecycle.mounted).toHaveBeenCalledTimes(1);
+        expect(wrapper.find('[aria-label="Repository actions"]').exists()).toBe(
+          true,
+        );
+      });
+      const header = wrapper.get('[aria-label="Repository header"]').element;
+      const detail = wrapper.get('[data-detail-probe="blob"]').element;
+      visible.value = false;
+      await nextTick();
+      await vi.waitFor(() =>
+        expect(detailLifecycle.unmounted).toHaveBeenCalledTimes(1),
+      );
+      visible.value = true;
+      await nextTick();
+      await vi.waitFor(() =>
+        expect(detailLifecycle.mounted).toHaveBeenCalledTimes(2),
+      );
+      expect(wrapper.get('[data-detail-probe="blob"]').element).not.toBe(
+        detail,
+      );
+      expect(wrapper.get('[aria-label="Repository header"]').element).toBe(
+        header,
+      );
+      expect(seen.filter(({ what }) => what === "info")).toHaveLength(1);
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
+  it("restarts pending header metadata only once when a cached repository returns on another branch", async () => {
+    infoGate = deferred();
+    const visible = ref(true);
+    const branch = ref("main");
+    const getInfo = vi.spyOn(repoAPI, "getInfo");
+    const wrapper = mountCachedDetail(visible, branch);
+    try {
+      await vi.waitFor(() => expect(getInfo).toHaveBeenCalledTimes(1));
+      visible.value = false;
+      await nextTick();
+      branch.value = "dev";
+      visible.value = true;
+      await nextTick();
+      await flushPromises();
+      expect(getInfo).toHaveBeenCalledTimes(2);
+    } finally {
+      infoGate.resolve();
+      await flushPromises();
+      wrapper.unmount();
+      getInfo.mockRestore();
+    }
+  });
+
+  it.each([
+    ["model", "blob"],
+    ["dataset", "commit"],
+  ])(
+    "renders %s %s details before header metadata without loading Files, README or history",
+    async (repoType, detailView) => {
+      const gate = deferred();
+      let infoRequests = 0;
+      const tabRequests = vi.fn(() => jsonResponse([]));
+      const base = `/api/${repoType}s/open-media-lab/big-repo`;
+      server.use(
+        http.get(base, async () => {
+          infoRequests += 1;
+          await gate.promise;
+          return jsonResponse({
+            id: "open-media-lab/big-repo",
+            tags: [],
+            private: false,
+          });
+        }),
+        http.get(`${base}/tree/:branch`, tabRequests),
+        http.get(`${base}/commits/:branch`, tabRequests),
+        http.post(`${base}/paths-info/:branch`, tabRequests),
+        http.get(
+          `/${repoType}s/open-media-lab/big-repo/resolve/:branch/README.md`,
+          tabRequests,
+        ),
+      );
+      const wrapper = mountViewer("files", {
+        repoType,
+        detailView,
+        detailKey: `${detailView}-first`,
+        branch: "dev",
+      });
+      await vi.waitFor(() => {
+        expect(infoRequests).toBe(1);
+        expect(
+          wrapper.find(`[data-detail-probe='${detailView}']`).exists(),
+        ).toBe(true);
+      });
+      expect(
+        wrapper
+          .get(`[data-detail-probe='${detailView}']`)
+          .attributes("data-embedded"),
+      ).toBe("true");
+      const header = wrapper.get('[aria-label="Repository header"]').element;
+      expect(wrapper.get('.repo-tabs a[aria-current="page"]').text()).toBe(
+        "Files",
+      );
+      expect(
+        wrapper.get('.repo-tabs a[aria-current="page"]').attributes("href"),
+      ).toBe(`/${repoType}s/open-media-lab/big-repo/tree/dev`);
+      expect(wrapper.find('[aria-label="Repository actions"]').exists()).toBe(
+        false,
+      );
+      expect(tabRequests).not.toHaveBeenCalled();
+      gate.resolve();
+      await vi.waitFor(() =>
+        expect(wrapper.find('[aria-label="Repository actions"]').exists()).toBe(
+          true,
+        ),
+      );
+      const otherDetail = detailView === "blob" ? "commit" : "blob";
+      await wrapper.setProps({
+        detailView: otherDetail,
+        detailKey: `${otherDetail}-second`,
+      });
+      await vi.waitFor(() =>
+        expect(
+          wrapper.find(`[data-detail-probe='${otherDetail}']`).exists(),
+        ).toBe(true),
+      );
+      expect(wrapper.get('[aria-label="Repository header"]').element).toBe(
+        header,
+      );
+      expect(infoRequests).toBe(1);
+      expect(tabRequests).not.toHaveBeenCalled();
+      wrapper.unmount();
+    },
+  );
+
+  it.each(["blob", "commit"])(
+    "leaves Space %s details unembedded without fetching wrapper repository data",
+    async (detailView) => {
+      const unused = vi.fn(() => jsonResponse([]));
+      const base = "/api/spaces/open-media-lab/big-repo";
+      server.use(
+        http.get(base, unused),
+        http.get(`${base}/tree/:branch`, unused),
+        http.get(`${base}/commits/:branch`, unused),
+        http.post(`${base}/paths-info/:branch`, unused),
+        http.get(
+          "/spaces/open-media-lab/big-repo/resolve/:branch/README.md",
+          unused,
+        ),
+      );
+      const wrapper = mountViewer("files", {
+        repoType: "space",
+        detailView,
+        detailKey: detailView,
+      });
+      await vi.waitFor(() =>
+        expect(
+          wrapper.find(`[data-detail-probe='${detailView}']`).exists(),
+        ).toBe(true),
+      );
+      await flushPromises();
+      expect(
+        wrapper
+          .get(`[data-detail-probe='${detailView}']`)
+          .attributes("data-embedded"),
+      ).toBe("false");
+      expect(wrapper.find('[aria-label="Repository header"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find(".repo-tabs").exists()).toBe(false);
+      expect(unused).not.toHaveBeenCalled();
+      wrapper.unmount();
+    },
+  );
 
   it("keeps the repository header, sidebar and tab links mounted while tab data loads", async () => {
     const wrapper = mountViewer("card");
@@ -342,11 +620,7 @@ describe("RepoViewer loading on a big repository", () => {
     );
     const summary = wrapper.get('section[aria-label="Latest commit"]');
     expect(summary.find('[role="status"]').exists()).toBe(true);
-    expect(
-      summary
-        .get("a[href='/datasets/open-media-lab/big-repo/commits/main']")
-        .text(),
-    ).toBe("History");
+    expectHistoryAboveSummary(wrapper, "main");
     gate.resolve();
     await vi.waitFor(() => expect(summary.text()).toContain("Summary ready"));
     expect(
@@ -386,11 +660,7 @@ describe("RepoViewer loading on a big repository", () => {
       ).toBe(true),
     );
     const summary = wrapper.get('section[aria-label="Latest commit"]');
-    expect(
-      summary
-        .get("a[href='/datasets/open-media-lab/big-repo/commits/main']")
-        .text(),
-    ).toBe("History");
+    expectHistoryAboveSummary(wrapper, "main");
     expect(
       wrapper
         .find("a[href='/datasets/open-media-lab/big-repo/blob/main/README.md']")
@@ -445,11 +715,7 @@ describe("RepoViewer loading on a big repository", () => {
         ).toContain("Latest on new"),
       );
       const summary = wrapper.get('section[aria-label="Latest commit"]');
-      expect(
-        summary
-          .get("a[href='/datasets/open-media-lab/big-repo/commits/new']")
-          .text(),
-      ).toBe("History");
+      expectHistoryAboveSummary(wrapper, "new");
       oldGate.resolve();
       await vi.waitFor(() => expect(oldReturned).toBe(true));
       await flushPromises();
@@ -626,13 +892,7 @@ describe("RepoViewer loading on a big repository", () => {
         wrapper.find('section[aria-label="Latest commit"]').text(),
       ).toContain("No commits yet"),
     );
-    expect(
-      wrapper
-        .get(
-          "section[aria-label='Latest commit'] a[href='/datasets/open-media-lab/big-repo/commits/main']",
-        )
-        .text(),
-    ).toBe("History");
+    expectHistoryAboveSummary(wrapper, "main");
     await wrapper.setProps({ tab: "commits" });
     await vi.waitFor(() => expect(wrapper.text()).toContain("No commits yet"));
     await wrapper.setProps({ tab: "files" });

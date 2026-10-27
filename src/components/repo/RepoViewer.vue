@@ -1,6 +1,10 @@
 <!-- src/components/repo/RepoViewer.vue -->
 <template>
-  <div :class="isCompositeHeader ? 'repository-page' : 'container-main'">
+  <div
+    :class="
+      isCompositeHeader ? 'repository-page' : detailView ? '' : 'container-main'
+    "
+  >
     <RepositoryHeader
       v-if="isCompositeHeader"
       :repo-type="repoType"
@@ -32,8 +36,23 @@
         />
       </template>
     </RepositoryHeader>
+    <div v-if="detailView" :class="{ 'repository-content': isCompositeHeader }">
+      <ErrorState
+        v-if="isCompositeHeader && error"
+        :error="error"
+        :context="errorContext('repository')"
+        :retry="loadRepoInfo"
+        mode="inline-panel"
+      />
+      <component
+        v-if="detailActive"
+        :is="detailComponent"
+        :key="detailKey"
+        :embedded="isCompositeHeader"
+      />
+    </div>
     <el-breadcrumb
-      v-if="error && !isCompositeHeader"
+      v-if="!detailView && error && !isCompositeHeader"
       separator="/"
       class="repo-breadcrumb mb-6 text-gray-700 dark:text-gray-300"
       aria-label="Repository navigation"
@@ -72,14 +91,14 @@
       </el-breadcrumb-item>
     </el-breadcrumb>
 
-    <div v-if="loading" class="text-center py-20">
+    <div v-if="!detailView && loading" class="text-center py-20">
       <el-icon class="is-loading" :size="40">
         <div class="i-carbon-circle-dash" />
       </el-icon>
     </div>
 
     <ErrorState
-      v-else-if="error"
+      v-else-if="!detailView && error"
       :error="error"
       :context="errorContext('repository')"
       :retry="loadRepoInfo"
@@ -90,7 +109,7 @@
     />
 
     <div
-      v-else
+      v-else-if="!detailView"
       class="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6"
       :class="{ 'repository-content': isCompositeHeader }"
     >
@@ -441,6 +460,29 @@
             </div>
           </div>
 
+          <div v-if="isCompositeHeader" class="repository-files-history">
+            <RouterLink
+              v-if="!isExternalRepo"
+              :to="tabTarget('commits')"
+              class="repository-history-link"
+            >
+              <span class="i-carbon-time" aria-hidden="true" /> History
+            </RouterLink>
+            <a
+              v-else-if="sourceHistoryUrl"
+              :href="sourceHistoryUrl"
+              class="repository-history-link"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <span class="i-carbon-time" aria-hidden="true" /> History
+              <span class="i-carbon-launch" aria-hidden="true" />
+            </a>
+            <span v-else class="repository-history-link" aria-disabled="true">
+              <span class="i-carbon-time" aria-hidden="true" /> History
+            </span>
+          </div>
+
           <!-- File List -->
           <div
             class="divide-y divide-gray-200 dark:divide-gray-700"
@@ -453,7 +495,6 @@
               :name="name"
               :branch="currentBranch"
               :external="isExternalRepo"
-              :source-url="sourceRepoUrl"
             />
             <div v-if="filesLoading" class="py-12 text-center">
               <el-icon class="is-loading" :size="40">
@@ -999,6 +1040,7 @@ huggingface-cli download {{ repoInfo?.id }}</pre
 </template>
 
 <script setup>
+import { defineAsyncComponent } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import axios from "axios";
 import { formatRelativeTime, formatUnixRelativeTime } from "@/utils/datetime";
@@ -1047,6 +1089,18 @@ import { tarSidecarPath } from "@/utils/indexed-tar";
 // dropdown collided with the surrounding header chrome and earned
 // nothing in return, so it was removed (issue #56 follow-up).
 const FILE_LIST_BATCH_SIZE = 50;
+const detailComponents = {
+  blob: defineAsyncComponent(
+    () =>
+      import(
+        "../../pages/[type]s/[namespace]/[name]/blob/[branch]/[...file].vue"
+      ),
+  ),
+  commit: defineAsyncComponent(
+    () =>
+      import("../../pages/[type]s/[namespace]/[name]/commit/[commit_id].vue"),
+  ),
+};
 
 /**
  * @typedef {Object} Props
@@ -1064,7 +1118,11 @@ const props = defineProps({
   branch: { type: String, default: "main" },
   currentPath: { type: String, default: "" },
   tab: { type: String, default: "card" },
+  detailView: { type: String, default: "" },
+  detailKey: { type: String, default: "" },
 });
+const detailComponent = computed(() => detailComponents[props.detailView]);
+const detailActive = ref(true);
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -1489,6 +1547,11 @@ const sourceRepoUrl = computed(() =>
       )
     : null,
 );
+const sourceHistoryUrl = computed(() =>
+  sourceRepoUrl.value
+    ? `${sourceRepoUrl.value.replace(/\/+$/, "")}/commits/${encodeURIComponent(currentBranch.value)}`
+    : null,
+);
 
 const tabClass = (active) => [
   // flex + items-center: the label stays vertically centred in the stretched row, as in a button
@@ -1499,7 +1562,10 @@ const tabClass = (active) => [
 ];
 
 function getCommitPath(commitId) {
-  return `/${props.repoType}s/${props.namespace}/${props.name}/commit/${commitId}`;
+  const path = `/${props.repoType}s/${props.namespace}/${props.name}/commit/${commitId}`;
+  return currentBranch.value === "main"
+    ? path
+    : `${path}?branch=${encodeURIComponent(currentBranch.value)}`;
 }
 
 function handleBranchChange() {
@@ -1593,12 +1659,19 @@ const loadRepoInfo = () => repoInfoResource.reload();
 let wasHidden = false;
 onDeactivated(() => {
   wasHidden = true;
+  // Detail pages read the active route; retain the header, but remount details
+  // when returning so another repository cannot change their cached content.
+  detailActive.value = false;
   repoInfoResource.stop();
 });
 onActivated(() => {
+  detailActive.value = true;
   if (!wasHidden) return;
   wasHidden = false;
-  if (!repoInfoResource.ready.value) repoInfoResource.reload();
+  if (props.detailView && !isCompositeHeader.value) return;
+  if (!repoInfoResource.ready.value && !repoInfoResource.loading.value) {
+    repoInfoResource.reload();
+  }
 });
 
 async function toggleLike() {
@@ -2308,7 +2381,10 @@ watch(fileSearchQuery, () => {
   }
   fileSearchDebounceHandle = setTimeout(() => {
     fileSearchDebounceHandle = null;
-    if (activeTab.value === "files" || activeTab.value === "card") {
+    if (
+      !props.detailView &&
+      (activeTab.value === "files" || activeTab.value === "card")
+    ) {
       loadFileTree({ resetPagination: true });
     }
   }, FILE_SEARCH_DEBOUNCE_MS);
@@ -2318,6 +2394,7 @@ let tabLoadId = 0;
 
 async function loadActiveTab() {
   const requestId = ++tabLoadId;
+  if (props.detailView) return;
   const tab = activeTab.value;
   if (["files", "card", "metadata"].includes(tab)) {
     const context = getFileTreeContext();
@@ -2341,7 +2418,7 @@ async function loadActiveTab() {
 
 // Route pages share this instance; only a changed resource context reloads.
 watch(
-  () => [props.tab, props.branch, props.currentPath],
+  () => [props.tab, props.branch, props.currentPath, props.detailView],
   ([, branch], [, previousBranch]) => {
     currentBranch.value = branch;
     if (branch !== previousBranch) {
@@ -2361,12 +2438,19 @@ watch(
       commits.value = [];
       commitsLoading.value = false;
     }
+    if (
+      (!props.detailView || isCompositeHeader.value) &&
+      repoInfoResource.status.value === "idle"
+    ) {
+      loadRepoInfo();
+    }
     loadActiveTab();
   },
 );
 
 // Lifecycle
 onMounted(async () => {
+  if (props.detailView && !isCompositeHeader.value) return;
   // The tab's own data does not depend on repo info: load both at once
   const info = loadRepoInfo();
 
@@ -2381,6 +2465,34 @@ onMounted(async () => {
 .repository-file-list {
   border: 1px solid var(--site-border);
   border-radius: 8px;
+}
+.repository-files-history {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+.repository-history-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  flex-shrink: 0;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--site-border);
+  border-radius: 999px;
+  background: var(--site-card);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+  color: var(--site-link);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.repository-history-link:hover {
+  background: var(--site-hover);
+}
+.repository-history-link[aria-disabled="true"] {
+  color: var(--site-muted);
 }
 .repository-history-navigation {
   display: flex;

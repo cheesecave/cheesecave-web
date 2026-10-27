@@ -1,8 +1,12 @@
 <!-- src/pages/[type]s/[namespace]/[name]/commit/[commit_id].vue -->
 <template>
-  <div class="container-main">
+  <div :class="embedded ? 'min-w-0 w-full' : 'container-main'">
     <!-- Breadcrumb Navigation -->
-    <el-breadcrumb separator="/" class="mb-6 text-gray-700 dark:text-gray-300">
+    <el-breadcrumb
+      v-if="!embedded"
+      separator="/"
+      class="mb-6 text-gray-700 dark:text-gray-300"
+    >
       <el-breadcrumb-item>
         <RouterLink
           to="/"
@@ -46,6 +50,15 @@
       >
     </el-breadcrumb>
 
+    <RouterLink
+      v-if="embedded"
+      :to="filesPath"
+      class="inline-flex items-center gap-2 mb-4 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+    >
+      <span class="i-carbon-arrow-left" aria-hidden="true" />
+      Back to Files
+    </RouterLink>
+
     <!-- Loading State -->
     <div v-if="loading" class="flex justify-center items-center py-20">
       <el-icon class="is-loading" size="48">
@@ -68,9 +81,12 @@
         <div class="flex items-start gap-4 mb-4">
           <div class="i-carbon-commit text-4xl text-blue-500 flex-shrink-0" />
           <div class="flex-1 min-w-0">
-            <h1 class="text-2xl font-bold mb-2 break-words">
+            <component
+              :is="embedded ? 'h2' : 'h1'"
+              class="text-2xl font-bold mb-2 break-words"
+            >
               {{ commitData.message }}
-            </h1>
+            </component>
             <div
               class="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400"
             >
@@ -649,8 +665,11 @@ import ErrorState from "@/components/common/ErrorState.vue";
 import { KIND, decodeError, notifyError } from "@/errors";
 import { useErrorContext } from "@/composables/useErrorContext";
 import { getRepositoryOperationCapabilities } from "@/utils/repositoryOperationCapabilities";
+import { buildRepositoryPath } from "@/utils/repo-paths";
 
 dayjs.extend(relativeTime);
+
+const props = defineProps({ embedded: { type: Boolean, default: false } });
 
 const route = useRoute();
 const router = useRouter();
@@ -660,6 +679,14 @@ const namespace = computed(() => route.params.namespace);
 const name = computed(() => route.params.name);
 const commitId = computed(() => route.params.commit_id);
 const repoId = computed(() => `${namespace.value}/${name.value}`);
+const backBranch = computed(() => {
+  const branch = route.query?.branch;
+  return typeof branch === "string" && branch ? branch : "main";
+});
+const filesPath = computed(
+  () =>
+    `${buildRepositoryPath(type.value, repoId.value)}/tree/${encodeURIComponent(backBranch.value)}`,
+);
 
 const loading = ref(true);
 const error = ref(null);
@@ -925,8 +952,12 @@ function getChangeType(type) {
 const blobPath = (path) =>
   `/${type.value}s/${namespace.value}/${name.value}/blob/main/${path}`;
 
-const commitPath = (id) =>
-  `/${type.value}s/${namespace.value}/${name.value}/commit/${id}`;
+const commitPath = (id) => {
+  const path = `/${type.value}s/${namespace.value}/${name.value}/commit/${id}`;
+  return props.embedded && backBranch.value !== "main"
+    ? `${path}?branch=${encodeURIComponent(backBranch.value)}`
+    : path;
+};
 
 function isBinaryFile(path) {
   // Check file extension to determine if it's a binary file

@@ -15,7 +15,16 @@ vi.mock("@/components/repo/RepoViewer.vue", async () => {
   return {
     default: defineComponent({
       name: "RepoViewer",
-      props: ["repoType", "namespace", "name", "branch", "currentPath", "tab"],
+      props: [
+        "repoType",
+        "namespace",
+        "name",
+        "branch",
+        "currentPath",
+        "tab",
+        "detailView",
+        "detailKey",
+      ],
       setup(props) {
         lifecycle.mounts += 1;
         const uid = getCurrentInstance().uid;
@@ -42,13 +51,16 @@ const suffixes = [
   ["/commits/[branch]/", "/commits/:branch"],
   ["/blob/[branch]/[...file]", "/blob/:branch/:file(.*)"],
   ["/settings", "/settings"],
+  ["/commit/[commit_id]", "/commit/:commit_id"],
 ];
 
 describe("composite repository header route scope", () => {
   it.each(["model", "dataset"])(
-    "includes only the four RepoViewer route records for %s repositories",
+    "includes the repository tabs, blobs and single commits for %s repositories",
     (type) => {
-      for (const [suffix] of suffixes.slice(0, 4)) {
+      for (const [suffix] of suffixes.filter(
+        ([suffix]) => suffix !== "/settings",
+      )) {
         expect(
           isCompositeRepositoryRoute({
             name: prefix + suffix,
@@ -61,7 +73,9 @@ describe("composite repository header route scope", () => {
   );
 
   it("excludes Spaces, repository operation pages, lists and unrelated routes", () => {
-    for (const [suffix] of suffixes.slice(0, 4)) {
+    for (const [suffix] of suffixes.filter(
+      ([suffix]) => suffix !== "/settings",
+    )) {
       expect(
         isCompositeRepositoryRoute({
           name: prefix + suffix,
@@ -70,11 +84,9 @@ describe("composite repository header route scope", () => {
       ).toBe(false);
     }
     for (const name of [
-      `${prefix}/blob/[branch]/[...file]`,
       `${prefix}/settings`,
       `${prefix}/upload/[branch]`,
       `${prefix}/edit/[branch]/[...file]`,
-      `${prefix}/commit/[commit]`,
       "/models/",
       "/datasets/",
       "/new",
@@ -184,17 +196,27 @@ describe("repository view route normalization", () => {
     wrapper.unmount();
   });
 
-  it("leaves blob and settings pages independent and restores the cached repository", async () => {
+  it("keeps the repository instance through blob and commit details and restores it after settings", async () => {
     const { wrapper, navigate } = await mountRouter("/datasets/mai_lin/demo");
     const header = wrapper.get("header").element;
-    for (const path of [
-      "/datasets/mai_lin/demo/blob/main/README.md",
-      "/datasets/mai_lin/demo/settings",
+    for (const [path, detailView, branch] of [
+      ["/datasets/mai_lin/demo/blob/dev/README.md", "blob", "dev"],
+      ["/datasets/mai_lin/demo/commit/abc123?branch=dev", "commit", "dev"],
+      ["/datasets/mai_lin/demo/commit/def456", "commit", "main"],
     ]) {
       await navigate(path);
-      expect(wrapper.find("section").exists()).toBe(false);
-      expect(wrapper.find("[data-generated-page]").exists()).toBe(true);
+      expect(wrapper.get("header").element).toBe(header);
+      expect(JSON.parse(wrapper.get("output").text())).toMatchObject({
+        tab: "files",
+        detailView,
+        detailKey: path.split("?")[0],
+        branch,
+      });
+      expect(lifecycle.mounts).toBe(1);
     }
+    await navigate("/datasets/mai_lin/demo/settings");
+    expect(wrapper.find("section").exists()).toBe(false);
+    expect(wrapper.find("[data-generated-page]").exists()).toBe(true);
     await navigate("/datasets/mai_lin/demo");
     expect(wrapper.get("header").element).toBe(header);
     expect(lifecycle.mounts).toBe(1);
@@ -280,11 +302,14 @@ describe("repository view route normalization", () => {
         meta,
       })),
     );
-    expect(children[4]).toEqual(routes[4]);
     expect(children[5]).toEqual(routes[5]);
-    expect(children[6]).toEqual(external);
+    expect(children[7]).toEqual(external);
     expect(
-      new Set(children.slice(0, 4).map(({ component }) => component)).size,
+      new Set(
+        children
+          .filter((_, index) => [0, 1, 2, 3, 4, 6].includes(index))
+          .map(({ component }) => component),
+      ).size,
     ).toBe(1);
     const props = children[2].props({
       params: {

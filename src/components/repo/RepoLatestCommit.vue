@@ -13,7 +13,6 @@ const props = defineProps({
   name: { type: String, required: true },
   branch: { type: String, required: true },
   external: { type: Boolean, default: false },
-  sourceUrl: { type: String, default: null },
 });
 const errorContext = useErrorContext();
 // This small request never controls the file list or loads history's permissions.
@@ -45,16 +44,9 @@ const commit = computed(() => resource.data.value);
 const repoPath = computed(
   () => `/${props.repoType}s/${props.namespace}/${props.name}`,
 );
-const historyPath = computed(
-  () => `${repoPath.value}/commits/${encodeURIComponent(props.branch)}`,
-);
 const commitPath = computed(
-  () => `${repoPath.value}/commit/${commit.value?.id}`,
-);
-const externalHistory = computed(() =>
-  props.sourceUrl
-    ? `${props.sourceUrl.replace(/\/+$/, "")}/commits/${encodeURIComponent(props.branch)}`
-    : null,
+  () =>
+    `${repoPath.value}/commit/${commit.value?.id}${props.branch === "main" ? "" : `?branch=${encodeURIComponent(props.branch)}`}`,
 );
 </script>
 
@@ -101,30 +93,10 @@ const externalHistory = computed(() =>
           <RouterLink :to="commitPath" class="latest-commit-sha">{{
             commit.id.slice(0, 7)
           }}</RouterLink>
-          <RouterLink :to="commitPath" class="latest-commit-date">
+          <span class="latest-commit-date">
             {{ formatRelativeTime(commit.date, "Unknown date") }}
-          </RouterLink>
+          </span>
         </template>
-        <RouterLink
-          v-if="!external"
-          :to="historyPath"
-          class="latest-commit-history"
-        >
-          <span class="i-carbon-change-catalog" aria-hidden="true" /> History
-        </RouterLink>
-        <a
-          v-else-if="externalHistory"
-          :href="externalHistory"
-          class="latest-commit-history"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <span class="i-carbon-change-catalog" aria-hidden="true" /> History
-          <span class="i-carbon-launch" aria-hidden="true" />
-        </a>
-        <span v-else class="latest-commit-history" aria-disabled="true">
-          <span class="i-carbon-change-catalog" aria-hidden="true" /> History
-        </span>
       </div>
     </div>
     <ErrorState
@@ -154,8 +126,7 @@ const externalHistory = computed(() =>
 .latest-commit-summary,
 .latest-commit-author,
 .latest-commit-status,
-.latest-commit-details,
-.latest-commit-history {
+.latest-commit-details {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -191,12 +162,6 @@ const externalHistory = computed(() =>
   font-family: ui-monospace, monospace;
   color: var(--site-link);
 }
-.latest-commit-history {
-  font-weight: 500;
-}
-.latest-commit-history[aria-disabled="true"] {
-  color: var(--site-muted);
-}
 a:hover {
   color: var(--site-link);
   text-decoration: underline;
@@ -212,9 +177,6 @@ a:hover {
   }
   .latest-commit-title {
     flex-basis: 100%;
-  }
-  .latest-commit-history {
-    margin-left: auto;
   }
 }
 </style>

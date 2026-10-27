@@ -1,8 +1,12 @@
 <!-- src/kohaku-hub-ui/src/pages/[type]s/[namespace]/[name]/blob/[branch]/[...file].vue -->
 <template>
-  <div class="container-main">
+  <div :class="embedded ? 'min-w-0 w-full' : 'container-main'">
     <!-- Breadcrumb -->
-    <el-breadcrumb separator="/" class="mb-6 text-gray-700 dark:text-gray-300">
+    <el-breadcrumb
+      v-if="!embedded"
+      separator="/"
+      class="mb-6 text-gray-700 dark:text-gray-300"
+    >
       <el-breadcrumb-item>
         <RouterLink
           to="/"
@@ -38,6 +42,15 @@
       <el-breadcrumb-item>{{ fileName }}</el-breadcrumb-item>
     </el-breadcrumb>
 
+    <RouterLink
+      v-if="embedded"
+      :to="filesPath"
+      class="inline-flex items-center gap-2 mb-4 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+    >
+      <span class="i-carbon-arrow-left" aria-hidden="true" />
+      Back to Files
+    </RouterLink>
+
     <div v-if="loading" class="text-center py-20">
       <el-icon class="is-loading" :size="40">
         <div class="i-carbon-circle-dash" />
@@ -64,9 +77,12 @@
               class="text-2xl sm:text-3xl flex-shrink-0"
             />
             <div class="min-w-0 flex-1">
-              <h1 class="text-lg sm:text-xl md:text-2xl font-bold break-words">
+              <component
+                :is="embedded ? 'h2' : 'h1'"
+                class="text-lg sm:text-xl md:text-2xl font-bold break-words"
+              >
                 {{ fileName }}
-              </h1>
+              </component>
               <div
                 class="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1"
               >
@@ -335,7 +351,10 @@ import {
 } from "@/utils/file-preview";
 import { mediaKind } from "@/utils/media-types";
 import { copyToClipboard } from "@/utils/clipboard";
-import { normalizeCatchAllParam } from "@/utils/repo-paths";
+import {
+  buildRepositoryPath,
+  normalizeCatchAllParam,
+} from "@/utils/repo-paths";
 import {
   KIND,
   decodeError,
@@ -347,6 +366,8 @@ import { useErrorContext } from "@/composables/useErrorContext";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { useAuthStore } from "@/stores/auth";
 import { repoAPI } from "@/utils/api";
+
+defineProps({ embedded: { type: Boolean, default: false } });
 
 const route = useRoute();
 const router = useRouter();
@@ -436,6 +457,18 @@ const fileExtension = computed(() => {
 
 const pathSegments = computed(() => {
   return filePath.value ? filePath.value.split("/").filter(Boolean) : [];
+});
+
+const filesPath = computed(() => {
+  const repository = buildRepositoryPath(
+    repoType.value,
+    `${namespace.value}/${name.value}`,
+  );
+  const parent = pathSegments.value
+    .slice(0, -1)
+    .map(encodeURIComponent)
+    .join("/");
+  return `${repository}/tree/${encodeURIComponent(branch.value)}${parent ? `/${parent}` : ""}`;
 });
 
 const fileUrl = computed(() => {
