@@ -391,7 +391,7 @@ async function handleLogout() {
 }
 .repository-site-header > .container-main {
   width: 100%;
-  max-width: 1680px;
+  max-width: none;
   padding-inline: 24px;
   column-gap: 24px;
   justify-content: flex-start;
