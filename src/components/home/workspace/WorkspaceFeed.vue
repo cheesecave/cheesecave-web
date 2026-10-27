@@ -26,33 +26,34 @@ const scope = defineModel("scope", { type: String, default: "all" });
     "
     :aria-busy="loading"
   >
-    <div v-if="!organization" class="feed-scopes">
-      <WorkspaceScopeFilter
-        v-model="scope"
-        :username="username"
-        :organizations="organizations"
-      />
-    </div>
-    <div
-      v-if="!organization"
-      class="feed-filters feed-types"
-      role="group"
-      aria-label="Activity category"
-    >
-      <button
-        v-for="item in [
-          { type: 'all', plural: 'All' },
-          ...types,
-          { type: 'likes', plural: 'Likes' },
-        ]"
-        :key="item.type"
-        type="button"
-        :aria-pressed="feedType === item.type"
-        :class="{ active: feedType === item.type }"
-        @click="feedType = item.type"
+    <div v-if="!organization" class="feed-toolbar">
+      <div
+        class="feed-filters feed-types"
+        role="group"
+        aria-label="Activity category"
       >
-        {{ item.plural }}
-      </button>
+        <button
+          v-for="item in [
+            { type: 'all', plural: 'All' },
+            ...types,
+            { type: 'likes', plural: 'Likes' },
+          ]"
+          :key="item.type"
+          type="button"
+          :aria-pressed="feedType === item.type"
+          :class="{ active: feedType === item.type }"
+          @click="feedType = item.type"
+        >
+          {{ item.plural }}
+        </button>
+      </div>
+      <div class="feed-scopes">
+        <WorkspaceScopeFilter
+          v-model="scope"
+          :username="username"
+          :organizations="organizations"
+        />
+      </div>
     </div>
     <p v-if="loading && items.length" class="loading-message" role="status">
       Updating activity…
@@ -129,15 +130,24 @@ const scope = defineModel("scope", { type: String, default: "all" });
   min-width: 0;
   padding: 32px clamp(20px, 3vw, 48px) 40px;
 }
-.feed-filters {
+.feed-toolbar {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
   border-bottom: 1px solid var(--ws-border);
-  margin: 28px 0 22px;
+  margin-bottom: 22px;
   padding-bottom: 12px;
 }
+.feed-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 .feed-scopes {
-  margin: 0 0 12px;
+  min-width: 0;
+  max-width: 100%;
+  margin-left: auto;
 }
 .feed-filters button {
   padding: 6px 12px;
@@ -231,12 +241,6 @@ const scope = defineModel("scope", { type: String, default: "all" });
   background: var(--site-primary, #94621f);
   font-size: 12px;
 }
-.feed-types {
-  margin-top: 0;
-}
-.feed-filters {
-  flex-wrap: wrap;
-}
 .load-more {
   justify-self: center;
   border: 1px solid var(--ws-border);
@@ -266,7 +270,6 @@ const scope = defineModel("scope", { type: String, default: "all" });
 
   .feed-filters {
     gap: 2px;
-    margin-top: 22px;
   }
   .feed-filters button {
     padding: 6px 10px;

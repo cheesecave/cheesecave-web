@@ -38,6 +38,7 @@ const selected = computed(
     v-model="scope"
     :options="options"
     label="Activity scope"
+    placement="bottom-end"
     menu-class="scope-menu"
     avatar-class="scope-avatar"
     label-class="scope-option-label"
