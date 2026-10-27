@@ -116,6 +116,14 @@ const navText = (type) =>
     .text()
     .replace(/\s/g, "");
 const memberPanel = () => wrapper.get('[aria-label="Organization members"]');
+function expectMemberAvatar(username) {
+  const member = memberPanel().get(`a[aria-label="${username}"]`);
+  expect(member.attributes("href")).toBe(`/${username}`);
+  expect(member.attributes("title")).toBe(username);
+  expect(member.get("img").attributes("src")).toBe(
+    `/api/users/${username}/avatar`,
+  );
+}
 
 describe("independent organization list loading", () => {
   it("redirects an invalid list type to the organization overview", async () => {
@@ -156,7 +164,7 @@ describe("independent organization list loading", () => {
     });
     await flushPromises();
     expect(wrapper.get("aside").text()).toContain(profile.description);
-    expect(memberPanel().get('a[href="/alice"]').text()).toBe("alice");
+    expectMemberAvatar("alice");
     expect(wrapper.get('main [role="status"]').text()).toBe(
       "Loading models...",
     );
@@ -184,7 +192,7 @@ describe("independent organization list loading", () => {
       data: { members: [{ user: "alice", role: "member" }] },
     });
     await flushPromises();
-    expect(memberPanel().get('a[href="/alice"]').text()).toBe("alice");
+    expectMemberAvatar("alice");
   });
 
   it("loads extended profile details independently and retries only those details", async () => {

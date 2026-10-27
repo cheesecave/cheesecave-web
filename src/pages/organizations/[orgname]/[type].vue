@@ -184,30 +184,10 @@
               ></template
             >
           </ErrorState>
-          <div v-else-if="members.length" class="space-y-2">
-            <div
-              v-for="member in members"
-              :key="member.user"
-              class="relative flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-            >
-              <EntityAvatar
-                :username="member.user"
-                :name="member.user"
-                :size="36"
-                :alt="`${member.user} avatar`"
-              />
-              <div class="min-w-0 flex-1">
-                <RouterLink
-                  :to="`/${member.user}`"
-                  class="stretched-link block truncate text-sm font-medium !text-inherit"
-                  >{{ member.user }}</RouterLink
-                >
-                <p class="text-xs text-gray-500 dark:text-gray-400">
-                  {{ member.role }}
-                </p>
-              </div>
-            </div>
-          </div>
+          <OrganizationMemberAvatars
+            v-else-if="members.length"
+            :members="members"
+          />
           <p
             v-else-if="membersLoaded"
             class="text-sm text-gray-500 dark:text-gray-400"
@@ -546,6 +526,7 @@
 import { repoAPI, orgAPI, settingsAPI } from "@/utils/api";
 import ProfileRepoCard from "@/components/profile/ProfileRepoCard.vue";
 import EntityAvatar from "@/components/common/EntityAvatar.vue";
+import OrganizationMemberAvatars from "@/components/profile/OrganizationMemberAvatars.vue";
 import LinkButton from "@/components/common/LinkButton.vue";
 import ProfileViewToggle from "@/components/profile/ProfileViewToggle.vue";
 import { useOrganizationProfileAccess } from "@/composables/useOrganizationProfileAccess";

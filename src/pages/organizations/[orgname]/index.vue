@@ -272,7 +272,7 @@
             </div>
           </div>
 
-          <!-- Members List -->
+          <!-- Member avatars -->
           <section
             class="card profile-panel"
             aria-label="Organization members"
@@ -302,32 +302,10 @@
               :retry="loadMembers"
               :retrying="membersLoading"
             />
-            <div v-else-if="members.length > 0" class="space-y-2">
-              <div
-                v-for="member in members"
-                :key="member.user"
-                class="relative flex items-center gap-2 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              >
-                <EntityAvatar
-                  :username="member.user"
-                  :name="member.user"
-                  :size="32"
-                  :alt="`${member.user} avatar`"
-                />
-                <div class="flex-1 min-w-0">
-                  <div class="text-sm font-medium truncate">
-                    <RouterLink
-                      :to="`/${member.user}`"
-                      class="stretched-link !text-inherit"
-                      >{{ member.user }}</RouterLink
-                    >
-                  </div>
-                  <div class="text-xs text-gray-500">
-                    {{ member.role }}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <OrganizationMemberAvatars
+              v-else-if="members.length > 0"
+              :members="members"
+            />
             <div
               v-else
               class="text-center py-4 text-sm text-gray-500 dark:text-gray-400"
@@ -807,6 +785,7 @@ import { repoAPI, orgAPI, settingsAPI } from "@/utils/api";
 import LinkButton from "@/components/common/LinkButton.vue";
 import ProfileRepoCard from "@/components/profile/ProfileRepoCard.vue";
 import EntityAvatar from "@/components/common/EntityAvatar.vue";
+import OrganizationMemberAvatars from "@/components/profile/OrganizationMemberAvatars.vue";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import FollowControls from "@/components/profile/FollowControls.vue";
 import ProfileViewToggle from "@/components/profile/ProfileViewToggle.vue";

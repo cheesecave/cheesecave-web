@@ -126,6 +126,15 @@ async function mountPage(type = "models", query = {}) {
   await flushPromises();
 }
 
+function expectMemberAvatar(username) {
+  const member = wrapper.get(`aside a[aria-label="${username}"]`);
+  expect(member.attributes("href")).toBe(`/${username}`);
+  expect(member.attributes("title")).toBe(username);
+  expect(member.get("img").attributes("src")).toBe(
+    `/api/users/${username}/avatar`,
+  );
+}
+
 describe("organization repository list profile", () => {
   it("shows organization details and real organization and member avatars", async () => {
     await mountPage();
@@ -145,8 +154,8 @@ describe("organization repository list profile", () => {
         "/api/users/bob/avatar",
       ]),
     );
-    expect(sidebar.get('a[href="/alice"]').text()).toBe("alice");
-    expect(sidebar.get('a[href="/bob"]').text()).toBe("bob");
+    expectMemberAvatar("alice");
+    expectMemberAvatar("bob");
   });
 
   it.each(["models", "datasets", "spaces"])(
@@ -254,8 +263,8 @@ describe("organization repository list profile", () => {
       expect(
         wrapper.find('button[aria-label="View as visitor"]').exists(),
       ).toBe(false);
-      expect(wrapper.get('aside a[href="/alice"]').text()).toBe("alice");
-      expect(wrapper.get('aside a[href="/bob"]').text()).toBe("bob");
+      expectMemberAvatar("alice");
+      expectMemberAvatar("bob");
     },
   );
 
@@ -288,8 +297,8 @@ describe("organization repository list profile", () => {
           `${destination[0].toUpperCase()}${destination.slice(1)}1`,
         );
       }
-      expect(sidebar.get('a[href="/alice"]').text()).toBe("alice");
-      expect(sidebar.get('a[href="/bob"]').text()).toBe("bob");
+      expectMemberAvatar("alice");
+      expectMemberAvatar("bob");
       await wrapper
         .get(`input[aria-label="Search ${type}"]`)
         .setValue("landscape");

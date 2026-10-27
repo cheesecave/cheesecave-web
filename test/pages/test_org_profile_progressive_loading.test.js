@@ -180,6 +180,16 @@ function repoSection(name) {
     .findAll("section")
     .find((el) => el.find("h2").exists() && el.get("h2").text() === name);
 }
+function expectMemberAvatar(username) {
+  const member = region("Organization members").get(
+    `a[aria-label="${username}"]`,
+  );
+  expect(member.attributes("href")).toBe(`/${username}`);
+  expect(member.attributes("title")).toBe(username);
+  expect(member.get("img").attributes("src")).toBe(
+    `/api/users/${username}/avatar`,
+  );
+}
 
 describe("organization profile independent regions", () => {
   it("loads every region before the organization lookup resolves", async () => {
@@ -220,7 +230,7 @@ describe("organization profile independent regions", () => {
       "Independent organization README",
     );
     expect(region("Storage usage").text()).toContain("1 KB");
-    expect(region("Organization members").text()).toContain("alice");
+    expectMemberAvatar("alice");
     expect(
       wrapper.find('a[href="/organizations/acme/settings"]').exists(),
     ).toBe(false);
@@ -310,7 +320,7 @@ describe("organization profile independent regions", () => {
     expect(region("Profile README").text()).toContain(
       "Independent organization README",
     );
-    expect(region("Organization members").text()).toContain("alice");
+    expectMemberAvatar("alice");
     expect(
       wrapper
         .get('aside a[href="/organizations/acme/models?view=visitor"]')
