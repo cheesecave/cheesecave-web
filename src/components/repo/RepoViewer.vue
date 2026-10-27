@@ -2523,8 +2523,11 @@ onMounted(async () => {
   min-height: 34px;
   padding: 7px 12px;
   border-radius: 8px;
-  background: var(--site-hover);
+  background: var(--site-card);
   box-shadow: 0 0 0 1px var(--site-border) inset;
+}
+.repository-branch-select :deep(.el-select__wrapper:hover) {
+  background: var(--site-hover);
 }
 .repository-branch-select :deep(.el-select__prefix),
 .repository-branch-select :deep(.el-select__caret) {
