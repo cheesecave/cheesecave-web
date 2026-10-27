@@ -10,6 +10,7 @@ import EntityAvatar from "@/components/common/EntityAvatar.vue";
 defineProps({
   options: { type: Array, required: true },
   label: { type: String, required: true },
+  placement: { type: String, default: "bottom-start" },
   menuClass: { type: String, default: "" },
   avatarClass: { type: String, default: "" },
   labelClass: { type: String, default: "" },
@@ -25,7 +26,7 @@ function select(value) {
 <template>
   <ElDropdown
     trigger="click"
-    placement="bottom-start"
+    :placement="placement"
     :show-arrow="false"
     popper-class="workspace-account-popper"
     @command="select"
