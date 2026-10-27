@@ -198,6 +198,24 @@ describe("profile follow controls", () => {
   });
 
   it.each([false, true])(
+    "only offers the followers list for an organization with visitorView=%s",
+    async (visitorView) => {
+      mocks.getFollowState.mockResolvedValue({
+        data: { ...original, username: "team", is_org: true },
+      });
+      await mountComponent(FollowControls, { username: "team", visitorView });
+      expect(
+        wrapper.findAll(".follow-counts button").map((item) => item.text()),
+      ).toEqual(["3 followers"]);
+      await button("3 followers").trigger("click");
+      await flushPromises();
+      expect(mocks.listFollowers).toHaveBeenCalledWith("team", { limit: 20 });
+      expect(mocks.listFollowing).not.toHaveBeenCalled();
+      expect(button("Follow").element.disabled).toBe(false);
+    },
+  );
+
+  it.each([false, true])(
     "keeps real organization following=%s usable in visitor view",
     async (following) => {
       const organization = { ...original, username: "team", is_org: true };

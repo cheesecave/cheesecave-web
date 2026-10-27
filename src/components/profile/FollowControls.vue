@@ -108,7 +108,7 @@ onBeforeUnmount(() => version++);
       <button type="button" @click="openList('followers')">
         <strong>{{ state.followers_count.toLocaleString() }}</strong> followers
       </button>
-      <button type="button" @click="openList('following')">
+      <button v-if="!state.is_org" type="button" @click="openList('following')">
         <strong>{{ state.following_count.toLocaleString() }}</strong> following
       </button>
     </div>

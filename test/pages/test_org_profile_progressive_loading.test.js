@@ -344,6 +344,14 @@ describe("organization profile independent regions", () => {
     requests.model[0].resolve(page("public-model", "private-model"));
     await flushPromises();
     const controls = region("Follow information");
+    const expectFollowerCount = (count) => {
+      expect(
+        controls
+          .findAll(".follow-counts button")
+          .map((button) => button.text()),
+      ).toEqual([`${count} followers`]);
+      expect(controls.get(".follow-counts").text()).not.toContain("following");
+    };
     const expectPublicContent = () => {
       expect(repoSection("Models").text()).toContain("public-model");
       expect(repoSection("Models").text()).not.toContain("private-model");
@@ -355,7 +363,7 @@ describe("organization profile independent regions", () => {
     expect(
       controls.get(".follow-button").attributes("disabled"),
     ).toBeUndefined();
-    expect(controls.text()).toContain("4 followers");
+    expectFollowerCount(4);
     expectPublicContent();
 
     await controls.get(".follow-button").trigger("click");
@@ -363,7 +371,7 @@ describe("organization profile independent regions", () => {
     expect(mocks.unfollowAccount).toHaveBeenCalledExactlyOnceWith("acme");
     expect(mocks.followAccount).not.toHaveBeenCalled();
     expect(controls.get(".follow-button").text()).toBe("Follow");
-    expect(controls.text()).toContain("3 followers");
+    expectFollowerCount(3);
     expectPublicContent();
 
     await wrapper
@@ -371,29 +379,31 @@ describe("organization profile independent regions", () => {
       .trigger("click");
     await flushPromises();
     expect(controls.get(".follow-button").text()).toBe("Follow");
-    expect(controls.text()).toContain("3 followers");
+    expectFollowerCount(3);
     expect(repoSection("Models").text()).toContain("private-model");
     expect(region("Storage usage").text()).toContain("10 KB");
     await wrapper.get('button[aria-label="View as visitor"]').trigger("click");
     await flushPromises();
     expect(controls.get(".follow-button").text()).toBe("Follow");
-    expect(controls.text()).toContain("3 followers");
+    expectFollowerCount(3);
     expectPublicContent();
 
     await controls.get(".follow-button").trigger("click");
     await flushPromises();
     expect(mocks.followAccount).toHaveBeenCalledExactlyOnceWith("acme");
     expect(controls.get(".follow-button").text()).toBe("Following");
-    expect(controls.text()).toContain("4 followers");
+    expectFollowerCount(4);
     expectPublicContent();
     await wrapper
       .get('button[aria-label="Exit visitor view"]')
       .trigger("click");
     await flushPromises();
+    expect(controls.get(".follow-button").text()).toBe("Following");
+    expectFollowerCount(4);
     await wrapper.get('button[aria-label="View as visitor"]').trigger("click");
     await flushPromises();
     expect(controls.get(".follow-button").text()).toBe("Following");
-    expect(controls.text()).toContain("4 followers");
+    expectFollowerCount(4);
     expect(mocks.follow).toHaveBeenCalledOnce();
     expectPublicContent();
   });
