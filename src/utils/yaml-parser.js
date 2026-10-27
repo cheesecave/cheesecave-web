@@ -5,28 +5,38 @@
 import yaml from "js-yaml";
 
 /**
+ * Extract a leading YAML block without parsing or rewriting its source.
+ * @param {string} markdown - Markdown with YAML frontmatter
+ * @returns {{source: string, content: string}|null} Raw YAML without delimiters and the remaining document, or null when no complete leading block exists
+ */
+export function extractYAMLFrontmatter(markdown) {
+  if (!markdown) return null;
+
+  const opening = /^\uFEFF?[ \t]*---[ \t]*\r?\n/.exec(markdown);
+  if (!opening) return null;
+  const rest = markdown.slice(opening[0].length);
+  const closing = /^(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/m.exec(rest);
+  if (!closing) return null;
+  return {
+    source: rest.slice(0, closing.index),
+    content: rest.slice(closing.index + closing[0].length),
+  };
+}
+
+/**
  * Parse YAML frontmatter from markdown
  * @param {string} markdown - Markdown with YAML frontmatter
  * @returns {{metadata: Object, content: string}} Parsed metadata and remaining content
  */
 export function parseYAMLFrontmatter(markdown) {
-  if (!markdown) return { metadata: {}, content: "" };
-
-  const opening = /^\uFEFF?[ \t]*---[ \t]*\r?\n/.exec(markdown);
-  if (!opening) {
-    return { metadata: {}, content: markdown };
-  }
-  const rest = markdown.slice(opening[0].length);
-  const closing = /^(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/m.exec(rest);
-  if (!closing) return { metadata: {}, content: markdown };
-  const yamlContent = rest.slice(0, closing.index);
-  const content = rest.slice(closing.index + closing[0].length);
+  const frontmatter = extractYAMLFrontmatter(markdown);
+  if (!frontmatter) return { metadata: {}, content: markdown || "" };
 
   try {
-    const raw = yaml.load(yamlContent);
+    const raw = yaml.load(frontmatter.source);
     const metadata =
       raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
-    return { metadata, content };
+    return { metadata, content: frontmatter.content };
   } catch (err) {
     console.error("YAML parse error:", err);
     return { metadata: {}, content: markdown };

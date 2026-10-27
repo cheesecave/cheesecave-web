@@ -112,6 +112,12 @@
         </button>
       </div>
 
+      <RepositoryFileMetadata
+        v-if="embedded && fileFrontmatter?.source.trim()"
+        class="file-detail-metadata"
+        :source="fileFrontmatter.source"
+      />
+
       <RepositoryFileCommit
         v-if="embedded"
         class="file-detail-commit"
@@ -483,7 +489,8 @@
               :class="{ 'file-markdown-preview': embedded }"
             >
               <MarkdownViewer
-                :content="fileContent"
+                :content="markdownPreviewContent"
+                :strip-frontmatter="!embedded"
                 :heading-offset="1"
                 :repo-type="repoType"
                 :namespace="namespace"
@@ -534,6 +541,7 @@ import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import CodeViewer from "@/components/common/CodeViewer.vue";
 import RepositoryFileTree from "@/components/repo/RepositoryFileTree.vue";
 import RepositoryFileCommit from "@/components/repo/RepositoryFileCommit.vue";
+import RepositoryFileMetadata from "@/components/repo/RepositoryFileMetadata.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import LinkButton from "@/components/common/LinkButton.vue";
 import TarBrowserPanel from "@/components/repo/preview/TarBrowserPanel.vue";
@@ -563,6 +571,7 @@ import { useErrorContext } from "@/composables/useErrorContext";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { useAuthStore } from "@/stores/auth";
 import { repoAPI } from "@/utils/api";
+import { extractYAMLFrontmatter } from "@/utils/yaml-parser";
 
 const props = defineProps({ embedded: { type: Boolean, default: false } });
 
@@ -733,6 +742,17 @@ const isPDF = computed(() => {
 const isMarkdown = computed(() => {
   return ["md", "markdown"].includes(fileExtension.value);
 });
+
+const fileFrontmatter = computed(() =>
+  isMarkdown.value && !loading.value && !loadError.value
+    ? extractYAMLFrontmatter(fileContent.value)
+    : null,
+);
+const markdownPreviewContent = computed(() =>
+  props.embedded && fileFrontmatter.value
+    ? fileFrontmatter.value.content
+    : fileContent.value,
+);
 
 const isTextFile = computed(() => {
   const textExtensions = [
@@ -1241,6 +1261,7 @@ onUnmounted(() => {
 .file-top-button {
   margin-left: auto;
 }
+.file-detail-metadata,
 .file-detail-commit {
   margin-bottom: 16px;
 }

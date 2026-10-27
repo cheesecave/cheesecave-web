@@ -2,11 +2,65 @@ import { describe, expect, it, vi } from "vitest";
 import cardFixtures from "../fixtures/repository_card_frontmatter.json";
 
 import {
+  extractYAMLFrontmatter,
   getOtherMetadata,
   getSpecializedFields,
   normalizeMetadata,
   parseYAMLFrontmatter,
 } from "@/utils/yaml-parser";
+
+describe("raw YAML frontmatter extraction", () => {
+  it("preserves original YAML order, comments, indentation, and spelling", () => {
+    const source = "# Repository card\ntags:\n  - Featured\nlicense: 'mit'\n";
+    const content = "\n# Demo\n\n---\nMore prose.\n";
+    expect(extractYAMLFrontmatter(`---\n${source}---\n${content}`)).toEqual({
+      source,
+      content,
+    });
+  });
+
+  it.each([
+    ["\uFEFF---\nlicense: mit\n---\n# Demo", "license: mit\n", "# Demo"],
+    ["---\r\nlicense: mit\r\n---\r\n# Demo", "license: mit\r\n", "# Demo"],
+    ["---\nlicense: mit\n...\n# Demo", "license: mit\n", "# Demo"],
+    ["---\nlicense: mit\n---", "license: mit\n", ""],
+    ["---\nlicense: mit\n...", "license: mit\n", ""],
+    ["---\n---\n# Demo", "", "# Demo"],
+  ])(
+    "extracts supported boundaries without normalizing source: %j",
+    (markdown, source, content) => {
+      expect(extractYAMLFrontmatter(markdown)).toEqual({ source, content });
+    },
+  );
+
+  it.each([
+    "",
+    "# Demo\n---\nlicense: mit\n---\n",
+    "---\nlicense: mit\n# Demo",
+    "---\nlicense: mit\n----\n# Demo",
+  ])(
+    "does not extract a missing or incomplete opening block: %j",
+    (markdown) => {
+      expect(extractYAMLFrontmatter(markdown)).toBeNull();
+    },
+  );
+
+  it("extracts invalid YAML for display while parsed metadata preserves the original document", () => {
+    const source = "license: [broken\n";
+    const content = "# Demo\n";
+    const markdown = `---\n${source}---\n${content}`;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(extractYAMLFrontmatter(markdown)).toEqual({ source, content });
+      expect(parseYAMLFrontmatter(markdown)).toEqual({
+        metadata: {},
+        content: markdown,
+      });
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+});
 
 describe("yaml parser utilities", () => {
   it.each(cardFixtures)(

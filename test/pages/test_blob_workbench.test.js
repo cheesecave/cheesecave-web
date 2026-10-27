@@ -170,6 +170,52 @@ describe("embedded file workbench", () => {
     expect(wrapper.find('[data-stub="CodeViewer"]').exists()).toBe(false);
   });
 
+  it("places file metadata between the path and commit without repeating it in the preview", async () => {
+    const source =
+      "license: mit\ntask_categories:\n  - text-classification\ncustom_field: keep-me\n";
+    const body = `---\n${source}---\n# Dataset\n\nThe dataset description.\n`;
+    const wrapper = mountFile({ body });
+    await ready(wrapper);
+    const metadata = wrapper.get('[aria-label="File metadata"]');
+    expect(metadata.get("code").text()).toBe(source.trimEnd());
+    const children = [...wrapper.get(".file-detail-main").element.children];
+    expect(
+      children.indexOf(wrapper.get(".file-detail-pathbar").element),
+    ).toBeLessThan(children.indexOf(metadata.element));
+    expect(children.indexOf(metadata.element)).toBeLessThan(
+      children.indexOf(wrapper.getComponent(commitStub).element),
+    );
+    expect(wrapper.getComponent(markdownStub).props("content")).toBe(
+      "# Dataset\n\nThe dataset description.\n",
+    );
+
+    await button(wrapper.get(".file-detail-toolbar"), "Code").trigger("click");
+    expect(wrapper.getComponent(codeStub).props("code")).toBe(body);
+    expect(wrapper.find('[aria-label="File metadata"]').exists()).toBe(true);
+    await button(wrapper, "Copy file content").trigger("click");
+    expect(mocks.copy).toHaveBeenLastCalledWith(body);
+  });
+
+  it("keeps unclosed frontmatter in the preview and does not invent metadata", async () => {
+    const body = "---\nlicense: mit\n# No closing delimiter\n";
+    const wrapper = mountFile({ body });
+    await ready(wrapper);
+    expect(wrapper.find('[aria-label="File metadata"]').exists()).toBe(false);
+    expect(wrapper.getComponent(markdownStub).props("content")).toBe(body);
+  });
+
+  it("shows the original metadata safely even when its YAML cannot be parsed", async () => {
+    const source = "broken: [\nhtml: <img src=x onerror=alert(1)>\n";
+    const wrapper = mountFile({ body: `---\n${source}---\n# Body\n` });
+    await ready(wrapper);
+    const metadata = wrapper.get('[aria-label="File metadata"]');
+    expect(metadata.get("code").text()).toBe(source.trimEnd());
+    expect(metadata.find("img").exists()).toBe(false);
+    expect(wrapper.getComponent(markdownStub).props("content")).toBe(
+      "# Body\n",
+    );
+  });
+
   it("keeps repository, folder, Raw and Edit destinations as real links", async () => {
     const wrapper = mountFile();
     await ready(wrapper);
