@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import LinkButton from "@/components/common/LinkButton.vue";
 import { externalRepoUrl } from "@/utils/external-repo";
+import { getRepositoryType } from "@/utils/repository-types";
 
 const props = defineProps({
   repoType: { type: String, required: true },
@@ -32,6 +33,7 @@ const sourceUrl = computed(() =>
 const typeLabel = computed(() =>
   props.repoType === "model" ? "Model" : "Dataset",
 );
+const typeIcon = computed(() => getRepositoryType(props.repoType).icon);
 const tabIcons = {
   card: "i-carbon-document",
   files: "i-carbon-folder",
@@ -46,11 +48,7 @@ const tabIcons = {
       <div class="repository-heading-row">
         <div class="repository-identity">
           <span
-            :class="
-              repoType === 'model'
-                ? 'i-carbon-machine-learning-model'
-                : 'i-carbon-data-table'
-            "
+            :class="typeIcon"
             class="repository-type-icon"
             aria-hidden="true"
           />
