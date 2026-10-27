@@ -126,11 +126,7 @@
                 >Edit profile</LinkButton
               >
             </div>
-            <FollowControls
-              v-if="localOrgReady"
-              :username="orgname"
-              :visitor-view="publicOnly"
-            />
+            <FollowControls v-if="localOrgReady" :username="orgname" />
             <div v-if="profileInfo" class="space-y-3 text-sm">
               <p
                 v-if="profileInfo.description"

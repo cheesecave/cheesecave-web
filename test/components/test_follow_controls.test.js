@@ -197,29 +197,76 @@ describe("profile follow controls", () => {
     expect(button("Following").attributes("aria-pressed")).toBe("true");
   });
 
-  it("previews an organization without changing the member's real follow state", async () => {
-    mocks.getFollowState.mockResolvedValue({
-      data: {
+  it.each([false, true])(
+    "keeps real organization following=%s usable in visitor view",
+    async (following) => {
+      const organization = { ...original, username: "team", is_org: true };
+      mocks.getFollowState.mockResolvedValue({
+        data: { ...organization, following },
+      });
+      mocks.follow.mockResolvedValue({
+        data: { ...organization, following: true, followers_count: 4 },
+      });
+      mocks.unfollow.mockResolvedValue({
+        data: { ...organization, following: false, followers_count: 3 },
+      });
+      await mountComponent(FollowControls, {
         username: "team",
-        is_org: true,
-        following: true,
-        can_follow: true,
-        followers_count: 3,
-        following_count: 2,
-      },
+        visitorView: true,
+      });
+      const control = button(following ? "Following" : "Follow");
+      expect(control.element.disabled).toBe(false);
+      expect(control.attributes("aria-pressed")).toBe(String(following));
+      await control.trigger("click");
+      await flushPromises();
+      expect(
+        following ? mocks.unfollow : mocks.follow,
+      ).toHaveBeenCalledExactlyOnceWith("team");
+      expect(wrapper.get(".follow-counts").text()).toContain(
+        following ? "3 followers" : "4 followers",
+      );
+      expect(button(following ? "Follow" : "Following").element.disabled).toBe(
+        false,
+      );
+      await wrapper.setProps({ visitorView: false });
+      expect(button(following ? "Follow" : "Following")).toBeDefined();
+      expect(mocks.getFollowState).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("keeps server restrictions in organization visitor view", async () => {
+    mocks.getFollowState.mockResolvedValue({
+      data: { ...original, username: "team", is_org: true, can_follow: false },
     });
     await mountComponent(FollowControls, {
       username: "team",
       visitorView: true,
     });
-    expect(button("Following")).toBeUndefined();
-    expect(button("Follow").attributes("disabled")).toBeDefined();
-    await button("Follow").trigger("click");
+    expect(button("Follow").element.disabled).toBe(true);
+    await wrapper.vm.toggleFollow();
     expect(mocks.follow).not.toHaveBeenCalled();
-    expect(mocks.unfollow).not.toHaveBeenCalled();
-    await wrapper.setProps({ visitorView: false });
-    expect(button("Following")).toBeDefined();
-    expect(mocks.getFollowState).toHaveBeenCalledOnce();
+  });
+
+  it("offers sign-in to an anonymous visitor of an organization", async () => {
+    Object.assign(mocks.auth, {
+      isAuthenticated: false,
+      username: null,
+      user: null,
+    });
+    mocks.getFollowState.mockResolvedValue({
+      data: { ...original, username: "team", is_org: true, can_follow: false },
+    });
+    await mountComponent(FollowControls, {
+      username: "team",
+      visitorView: true,
+    });
+    expect(button("Follow").element.disabled).toBe(false);
+    await button("Follow").trigger("click");
+    expect(mocks.router.push).toHaveBeenCalledWith({
+      path: "/login",
+      query: { return: "/bob?sort=updated" },
+    });
+    expect(mocks.follow).not.toHaveBeenCalled();
   });
 
   it("keeps anonymous login behavior when visitorView is set", async () => {

@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   repos: vi.fn(),
   visibility: vi.fn(),
   follow: vi.fn(),
+  followAccount: vi.fn(),
+  unfollowAccount: vi.fn(),
 }));
 vi.mock("vue-router/auto", async (original) => ({
   ...(await original()),
@@ -37,7 +39,11 @@ vi.mock("@/utils/api", async (original) => ({
     listAllRepos: (...args) => mocks.repos(...args),
     getInfo: (...args) => mocks.visibility(...args),
   },
-  socialAPI: { getFollowState: (...args) => mocks.follow(...args) },
+  socialAPI: {
+    getFollowState: (...args) => mocks.follow(...args),
+    follow: (...args) => mocks.followAccount(...args),
+    unfollow: (...args) => mocks.unfollowAccount(...args),
+  },
 }));
 import OrgProfile from "@/pages/organizations/[orgname]/index.vue";
 
@@ -110,6 +116,26 @@ beforeEach(() => {
   mocks.quota.mockResolvedValue({ data: quota });
   mocks.visibility.mockResolvedValue({ data: { private: false } });
   mocks.follow.mockResolvedValue({
+    data: {
+      username: "acme",
+      is_org: true,
+      following: false,
+      can_follow: true,
+      followers_count: 3,
+      following_count: 2,
+    },
+  });
+  mocks.followAccount.mockResolvedValue({
+    data: {
+      username: "acme",
+      is_org: true,
+      following: true,
+      can_follow: true,
+      followers_count: 4,
+      following_count: 2,
+    },
+  });
+  mocks.unfollowAccount.mockResolvedValue({
     data: {
       username: "acme",
       is_org: true,
@@ -299,6 +325,77 @@ describe("organization profile independent regions", () => {
     mountPage();
     await flushPromises();
     expect(wrapper.text()).not.toContain("Independent organization README");
+  });
+
+  it("keeps real follow actions and counts while visitor mode only filters organization content", async () => {
+    mocks.route.query = { view: "visitor" };
+    mocks.follow.mockResolvedValue({
+      data: {
+        username: "acme",
+        is_org: true,
+        following: true,
+        can_follow: true,
+        followers_count: 4,
+        following_count: 2,
+      },
+    });
+    mountPage();
+    await flushPromises();
+    requests.model[0].resolve(page("public-model", "private-model"));
+    await flushPromises();
+    const controls = region("Follow information");
+    const expectPublicContent = () => {
+      expect(repoSection("Models").text()).toContain("public-model");
+      expect(repoSection("Models").text()).not.toContain("private-model");
+      expect(region("Storage usage").text()).toContain("1 KB");
+      expect(region("Storage usage").text()).not.toContain("Private");
+      expect(region("Storage usage").text()).not.toContain("10 KB");
+    };
+    expect(controls.get(".follow-button").text()).toBe("Following");
+    expect(
+      controls.get(".follow-button").attributes("disabled"),
+    ).toBeUndefined();
+    expect(controls.text()).toContain("4 followers");
+    expectPublicContent();
+
+    await controls.get(".follow-button").trigger("click");
+    await flushPromises();
+    expect(mocks.unfollowAccount).toHaveBeenCalledExactlyOnceWith("acme");
+    expect(mocks.followAccount).not.toHaveBeenCalled();
+    expect(controls.get(".follow-button").text()).toBe("Follow");
+    expect(controls.text()).toContain("3 followers");
+    expectPublicContent();
+
+    await wrapper
+      .get('button[aria-label="Exit visitor view"]')
+      .trigger("click");
+    await flushPromises();
+    expect(controls.get(".follow-button").text()).toBe("Follow");
+    expect(controls.text()).toContain("3 followers");
+    expect(repoSection("Models").text()).toContain("private-model");
+    expect(region("Storage usage").text()).toContain("10 KB");
+    await wrapper.get('button[aria-label="View as visitor"]').trigger("click");
+    await flushPromises();
+    expect(controls.get(".follow-button").text()).toBe("Follow");
+    expect(controls.text()).toContain("3 followers");
+    expectPublicContent();
+
+    await controls.get(".follow-button").trigger("click");
+    await flushPromises();
+    expect(mocks.followAccount).toHaveBeenCalledExactlyOnceWith("acme");
+    expect(controls.get(".follow-button").text()).toBe("Following");
+    expect(controls.text()).toContain("4 followers");
+    expectPublicContent();
+    await wrapper
+      .get('button[aria-label="Exit visitor view"]')
+      .trigger("click");
+    await flushPromises();
+    await wrapper.get('button[aria-label="View as visitor"]').trigger("click");
+    await flushPromises();
+    expect(controls.get(".follow-button").text()).toBe("Following");
+    expect(controls.text()).toContain("4 followers");
+    expect(mocks.follow).toHaveBeenCalledOnce();
+    expectPublicContent();
   });
 
   it("keeps old sort results from replacing the newest result", async () => {
