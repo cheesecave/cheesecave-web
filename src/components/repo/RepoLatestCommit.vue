@@ -78,21 +78,23 @@ const commitPath = computed(
             <EntityAvatar :username="commit.author" :size="24" />
             <span>{{ commit.author }}</span>
           </RouterLink>
-          <RouterLink
-            :to="commitPath"
-            class="latest-commit-title"
-            :title="commit.title"
-            >{{ commit.title || commit.id.slice(0, 7) }}</RouterLink
-          >
+          <div class="latest-commit-message">
+            <RouterLink
+              :to="commitPath"
+              class="latest-commit-title"
+              :title="commit.title"
+              >{{ commit.title || commit.id.slice(0, 7) }}</RouterLink
+            >
+            <RouterLink :to="commitPath" class="latest-commit-sha">{{
+              commit.id.slice(0, 7)
+            }}</RouterLink>
+          </div>
         </div>
       </template>
       <div v-else class="latest-commit-status">No commits yet</div>
 
       <div class="latest-commit-details">
         <template v-if="!external && resource.ready.value && commit">
-          <RouterLink :to="commitPath" class="latest-commit-sha">{{
-            commit.id.slice(0, 7)
-          }}</RouterLink>
           <span class="latest-commit-date">
             {{ formatRelativeTime(commit.date, "Unknown date") }}
           </span>
@@ -124,6 +126,7 @@ const commitPath = computed(
   gap: 16px;
 }
 .latest-commit-summary,
+.latest-commit-message,
 .latest-commit-author,
 .latest-commit-status,
 .latest-commit-details {
@@ -151,6 +154,7 @@ const commitPath = computed(
 }
 .latest-commit-details {
   flex-shrink: 0;
+  justify-content: flex-end;
   gap: 12px;
   white-space: nowrap;
 }
@@ -159,6 +163,8 @@ const commitPath = computed(
   color: var(--site-muted);
 }
 .latest-commit-sha {
+  flex-shrink: 0;
+  white-space: nowrap;
   font-family: ui-monospace, monospace;
   color: var(--site-link);
 }
@@ -175,7 +181,7 @@ a:hover {
   .latest-commit-summary {
     flex-wrap: wrap;
   }
-  .latest-commit-title {
+  .latest-commit-message {
     flex-basis: 100%;
   }
 }

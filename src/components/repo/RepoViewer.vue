@@ -370,6 +370,7 @@
         <div v-if="activeTab === 'files'" class="card">
           <div
             class="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3"
+            :class="{ 'flex-wrap': isCompositeHeader }"
           >
             <div class="flex items-center gap-2 min-w-0">
               <el-select
@@ -393,7 +394,34 @@
 
             <div
               class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
+              :class="{ 'sm:ml-auto': isCompositeHeader }"
             >
+              <div v-if="isCompositeHeader" class="repository-files-history">
+                <RouterLink
+                  v-if="!isExternalRepo"
+                  :to="tabTarget('commits')"
+                  class="repository-history-link"
+                >
+                  <span class="i-carbon-time" aria-hidden="true" /> History
+                </RouterLink>
+                <a
+                  v-else-if="sourceHistoryUrl"
+                  :href="sourceHistoryUrl"
+                  class="repository-history-link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span class="i-carbon-time" aria-hidden="true" /> History
+                  <span class="i-carbon-launch" aria-hidden="true" />
+                </a>
+                <span
+                  v-else
+                  class="repository-history-link"
+                  aria-disabled="true"
+                >
+                  <span class="i-carbon-time" aria-hidden="true" /> History
+                </span>
+              </div>
               <LinkButton
                 v-if="isOwner"
                 :to="`/${repoType}s/${namespace}/${name}/upload/${currentBranch}`"
@@ -458,29 +486,6 @@
                 Delete Folder
               </el-button>
             </div>
-          </div>
-
-          <div v-if="isCompositeHeader" class="repository-files-history">
-            <RouterLink
-              v-if="!isExternalRepo"
-              :to="tabTarget('commits')"
-              class="repository-history-link"
-            >
-              <span class="i-carbon-time" aria-hidden="true" /> History
-            </RouterLink>
-            <a
-              v-else-if="sourceHistoryUrl"
-              :href="sourceHistoryUrl"
-              class="repository-history-link"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <span class="i-carbon-time" aria-hidden="true" /> History
-              <span class="i-carbon-launch" aria-hidden="true" />
-            </a>
-            <span v-else class="repository-history-link" aria-disabled="true">
-              <span class="i-carbon-time" aria-hidden="true" /> History
-            </span>
           </div>
 
           <!-- File List -->
@@ -2469,7 +2474,6 @@ onMounted(async () => {
 .repository-files-history {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 12px;
 }
 .repository-history-link {
   display: inline-flex;
