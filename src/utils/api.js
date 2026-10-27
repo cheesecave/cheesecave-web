@@ -295,8 +295,11 @@ export const repoAPI = {
    * @returns {Promise} - Array of repositories
    */
   // `partial=ok`: when an external source is down, answer without it and say so, instead of a 503
-  listRepos: (type, params) =>
-    api.get(`/api/${type}s`, { params: { partial: "ok", ...params } }),
+  listRepos: (type, params, config = {}) =>
+    api.get(`/api/${type}s`, {
+      ...config,
+      params: { partial: "ok", ...params },
+    }),
 
   /**
    * Every repository of a listing: follows `Link: rel="next"` to the last page.

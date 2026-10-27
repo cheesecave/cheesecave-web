@@ -55,6 +55,10 @@ describe("TheHeader", () => {
         stubs: {
           ...ElementPlusStubs,
           RouterLink: RouterLinkStub,
+          HeaderSearch: {
+            template:
+              '<input data-testid="header-search" aria-label="Search the Hub" />',
+          },
         },
       },
     });
@@ -164,6 +168,23 @@ describe("TheHeader", () => {
       "repository-site-header",
     );
     expect(wrapper.get("header").classes()).toContain("sticky");
+    wrapper.unmount();
+  });
+
+  it("adds search immediately after the brand only in the repository header", async () => {
+    const wrapper = mountHeader();
+    expect(wrapper.find('[data-testid="header-search"]').exists()).toBe(false);
+    await wrapper.setProps({ repository: true });
+    const container = wrapper.get(".container-main");
+    const search = container.get('[data-testid="header-search"]');
+    expect(container.element.children[0].tagName).toBe("A");
+    expect(container.element.children[1]).toBe(search.element);
+    expect(
+      search.element.compareDocumentPosition(container.get("nav").element) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await wrapper.setProps({ repository: false });
+    expect(wrapper.find('[data-testid="header-search"]').exists()).toBe(false);
     wrapper.unmount();
   });
 
