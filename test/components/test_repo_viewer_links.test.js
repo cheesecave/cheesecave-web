@@ -200,7 +200,7 @@ describe("RepoViewer real links", () => {
       expect(heading.get(".repository-name").attributes("href")).toBe(
         `/${repoType}s/open-media-lab/big-repo`,
       );
-      expect(wrapper.get(".repository-summary").text()).not.toContain(label);
+      expect(wrapper.find(".repository-summary").exists()).toBe(false);
       expect(
         wrapper.find(".repository-summary .repository-kind").exists(),
       ).toBe(false);
@@ -228,6 +228,130 @@ describe("RepoViewer real links", () => {
     expect(wrapper.get("a.repository-history-link").attributes("href")).toBe(
       `${PAGE}/commits/main`,
     );
+  });
+
+  it.each([
+    ["model", 42],
+    ["dataset", 0],
+  ])(
+    "shows public %s downloads (%i) and update time only in the side Info card",
+    async (repoType, downloads) => {
+      installHandlers(
+        { private: false, downloads, lastModified: "2026-04-21T10:00:00Z" },
+        repoType,
+      );
+      const wrapper = mountViewer("files", { repoType });
+      await ready(wrapper);
+      const header = wrapper.get('[aria-label="Repository header"]');
+      expect(header.text()).not.toContain("Public");
+      expect(header.text()).not.toMatch(/downloads|Updated/i);
+      const info = wrapper.get('aside [aria-label="Repository info"]');
+      expect(info.text()).toMatch(new RegExp(`Downloads:\\s*${downloads}`));
+      expect(info.text()).toMatch(/Updated:\s*\S/);
+      expect(header.find('[aria-label="Repository likes"]').exists()).toBe(
+        true,
+      );
+      wrapper.unmount();
+    },
+  );
+
+  it.each([
+    ["model", true],
+    ["model", false],
+    ["dataset", true],
+    ["dataset", false],
+  ])(
+    "replaces private %s likes with Private and makes no like requests (signed in: %s)",
+    async (repoType, signedIn) => {
+      if (signedIn) useAuthStore().user = { username: "alice", id: 1 };
+      installHandlers({ private: true, likes: 19 }, repoType);
+      const base = `/api/${repoType}s/open-media-lab/big-repo`;
+      const requests = [];
+      server.use(
+        http.get(`${base}/like`, () => {
+          requests.push("GET");
+          return jsonResponse({ liked: true });
+        }),
+        http.post(`${base}/like`, () => {
+          requests.push("POST");
+          return jsonResponse({ likes_count: 20 });
+        }),
+        http.delete(`${base}/like`, () => {
+          requests.push("DELETE");
+          return jsonResponse({ likes_count: 18 });
+        }),
+      );
+      const wrapper = mountViewer("files", { repoType });
+      await ready(wrapper);
+      expect(requests).toEqual([]);
+      const header = wrapper.get('[aria-label="Repository header"]');
+      const identity = header.get(".repository-identity");
+      const label = identity.get(".repository-visibility");
+      expect(label.text()).toBe("Private");
+      expect(identity.get(".repository-owner").attributes("href")).toBe(
+        "/organizations/open-media-lab",
+      );
+      expect(identity.get(".repository-name").attributes("href")).toBe(
+        `/${repoType}s/open-media-lab/big-repo`,
+      );
+      expect(identity.get(`h1 a[href='/${repoType}s']`).text()).toBe(
+        repoType === "model" ? "Model:" : "Dataset:",
+      );
+      expect(
+        identity
+          .get(".repository-name")
+          .element.compareDocumentPosition(label.element) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        label.element.compareDocumentPosition(
+          identity.get(".repository-copy").element,
+        ) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(header.find(".repository-like").exists()).toBe(false);
+      expect(header.text()).not.toContain("19");
+      if (signedIn) {
+        wrapper.getComponent({ name: "RepositoryHeader" }).vm.$emit("like");
+        await flushPromises();
+      }
+      expect(requests).toEqual([]);
+      wrapper.unmount();
+    },
+  );
+
+  it("preserves a private Space's existing like control and update summary", async () => {
+    useAuthStore().user = { username: "alice", id: 1 };
+    installHandlers({ private: true, likes: 19, sdk: "gradio" }, "space");
+    const requests = [];
+    const base = "/api/spaces/open-media-lab/big-repo";
+    server.use(
+      http.get(`${base}/like`, () => {
+        requests.push("GET");
+        return jsonResponse({ liked: false });
+      }),
+      http.post(`${base}/like`, () => {
+        requests.push("POST");
+        return jsonResponse({ likes_count: 20 });
+      }),
+    );
+    const wrapper = mountViewer("files", { repoType: "space" });
+    await vi.waitFor(() =>
+      expect(wrapper.find(".card.repo-header").exists()).toBe(true),
+    );
+    const header = wrapper.get(".card.repo-header");
+    expect(header.text()).toContain("Private");
+    expect(header.text()).toContain("Updated");
+    const like = header
+      .findAll("button")
+      .find((button) => button.find(".i-carbon-favorite").exists());
+    expect(like.text()).toBe("19");
+    await like.trigger("click");
+    await vi.waitFor(() => expect(like.text()).toBe("20"));
+    expect(requests).toEqual(["GET", "POST"]);
+    expect(
+      wrapper.get('aside [aria-label="Repository info"]').text(),
+    ).not.toContain("Downloads:");
+    wrapper.unmount();
   });
 
   it("shows total repository storage instead of the number or size of listed files", async () => {

@@ -1,7 +1,6 @@
 <script setup>
 import { computed } from "vue";
 import LinkButton from "@/components/common/LinkButton.vue";
-import { formatRelativeTime } from "@/utils/datetime";
 import { externalRepoUrl } from "@/utils/external-repo";
 
 const props = defineProps({
@@ -69,8 +68,15 @@ const tabIcons = {
               }}</RouterLink>
             </h1>
             <template v-if="repoInfo">
+              <span
+                v-if="repoInfo.private"
+                class="repository-visibility"
+                aria-label="Private repository"
+              >
+                <span class="i-carbon-locked" aria-hidden="true" /> Private
+              </span>
               <button
-                v-if="signedIn"
+                v-else-if="signedIn"
                 type="button"
                 class="repository-like"
                 :class="{ 'is-liked': liked }"
@@ -125,44 +131,20 @@ const tabIcons = {
           </el-button>
         </div>
       </div>
-      <div class="repository-summary">
-        <template v-if="repoInfo">
-          <span class="repository-visibility">
-            <span
-              :class="
-                repoInfo.private ? 'i-carbon-locked' : 'i-carbon-unlocked'
-              "
-              aria-hidden="true"
-            />
-            {{ repoInfo.private ? "Private" : "Public" }}
-          </span>
-          <span class="repository-stat">
-            <span class="i-carbon-download" aria-hidden="true" />
-            {{ repoInfo.downloads || 0 }} downloads
-          </span>
-          <span class="repository-stat">
-            <span class="i-carbon-calendar" aria-hidden="true" />
-            Updated {{ formatRelativeTime(repoInfo.lastModified) }}
-          </span>
-          <a
-            v-if="
-              repoInfo._source &&
-              repoInfo._source !== 'local' &&
-              repoInfo._source_url
-            "
-            :href="sourceUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="repository-source"
-            >View on {{ repoInfo._source }}
-            <span class="i-carbon-launch" aria-hidden="true"
-          /></a>
-          <span
-            v-else-if="repoInfo._source && repoInfo._source !== 'local'"
-            class="repository-source"
-            >{{ repoInfo._source }}</span
-          >
-        </template>
+      <div
+        v-if="repoInfo?._source && repoInfo._source !== 'local'"
+        class="repository-summary"
+      >
+        <a
+          v-if="repoInfo._source_url"
+          :href="sourceUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="repository-source"
+          >View on {{ repoInfo._source }}
+          <span class="i-carbon-launch" aria-hidden="true"
+        /></a>
+        <span v-else class="repository-source">{{ repoInfo._source }}</span>
       </div>
       <slot name="metadata" />
       <nav
@@ -202,6 +184,9 @@ const tabIcons = {
   border-bottom: 1px solid var(--site-border);
 }
 .repository-header-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   max-width: none;
   margin: 0 auto;
   padding: 24px 24px 0;
@@ -215,7 +200,7 @@ const tabIcons = {
 }
 .repository-identity {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   min-width: 0;
 }
@@ -228,7 +213,8 @@ const tabIcons = {
 }
 .repository-type-icon {
   flex-shrink: 0;
-  margin-top: 3px;
+  width: 28px;
+  height: 28px;
   font-size: 28px;
   color: var(--site-muted);
 }
@@ -288,7 +274,8 @@ h1 a:hover,
   gap: 8px;
 }
 .repository-actions :deep(.el-button),
-.repository-like {
+.repository-like,
+.repository-visibility {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
@@ -308,7 +295,8 @@ h1 a:hover,
   gap: 6px;
 }
 .repository-actions :deep(.el-button:not(.el-button--primary)),
-.repository-like {
+.repository-like,
+.repository-visibility {
   background: var(--site-card);
   color: var(--site-card-text);
 }
@@ -335,29 +323,30 @@ button.repository-like:hover {
   align-items: center;
   flex-wrap: wrap;
   gap: 10px 18px;
-  margin: 16px 0;
+  margin: 0;
   color: var(--site-muted);
   font-size: 13px;
 }
-.repository-visibility,
-.repository-stat,
 .repository-source {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 .repository-visibility {
-  border: 1px solid var(--site-border);
-  border-radius: 6px;
-  padding: 2px 7px;
-  font-size: 12px;
+  color: var(--site-muted);
 }
 .repository-header-inner :deep(.metadata-header) {
   background: transparent;
   border: 0;
   border-radius: 0;
   padding: 0;
-  margin: 0 0 16px;
+  margin: 0;
+}
+.repository-header-inner :deep(.metadata-header a),
+.repository-header-inner :deep(.metadata-header button),
+.repository-header-inner :deep(.metadata-header .el-tag__content) {
+  display: inline-flex;
+  align-items: center;
 }
 .repository-navigation {
   display: flex;
@@ -400,9 +389,13 @@ button:focus-visible {
     font-size: 20px;
   }
   .repository-identity {
+    align-items: flex-start;
     gap: 8px;
   }
   .repository-type-icon {
+    width: 24px;
+    height: 24px;
+    margin-top: 2px;
     font-size: 24px;
   }
   .repository-actions {
@@ -415,7 +408,8 @@ button:focus-visible {
     justify-content: center;
   }
   .repository-actions :deep(.el-button),
-  .repository-like {
+  .repository-like,
+  .repository-visibility {
     min-height: 40px;
   }
   .repository-actions > :last-child:nth-child(odd) {

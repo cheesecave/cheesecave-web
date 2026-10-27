@@ -846,12 +846,16 @@
         <ModelInfoCard v-if="modelDetails" :summary="modelDetails" />
 
         <!-- Basic Metadata -->
-        <div class="card">
+        <div class="card" aria-label="Repository info">
           <h3 class="font-semibold mb-3">Info</h3>
           <div class="space-y-2 text-sm">
             <div>
               <span class="text-gray-600 dark:text-gray-400">Type:</span>
               <span class="ml-2 font-medium">{{ repoTypeLabel }}</span>
+            </div>
+            <div v-if="isCompositeHeader && repoInfo">
+              <span class="text-gray-600 dark:text-gray-400">Downloads:</span>
+              <span class="ml-2">{{ repoInfo.downloads || 0 }}</span>
             </div>
             <div>
               <span class="text-gray-600 dark:text-gray-400">Created:</span>
@@ -1637,9 +1641,9 @@ async function fetchRepoInfo({ signal }) {
     ));
   }
 
-  // Check if current user has liked (only if authenticated)
+  // Private model/dataset headers show visibility instead of a like control.
   let liked = null;
-  if (authStore.isAuthenticated) {
+  if (authStore.isAuthenticated && !(isCompositeHeader.value && data.private)) {
     try {
       const { data: likeData } = await likesAPI.checkLiked(
         props.repoType,
@@ -1658,7 +1662,8 @@ async function fetchRepoInfo({ signal }) {
 
   repoInfo.value = data;
   likesCount.value = data.likes || 0;
-  if (liked !== null) isLiked.value = liked;
+  if (isCompositeHeader.value && data.private) isLiked.value = false;
+  else if (liked !== null) isLiked.value = liked;
 
   // Check if namespace is an org (for correct linking)
   checkIfNamespaceIsOrg();
@@ -1700,6 +1705,7 @@ onActivated(() => {
 });
 
 async function toggleLike() {
+  if (isCompositeHeader.value && repoInfo.value?.private) return;
   if (!authStore.isAuthenticated) {
     ElMessage.warning("Please login to like repositories");
     return;
