@@ -12,7 +12,8 @@
   the UI froze. Going inactive, or a new source, cancels in-flight fetches.
 
   FilePreviewDialog wraps it for the file-list icon; the blob page embeds it
-  for parquet files.
+  for safetensors and parquet files. Page mode lets tables grow with the
+  document instead of keeping the dialog's internal vertical scroll limits.
 -->
 
 <script setup>
@@ -37,6 +38,7 @@ const props = defineProps({
   // False pauses loading and aborts in-flight fetches (the dialog passes
   // its visibility; a page that always shows the panel leaves it on)
   active: { type: Boolean, default: true },
+  pageMode: { type: Boolean, default: false },
   kind: { type: String, required: true }, // "safetensors" | "parquet"
   // One of resolveUrl OR bytes is required:
   //   - resolveUrl: standard /resolve/ URL — Range-read against
@@ -383,7 +385,7 @@ const previewTitle = computed(() => {
         :default-expand-all="false"
         size="small"
         :border="true"
-        max-height="360"
+        :max-height="pageMode ? undefined : '360'"
       >
         <el-table-column label="Name" min-width="280">
           <template #default="{ row }">
@@ -520,7 +522,7 @@ const previewTitle = computed(() => {
         :data="parquetColumnRows"
         size="small"
         :border="true"
-        max-height="260"
+        :max-height="pageMode ? undefined : '260'"
       >
         <el-table-column prop="name" label="Name" min-width="220" />
         <el-table-column prop="physicalType" label="Physical" width="130" />
@@ -535,7 +537,7 @@ const previewTitle = computed(() => {
         :data="payload.metadata.rowGroups.map((rg, idx) => ({ idx, ...rg }))"
         size="small"
         :border="true"
-        max-height="220"
+        :max-height="pageMode ? undefined : '220'"
       >
         <el-table-column prop="idx" label="#" width="70" />
         <el-table-column label="Rows" align="right">

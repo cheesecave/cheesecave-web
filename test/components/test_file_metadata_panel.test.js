@@ -3,7 +3,9 @@
 // covered through FilePreviewDialog; this covers what only a standalone
 // panel does (pausing, and cleaning up when its page goes away).
 
+import { readFileSync } from "node:fs";
 import { flushPromises, mount } from "@vue/test-utils";
+import { ElTable, ElTableColumn } from "element-plus";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ElementPlusStubs } from "../helpers/vue";
@@ -24,7 +26,7 @@ vi.mock("@/utils/parquet", () => ({
   summarizeParquetSchema: vi.fn(),
 }));
 
-import { parseParquetMetadata } from "@/utils/parquet";
+import { parseParquetMetadata, summarizeParquetSchema } from "@/utils/parquet";
 import FileMetadataPanel from "@/components/repo/preview/FileMetadataPanel.vue";
 
 const URL = "http://host/datasets/o/n/resolve/main/data.parquet";
@@ -43,11 +45,105 @@ function mountPanel(props = {}) {
   });
 }
 
+function mountReadyPanel(props) {
+  return mount(FileMetadataPanel, {
+    props,
+    global: {
+      components: { ElTable, ElTableColumn },
+      stubs: ElementPlusStubs,
+    },
+  });
+}
+
+const safetensorsBytes = new Uint8Array(
+  readFileSync(
+    new globalThis.URL(
+      "../fixtures/previews/tiny.safetensors",
+      import.meta.url,
+    ),
+  ),
+);
+
 beforeEach(() => {
   mocks.calls.length = 0;
 });
 
 describe("FileMetadataPanel", () => {
+  it("keeps the dialog tensor table bounded while showing the parsed model statistics", async () => {
+    const wrapper = mountReadyPanel({
+      kind: "safetensors",
+      filename: "tiny.safetensors",
+      bytes: safetensorsBytes,
+    });
+    await flushPromises();
+    const tensors = wrapper
+      .findAllComponents(ElTable)
+      .find((table) => table.props("rowKey") === "path");
+    expect(tensors.props("maxHeight")).toBe("360");
+    expect(tensors.props("data")[0]).toMatchObject({
+      segment: "encoder",
+      leafCount: 3,
+      parameters: 528,
+    });
+    expect(wrapper.text()).toContain("Total parameters");
+    expect(wrapper.text()).toContain("528");
+    expect(wrapper.text()).toContain("__metadata__");
+    wrapper.unmount();
+  });
+
+  it("lets the tensor tree grow with the page instead of creating a vertical table scroller", async () => {
+    const wrapper = mountReadyPanel({
+      kind: "safetensors",
+      filename: "tiny.safetensors",
+      bytes: safetensorsBytes,
+      pageMode: true,
+    });
+    await flushPromises();
+    const tensors = wrapper
+      .findAllComponents(ElTable)
+      .find((table) => table.props("rowKey") === "path");
+    expect(tensors.props("maxHeight")).toBeUndefined();
+    expect(tensors.props("data")[0]).toMatchObject({
+      segment: "encoder",
+      leafCount: 3,
+      parameters: 528,
+    });
+    expect(wrapper.text()).toContain("Parameters by dtype");
+    expect(wrapper.text()).toContain("528");
+    wrapper.unmount();
+  });
+
+  it("removes parquet table limits in page mode while keeping dialog defaults", async () => {
+    vi.mocked(parseParquetMetadata).mockResolvedValueOnce({
+      numRows: 12,
+      rowGroups: [{ numRows: 12, totalByteSize: 48 }],
+      byteLength: 1024,
+    });
+    vi.mocked(summarizeParquetSchema).mockReturnValueOnce({
+      columnCount: 1,
+      columns: [{ name: "id", physicalType: "INT32" }],
+    });
+    const wrapper = mountReadyPanel({
+      kind: "parquet",
+      resolveUrl: URL,
+      filename: "data.parquet",
+    });
+    await flushPromises();
+    expect(
+      wrapper
+        .findAllComponents(ElTable)
+        .map((table) => table.props("maxHeight")),
+    ).toEqual(["260", "220"]);
+    await wrapper.setProps({ pageMode: true });
+    expect(
+      wrapper
+        .findAllComponents(ElTable)
+        .map((table) => table.props("maxHeight")),
+    ).toEqual([undefined, undefined]);
+    expect(wrapper.text()).toContain("Row groups");
+    wrapper.unmount();
+  });
+
   it("loads on mount without a dialog around it", async () => {
     const wrapper = mountPanel();
     await flushPromises();

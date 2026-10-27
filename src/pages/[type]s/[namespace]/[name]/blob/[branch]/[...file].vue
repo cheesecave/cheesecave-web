@@ -224,7 +224,7 @@
         </div>
       </div>
 
-      <div v-if="loading" class="text-center py-20">
+      <div v-if="loading && !isSafetensors" class="text-center py-20">
         <el-icon class="is-loading" :size="40">
           <div class="i-carbon-circle-dash" />
         </el-icon>
@@ -365,12 +365,22 @@
             :zip="zipTarget"
             :filename="fileName"
           />
+          <!-- Safetensors reads the header independently of the size lookup.
+             Its tensor tree grows with the page instead of a dialog viewport. -->
+          <div v-else-if="isSafetensors" class="file-metadata-preview">
+            <FileMetadataPanel
+              kind="safetensors"
+              :resolve-url="metadataResolveUrl"
+              :filename="fileName"
+              :page-mode="embedded"
+            />
+          </div>
           <!-- Parquet: the same metadata view as the file-list icon (rows,
              columns, row groups), range-read from the footer. -->
           <FileMetadataPanel
             v-else-if="isParquet"
             kind="parquet"
-            :resolve-url="parquetResolveUrl"
+            :resolve-url="metadataResolveUrl"
             :filename="fileName"
           />
           <!-- PSD: the flattened image saved in the file, read by Range (the
@@ -630,12 +640,14 @@ const indexedTarTreeEntry = ref(null);
 const isIndexedTar = ref(false);
 const isZipArchive = computed(() => isZipArchivePath(filePath.value));
 const isParquet = computed(() => getPreviewKind(filePath.value) === "parquet");
+const isSafetensors = computed(
+  () => getPreviewKind(filePath.value) === "safetensors",
+);
 const isPsd = computed(() => isPsdPath(filePath.value));
 // One source per file: it remembers the size and the header it has read
 const psdSource = computed(() => createHttpRangeSource(fileUrl.value));
-// Absolute, like the file-list preview: hyparquet range-reads this URL.
-// Only read while isParquet, so the path is never empty.
-const parquetResolveUrl = computed(() =>
+// Absolute, like the file-list preview: metadata readers range-read this URL.
+const metadataResolveUrl = computed(() =>
   buildResolveUrl({
     baseUrl: window.location.origin,
     repoType: repoType.value,
@@ -1363,6 +1375,10 @@ onUnmounted(() => {
   border-top: 0;
   border-radius: 0 0 6px 6px;
 }
+.file-metadata-preview {
+  min-width: 0;
+  padding: 24px;
+}
 .file-markdown-preview {
   max-width: 1060px;
   margin: 0 auto;
@@ -1372,6 +1388,9 @@ onUnmounted(() => {
   max-width: none;
 }
 @media (max-width: 899px) {
+  .file-metadata-preview {
+    padding: 16px;
+  }
   .repository-file-workbench {
     grid-template-columns: minmax(0, 1fr);
   }
