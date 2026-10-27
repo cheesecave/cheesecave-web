@@ -836,6 +836,20 @@ export const repoAPI = {
  * Organization API
  */
 export const orgAPI = {
+  /** Public profile lookup, including configured external sources. */
+  getProfileInfo: (name) =>
+    api.get(`/org/${encodeURIComponent(name)}`, { params: { fallback: true } }),
+
+  getProfileReadme: (name) => {
+    const encoded = encodeURIComponent(name);
+    return api.get(`/spaces/${encoded}/${encoded}/resolve/main/README.md`);
+  },
+
+  getPublicQuota: (name) =>
+    api.get(`/api/quota/${encodeURIComponent(name)}/public`, {
+      withCredentials: true,
+    }),
+
   /**
    * Create a new organization
    * @param {Object} data - { name: string, description?: string }

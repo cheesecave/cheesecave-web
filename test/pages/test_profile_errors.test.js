@@ -4,6 +4,7 @@
 import { h, reactive } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
 import axios from "axios";
+import { orgAPI } from "@/utils/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ElementPlusStubs, RouterLinkStub } from "../helpers/vue";
 import { http, HttpResponse } from "@/testing/msw";
@@ -32,7 +33,10 @@ vi.mock("@/stores/auth", () => ({
 vi.mock("@/utils/api", async (original) => ({
   ...(await original()),
   repoAPI: { listAllRepos: (...args) => mocks.listAllRepos(...args) },
-  orgAPI: { listMembers: async () => ({ data: { members: [] } }) },
+  orgAPI: {
+    ...(await original()).orgAPI,
+    listMembers: async () => ({ data: { members: [] } }),
+  },
   settingsAPI: {
     whoamiV2: async () => ({ data: { orgs: [] } }),
     getOrgProfile: async () => ({ data: {} }),
@@ -73,7 +77,7 @@ beforeEach(() => {
   mocks.listAllRepos.mockResolvedValue({ data: [], incomplete: [] });
   server.use(
     http.get("*/api/users/:name/type", () =>
-      jsonResponse({ type: "user", _source: "local" }),
+      jsonResponse({ type: mocks.mode, _source: "local" }),
     ),
     http.get("*/org/:name", ({ request }) =>
       mocks.mode === "user"
@@ -142,13 +146,12 @@ describe.each(["user", "org"])("%s profile failures", (mode) => {
   });
 
   it("switches to 'not found' when the retry learns the account does not exist", async () => {
-    if (mode === "user")
-      server.use(
-        http.get(
-          "*/api/users/:name/type",
-          () => new HttpResponse(null, { status: 404 }),
-        ),
-      );
+    server.use(
+      http.get(
+        "*/api/users/:name/type",
+        () => new HttpResponse(null, { status: 404 }),
+      ),
+    );
     infoStatus = 503;
     await mountProfile(mode);
     infoStatus = 404;
@@ -158,24 +161,30 @@ describe.each(["user", "org"])("%s profile failures", (mode) => {
   });
 
   it("carries on when the lookup was cancelled", async () => {
-    const real = axios.get.bind(axios);
-    vi.spyOn(axios, "get").mockImplementation((url, ...rest) =>
-      /\/(org|api\/users)\/bob(\/profile)?$/.test(String(url)) &&
-      mode === "user" &&
-      String(url).includes("profile")
-        ? Promise.reject(new DOMException("a", "AbortError"))
-        : mode === "org" && String(url) === "/org/bob"
-          ? Promise.reject(new DOMException("a", "AbortError"))
-          : real(url, ...rest),
-    );
+    let lookup;
+    if (mode === "org") {
+      lookup = vi
+        .spyOn(orgAPI, "getProfileInfo")
+        .mockRejectedValueOnce(new DOMException("a", "AbortError"));
+    } else {
+      const real = axios.get.bind(axios);
+      lookup = vi
+        .spyOn(axios, "get")
+        .mockImplementation((url, ...rest) =>
+          String(url) === "/api/users/bob/profile"
+            ? Promise.reject(new DOMException("a", "AbortError"))
+            : real(url, ...rest),
+        );
+    }
     await mountProfile(mode);
+    expect(lookup).toHaveBeenCalled();
     expect(wrapper.find('[data-testid="error-state"]').exists()).toBe(false);
   });
 
   it("says why the repositories could not be listed, instead of showing none", async () => {
     let up = false;
     mocks.listAllRepos.mockImplementation(async (type) => {
-      if (!up && (mode === "org" || type === "model")) throw httpFailure(500);
+      if (!up && type === "model") throw httpFailure(500);
       return { data: [], incomplete: [] };
     });
     await mountProfile(mode);
@@ -204,7 +213,7 @@ describe("independent user profile lookup failures", () => {
       server.use(
         http.get("*/api/users/:name/type", () =>
           identityStatus === 200
-            ? jsonResponse({ type: "user", _source: "local" })
+            ? jsonResponse({ type: mocks.mode, _source: "local" })
             : new HttpResponse(null, { status: identityStatus }),
         ),
       );

@@ -31,7 +31,10 @@ vi.mock("@/stores/auth", () => ({
 vi.mock("@/utils/api", async (original) => ({
   ...(await original()),
   repoAPI: { listAllRepos: (...args) => mocks.listAllRepos(...args) },
-  orgAPI: { listMembers: async () => ({ data: { members: [] } }) },
+  orgAPI: {
+    ...(await original()).orgAPI,
+    listMembers: async () => ({ data: { members: [] } }),
+  },
   settingsAPI: {
     whoamiV2: async () => ({ data: { orgs: [] } }),
     getOrgProfile: async () => ({ data: {} }),
@@ -68,7 +71,7 @@ beforeEach(() => {
   mocks.listAllRepos.mockResolvedValue({ data: [], incomplete: [] });
   server.use(
     http.get("*/api/users/:name/type", () =>
-      jsonResponse({ type: "user", _source: "local" }),
+      jsonResponse({ type: mocks.mode, _source: "local" }),
     ),
     http.get("*/org/:name", () =>
       mocks.mode === "user"

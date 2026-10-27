@@ -32,9 +32,10 @@ vi.mock("@/stores/auth", () => ({
     canWriteToNamespace: () => true,
   }),
 }));
-vi.mock("@/utils/api", () => ({
+vi.mock("@/utils/api", async (original) => ({
+  ...(await original()),
   repoAPI: { listAllRepos: async () => ({ data: [], incomplete: [] }) },
-  orgAPI: mocks.orgAPI,
+  orgAPI: { ...(await original()).orgAPI, ...mocks.orgAPI },
   settingsAPI: { getOrgProfile: async () => ({ data: {} }) },
   socialAPI: {
     getFollowState: async () => ({
@@ -61,6 +62,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, "error").mockImplementation(() => {});
   mocks.fetchUserInfo.mockResolvedValue({
+    name: "alice",
     orgs: [{ name: "acme", roleInOrg: "admin" }],
   });
   mocks.orgAPI.get.mockResolvedValue({
@@ -68,7 +70,14 @@ beforeEach(() => {
   });
   mocks.orgAPI.listMembers.mockResolvedValue({ data: { members: MEMBERS } });
   server.use(
+    http.get("*/api/users/:name/type", () =>
+      jsonResponse({ type: "org", _source: "local" }),
+    ),
     http.get("*/org/:name", () => jsonResponse({ name: "acme" })),
+    http.get(
+      "*/spaces/:namespace/:name/resolve/main/README.md",
+      () => new HttpResponse(null, { status: 404 }),
+    ),
     http.get("*/api/quota/:name/public", () =>
       jsonResponse({
         can_see_private: true,
@@ -143,7 +152,7 @@ describe("organizations list", () => {
   });
 
   it("links the invitation to create a first organization", async () => {
-    mocks.fetchUserInfo.mockResolvedValue({ orgs: [] });
+    mocks.fetchUserInfo.mockResolvedValue({ name: "alice", orgs: [] });
     await mountPage(OrganizationList);
     expect(link("Create Your First Organization").attributes("href")).toBe(
       "/organizations/new",
@@ -155,13 +164,13 @@ describe("organizations list", () => {
 describe("organization page", () => {
   it("links the settings and storage buttons and each member", async () => {
     await mountPage(OrganizationPage);
-    expect(link("Organization Settings").attributes("href")).toBe(
+    expect(link("Edit profile").attributes("href")).toBe(
       "/organizations/acme/settings",
     );
     expect(link("View Details").attributes("href")).toBe(
       "/organizations/acme/storage",
     );
-    expect(hasButton("Organization Settings")).toBe(false);
+    expect(hasButton("Edit profile")).toBe(false);
     expect(hasButton("View Details")).toBe(false);
 
     const member = wrapper.get("a[href='/bob']");
@@ -175,11 +184,12 @@ describe("organization page", () => {
 
   it("shows neither to someone who is not an admin of it", async () => {
     mocks.fetchUserInfo.mockResolvedValue({
+      name: "alice",
       orgs: [{ name: "acme", roleInOrg: "member" }],
     });
     await mountPage(OrganizationPage);
-    expect(link("Organization Settings")).toBeUndefined();
-    expect(hasButton("Organization Settings")).toBe(false);
+    expect(link("Edit profile")).toBeUndefined();
+    expect(hasButton("Edit profile")).toBe(false);
   });
 });
 

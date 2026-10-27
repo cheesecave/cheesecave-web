@@ -24,7 +24,9 @@ const identity = computed(() => getAuthIdentity(auth));
 const isSelf = computed(
   () => auth.isAuthenticated && auth.username === props.username,
 );
-const isVisitorPreview = computed(() => isSelf.value && props.visitorView);
+const isVisitorPreview = computed(
+  () => props.visitorView && (isSelf.value || state.value?.is_org === true),
+);
 const isFollowing = computed(
   () => !isVisitorPreview.value && Boolean(state.value?.following),
 );
@@ -120,7 +122,9 @@ onBeforeUnmount(() => version++);
       :aria-pressed="isFollowing"
       :title="
         isVisitorPreview
-          ? 'Preview only. You cannot follow your own profile.'
+          ? isSelf
+            ? 'Preview only. You cannot follow your own profile.'
+            : 'Exit visitor view to follow this organization.'
           : !followAllowed
             ? 'Following is unavailable for this account.'
             : undefined
