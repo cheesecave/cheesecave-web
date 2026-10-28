@@ -364,10 +364,7 @@
                   :status="getQuotaStatus(quotaInfo.public_percentage_used)"
                   :show-text="false"
                 />
-                <div
-                  v-else
-                  class="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full"
-                ></div>
+                <UnlimitedMeter v-else />
               </div>
 
               <!-- Private Storage (only if user has permission) -->
@@ -395,10 +392,7 @@
                   :status="getQuotaStatus(quotaInfo.private_percentage_used)"
                   :show-text="false"
                 />
-                <div
-                  v-else
-                  class="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full"
-                ></div>
+                <UnlimitedMeter v-else />
               </div>
 
               <!-- Total -->

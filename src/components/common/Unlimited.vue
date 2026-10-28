@@ -1,20 +1,21 @@
 <script setup>
 // PROTOTYPE: "no limit" as the chosen option writes it. The symbol alone carries the word as a tooltip and an
 // accessible name; it is set in the page's own font because a monospace font draws it small.
-import { symbolAlone, unlimitedText } from "@/utils/unlimited";
+import { symbolAlone, unlimitedText, unlimitedWord } from "@/utils/unlimited";
 
 const props = defineProps({ kind: { type: String, default: "value" } });
 const alone = symbolAlone(props.kind);
 const text = unlimitedText(props.kind);
+const word = unlimitedWord();
 </script>
 
 <template>
   <span
     v-if="alone"
     class="unlimited-symbol"
-    title="Unlimited"
+    :title="word"
     role="img"
-    aria-label="Unlimited"
+    :aria-label="word"
     >{{ text }}</span
   >
   <span v-else>{{ text }}</span>

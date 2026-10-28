@@ -1,9 +1,9 @@
 <script setup>
 // PROTOTYPE: the pill that switches the option for the whole tab.
-import { VARIANTS, unlimitedVariant } from "@/utils/unlimited";
+import { VARIANTS, LABELS, unlimitedVariant } from "@/utils/unlimited";
 
 const current = unlimitedVariant();
-const names = { word: "today", a: "A ∞", b: "B ∞ + word", c: "C mixed" };
+const names = LABELS;
 function choose(name) {
   const url = new URL(window.location.href);
   url.searchParams.set("inf", name);
