@@ -81,7 +81,8 @@ function refined(kind, variant) {
   const word = REFINED[variant];
   if (kind === "value") return INFINITY;
   if (kind === "standalone" || kind === "control") return `${INFINITY} ${word}`;
-  if (kind === "prose") return `${word.toLowerCase()} (${INFINITY})`;
+  // inside brackets already: no brackets of its own
+  if (kind === "prose") return `${INFINITY} ${word.toLowerCase()}`;
   return variant === "c2"
     ? `Namespace has no quota limit (${INFINITY})`
     : `Namespace has unlimited quota (${INFINITY})`;
