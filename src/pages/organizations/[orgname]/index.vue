@@ -353,7 +353,7 @@
                     >
                       / {{ formatBytes(quotaInfo.public_quota_bytes) }}
                     </span>
-                    <span v-else class="text-gray-400">/ Unlimited</span>
+                    <span v-else class="text-gray-400">/ <Unlimited /></span>
                   </span>
                 </div>
                 <el-progress
@@ -364,10 +364,7 @@
                   :status="getQuotaStatus(quotaInfo.public_percentage_used)"
                   :show-text="false"
                 />
-                <div
-                  v-else
-                  class="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full"
-                ></div>
+                <UnlimitedMeter v-else />
               </div>
 
               <!-- Private Storage (only if user has permission) -->
@@ -384,7 +381,7 @@
                     >
                       / {{ formatBytes(quotaInfo.private_quota_bytes) }}
                     </span>
-                    <span v-else class="text-gray-400">/ Unlimited</span>
+                    <span v-else class="text-gray-400">/ <Unlimited /></span>
                   </span>
                 </div>
                 <el-progress
@@ -395,10 +392,7 @@
                   :status="getQuotaStatus(quotaInfo.private_percentage_used)"
                   :show-text="false"
                 />
-                <div
-                  v-else
-                  class="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full"
-                ></div>
+                <UnlimitedMeter v-else />
               </div>
 
               <!-- Total -->
@@ -781,6 +775,8 @@
 </template>
 
 <script setup>
+import Unlimited from "@/components/common/Unlimited.vue";
+import UnlimitedMeter from "@/components/common/UnlimitedMeter.vue";
 import { repoAPI, orgAPI, settingsAPI } from "@/utils/api";
 import LinkButton from "@/components/common/LinkButton.vue";
 import ProfileRepoCard from "@/components/profile/ProfileRepoCard.vue";
@@ -936,7 +932,8 @@ function formatDate(date) {
 }
 
 function formatBytes(bytes) {
-  if (bytes === null || bytes === undefined) return "Unlimited";
+  // an unknown figure: a quota without a limit is written by the Unlimited component, never here
+  if (bytes === null || bytes === undefined) return "\u2014";
   if (bytes === 0) return "0 B";
   const k = 1000;
   const sizes = ["B", "KB", "MB", "GB", "TB"];

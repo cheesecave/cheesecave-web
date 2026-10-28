@@ -414,7 +414,7 @@ describe("the lists as they are drawn", () => {
     await flushPromises();
 
     const text = wrapper.text().replace(/\s+/g, " ");
-    expect(text).toContain("Usage: 0 / Unlimited");
+    expect(text).toContain("Usage: 0 / \u221e");
     expect(text).toContain("Usage: 2 / 5");
     expect(text).toContain("Usage: 1 / 1");
     expect(text).toContain("Maximum usage reached");
@@ -446,8 +446,20 @@ describe("the generated link", () => {
 
     vm.inviteForm.max_usage = -1;
     await flushPromises();
-    expect(wrapper.text().replace(/\s+/g, " ")).toContain(
-      "Usage: 0 / Unlimited",
+    expect(wrapper.text().replace(/\s+/g, " ")).toContain("Usage: 0 / \u221e");
+    expect(wrapper.find('[role="img"][aria-label="No limit"]').exists()).toBe(
+      true,
     );
+  });
+
+  it('offers "\u221e No limit" first in the list of maximum usages', async () => {
+    const vm = await mountPage();
+    vm.showInviteDialog = true;
+    vm.inviteForm.type = "reusable";
+    await flushPromises();
+
+    const options = wrapper.findAll("option").map((option) => option.text());
+    expect(options).toContain("\u221e No limit");
+    expect(options).toContain("1 use");
   });
 });

@@ -65,3 +65,7 @@ pnpm build      # production build
   Ctrl/Cmd-click work: a `RouterLink`, a `LinkButton` when it should look like a button, or the
   `.stretched-link` pattern for a card (see `ProfileRepoCard`). A control that does something else,
   or whose meaning is relative to where you came from (Cancel, Back, Logout), stays a button.
+- "No limit" (a quota or invitation without a limit) is written as the symbol ∞, not the word "Unlimited". On the right side
+  of "10 MB / ∞" or "Usage: 0 / ∞" use the `Unlimited` component (it carries the word "No limit" as its accessible name and
+  tooltip); in a control or a sentence use the strings of `src/utils/unlimited.js`; a quota meter without a limit is
+  `UnlimitedMeter`, not an empty bar. An unknown figure is a dash, never ∞.

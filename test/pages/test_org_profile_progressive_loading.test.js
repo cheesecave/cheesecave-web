@@ -239,6 +239,31 @@ describe("organization profile independent regions", () => {
     expect(repoSection("Models").text()).toContain("ready-model");
   });
 
+  it("writes a quota with no limit as the symbol, with a hatched meter and not an empty bar", async () => {
+    mountPage();
+    await flushPromises();
+    const storage = region("Storage usage");
+
+    expect(storage.text().replace(/\s+/g, " ")).toContain("1 KB / \u221e");
+    expect(storage.text().replace(/\s+/g, " ")).toContain("9 KB / \u221e");
+    expect(storage.findAll('[role="img"][aria-label="No limit"]')).toHaveLength(
+      2,
+    );
+    expect(storage.findAll(".no-cap-track")).toHaveLength(2);
+  });
+
+  it("writes an unknown figure as a dash, never as the symbol of a quota without a limit", async () => {
+    mocks.quota.mockResolvedValue({
+      data: { ...quota, public_used_bytes: null },
+    });
+    mountPage();
+    await flushPromises();
+
+    expect(region("Storage usage").text().replace(/\s+/g, " ")).toContain(
+      "\u2014 / \u221e",
+    );
+  });
+
   it("keeps successful repositories while one fails and only retries that list", async () => {
     mountPage();
     await flushPromises();
