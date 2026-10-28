@@ -560,7 +560,7 @@
                           ({{ formatSize(quotaInfo.namespace_quota_bytes) }})
                         </span>
                         <span v-else class="text-sm text-gray-500">
-                          (unlimited)
+                          ({{ UNLIMITED_BRACKET }})
                         </span>
                       </el-radio>
                       <el-radio label="custom">Custom Limit</el-radio>
@@ -590,7 +590,7 @@
                     v-else
                     class="text-sm text-gray-500 dark:text-gray-400 mt-1"
                   >
-                    Namespace has unlimited quota
+                    {{ NAMESPACE_UNLIMITED }}
                   </div>
                 </el-form-item>
 
@@ -611,6 +611,7 @@
 </template>
 
 <script setup>
+import { NAMESPACE_UNLIMITED, UNLIMITED_BRACKET } from "@/utils/unlimited";
 import { useRoute, useRouter } from "vue-router";
 import { repoAPI, settingsAPI, validationAPI, quotaAPI } from "@/utils/api";
 import { ElMessage, ElMessageBox } from "element-plus";

@@ -98,3 +98,28 @@ describe("invite page failures", () => {
     expect(mocks.get).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("how often an invitation can be used", () => {
+  const usage = async (extra) => {
+    mocks.get.mockResolvedValue({
+      data: { ...invitation, is_reusable: true, ...extra },
+    });
+    const w = mountPage();
+    await flushPromises();
+    return w;
+  };
+
+  it("writes no limit as the symbol, named for a screen reader", async () => {
+    const w = await usage({ usage_count: 0, max_usage: -1 });
+
+    expect(w.text().replace(/\s+/g, " ")).toContain("0 / \u221e");
+    expect(w.get('[role="img"]').attributes("aria-label")).toBe("No limit");
+  });
+
+  it("writes a limit as its number", async () => {
+    const w = await usage({ usage_count: 2, max_usage: 5 });
+
+    expect(w.text().replace(/\s+/g, " ")).toContain("2 / 5");
+    expect(w.find('[role="img"]').exists()).toBe(false);
+  });
+});

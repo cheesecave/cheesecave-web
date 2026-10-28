@@ -526,3 +526,48 @@ describe("user profile progressive loading", () => {
     },
   );
 });
+
+describe("the storage of a profile with no quota limit", () => {
+  it("is written with the symbol and a hatched meter, as a limit would be a size and a bar", async () => {
+    server.use(
+      http.get("*/api/quota/:name/public", () =>
+        jsonResponse({
+          public_used_bytes: 1000,
+          public_quota_bytes: null,
+          private_used_bytes: 9000,
+          private_quota_bytes: null,
+          total_used_bytes: 10000,
+          can_see_private: true,
+        }),
+      ),
+    );
+    mountProfile();
+    await finishProfile();
+    await vi.waitFor(() => expect(wrapper.text()).toContain("Storage Usage"));
+
+    const text = wrapper.text().replace(/\s+/g, " ");
+    expect(text).toContain("1 KB / \u221e");
+    expect(wrapper.findAll('[role="img"][aria-label="No limit"]').length).toBe(
+      2,
+    );
+    expect(wrapper.findAll(".no-cap-track")).toHaveLength(2);
+  });
+
+  it("writes an unknown figure as a dash, never as the symbol of a quota without a limit", async () => {
+    server.use(
+      http.get("*/api/quota/:name/public", () =>
+        jsonResponse({
+          public_used_bytes: null,
+          public_quota_bytes: null,
+          total_used_bytes: null,
+          can_see_private: false,
+        }),
+      ),
+    );
+    mountProfile();
+    await finishProfile();
+    await vi.waitFor(() => expect(wrapper.text()).toContain("Storage Usage"));
+
+    expect(wrapper.text().replace(/\s+/g, " ")).toContain("\u2014 / \u221e");
+  });
+});

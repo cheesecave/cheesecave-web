@@ -243,3 +243,37 @@ describe("repo settings action failures", () => {
     fallback("Failed to save LFS settings");
   });
 });
+
+describe("a repository quota with no limit", () => {
+  const NO_CAP = {
+    quota_bytes: null,
+    namespace_quota_bytes: null,
+    namespace_available_bytes: null,
+    effective_quota_bytes: null,
+  };
+
+  it("says the namespace has none, with the symbol, in brackets and in a sentence", async () => {
+    mocks.quotaAPI.getRepoQuota.mockResolvedValue({ data: NO_CAP });
+    const wrapper = await mountPage();
+    wrapper.vm.activeTab = "quota";
+    await flushPromises();
+    const text = () => wrapper.text().replace(/\s+/g, " ");
+    expect(text()).toContain("(\u221e no limit)");
+
+    wrapper.vm.quotaSettings.mode = "custom";
+    await flushPromises();
+    expect(text()).toContain("Namespace has no quota limit (\u221e)");
+  });
+
+  it("keeps writing a limit as a size", async () => {
+    mocks.quotaAPI.getRepoQuota.mockResolvedValue({
+      data: { ...QUOTA, namespace_quota_bytes: 5_000_000_000 },
+    });
+    const wrapper = await mountPage();
+    wrapper.vm.activeTab = "quota";
+    await flushPromises();
+
+    expect(wrapper.text()).toMatch(/\(\d+(\.\d+)? GB\)/);
+    expect(wrapper.text()).not.toContain("\u221e");
+  });
+});

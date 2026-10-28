@@ -67,11 +67,8 @@
               <span class="text-gray-600 dark:text-gray-400">Usage:</span>
               <span class="font-mono text-sm">
                 {{ invitation.usage_count }} /
-                {{
-                  invitation.max_usage === -1
-                    ? "Unlimited"
-                    : invitation.max_usage
-                }}
+                <Unlimited v-if="invitation.max_usage === -1" />
+                <template v-else>{{ invitation.max_usage }}</template>
               </span>
             </div>
           </div>
@@ -158,6 +155,7 @@
 </template>
 
 <script setup>
+import Unlimited from "@/components/common/Unlimited.vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { invitationAPI } from "@/utils/api";
