@@ -7,6 +7,7 @@
       'repository-shell': isRepositoryView,
     }"
   >
+    <UnlimitedSwitcher />
     <SessionBanner class="shrink-0" />
     <TheHeader
       v-if="!isRepositoryView"

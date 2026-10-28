@@ -232,11 +232,8 @@
                     class="text-sm text-gray-600 dark:text-gray-400"
                   >
                     Usage: {{ invite.usage_count }} /
-                    {{
-                      invite.max_usage === -1
-                        ? "Unlimited"
-                        : invite.max_usage || "1"
-                    }}
+                    <Unlimited v-if="invite.max_usage === -1" />
+                    <template v-else>{{ invite.max_usage || "1" }}</template>
                   </div>
                   <div v-if="!invite.is_available" class="text-sm text-red-600">
                     {{ getInvitationStatus(invite) }}
@@ -323,7 +320,7 @@
         <div v-if="inviteForm.type === 'reusable'">
           <el-form-item label="Maximum Usage">
             <el-select v-model="inviteForm.max_usage" style="width: 100%">
-              <el-option label="Unlimited" :value="-1" />
+              <el-option :label="unlimitedText('control')" :value="-1" />
               <el-option label="1 use" :value="1" />
               <el-option label="5 uses" :value="5" />
               <el-option label="10 uses" :value="10" />
@@ -356,9 +353,8 @@
             </el-input>
             <div class="text-sm text-gray-500 mt-1">
               Share this link anywhere. Usage: 0 /
-              {{
-                inviteForm.max_usage === -1 ? "Unlimited" : inviteForm.max_usage
-              }}
+              <Unlimited v-if="inviteForm.max_usage === -1" />
+              <template v-else>{{ inviteForm.max_usage }}</template>
             </div>
           </el-form-item>
         </div>
@@ -384,6 +380,7 @@
 </template>
 
 <script setup>
+import { unlimitedText } from "@/utils/unlimited";
 import { notifyError } from "@/errors";
 import { useRoute, useRouter } from "vue-router";
 import { orgAPI, invitationAPI, settingsAPI } from "@/utils/api";

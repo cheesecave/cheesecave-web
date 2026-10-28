@@ -286,7 +286,7 @@
                     >
                       / {{ formatBytes(quotaInfo.public_quota_bytes) }}
                     </span>
-                    <span v-else class="text-gray-400">/ Unlimited</span>
+                    <span v-else class="text-gray-400">/ <Unlimited /></span>
                   </span>
                 </div>
                 <el-progress
@@ -317,7 +317,7 @@
                     >
                       / {{ formatBytes(quotaInfo.private_quota_bytes) }}
                     </span>
-                    <span v-else class="text-gray-400">/ Unlimited</span>
+                    <span v-else class="text-gray-400">/ <Unlimited /></span>
                   </span>
                 </div>
                 <el-progress
@@ -711,6 +711,7 @@
 </template>
 
 <script setup>
+import { unlimitedText } from "@/utils/unlimited";
 import { repoAPI, orgAPI, settingsAPI } from "@/utils/api";
 import LinkButton from "@/components/common/LinkButton.vue";
 import ProfileRepoCard from "@/components/profile/ProfileRepoCard.vue";
@@ -908,7 +909,7 @@ function formatDate(date) {
 }
 
 function formatBytes(bytes) {
-  if (bytes === null || bytes === undefined) return "Unlimited";
+  if (bytes === null || bytes === undefined) return unlimitedText("value");
   if (bytes === 0) return "0 B";
   const k = 1000;
   const sizes = ["B", "KB", "MB", "GB", "TB"];
