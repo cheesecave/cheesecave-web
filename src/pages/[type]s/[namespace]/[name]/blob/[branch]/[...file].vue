@@ -650,7 +650,24 @@ const fileHeaders = ref({});
 const markdownView = ref("preview");
 
 // Prototype (?mdw=): Markdown preview width options, default = today.
-const MDW_OPTIONS = ["today", "wide", "fill", "toggle", "bleed"];
+const MDW_OPTIONS = [
+  "today",
+  "wide",
+  "fill",
+  "toggle",
+  "bleed",
+  "gitlab",
+  "hf",
+  "hf1600",
+];
+// Page-level caps (GitLab / Hugging Face style): the repository shell is limited
+// and centred, the Markdown fills the box.
+const PAGE_CAPS = { gitlab: "1256px", hf: "1504px", hf1600: "1600px" };
+function applyPageCap(o) {
+  const root = document.documentElement;
+  if (PAGE_CAPS[o]) root.style.setProperty("--repo-page-cap", PAGE_CAPS[o]);
+  else root.style.removeProperty("--repo-page-cap");
+}
 const mdwOption = ref("today");
 try {
   const q = new URLSearchParams(window.location.search).get("mdw");
@@ -675,7 +692,10 @@ function setMdwOption(v) {
     /* ignore */
   }
   mdwOption.value = v;
+  applyPageCap(v);
 }
+applyPageCap(mdwOption.value);
+onBeforeUnmount(() => applyPageCap("today"));
 const fileWorkbench = ref(null);
 const sidebarOpen = ref(true);
 const sidebarHeight = ref(window.innerHeight);
@@ -1446,7 +1466,10 @@ onUnmounted(() => {
 .file-markdown-preview[data-mdw="wide"] {
   max-width: 1400px;
 }
-.file-markdown-preview[data-mdw="fill"] {
+.file-markdown-preview[data-mdw="fill"],
+.file-markdown-preview[data-mdw="gitlab"],
+.file-markdown-preview[data-mdw="hf"],
+.file-markdown-preview[data-mdw="hf1600"] {
   max-width: none;
 }
 .file-markdown-preview[data-mdw="bleed"] {
@@ -1462,6 +1485,10 @@ onUnmounted(() => {
 .file-markdown-preview[data-mdw="bleed"] :deep(.markdown-body > table),
 .file-markdown-preview[data-mdw="bleed"] :deep(.markdown-body > .code-block) {
   grid-column: 1 / -1;
+}
+:global(.repository-page) {
+  max-width: var(--repo-page-cap, none);
+  margin-inline: auto;
 }
 .mdw-pill {
   position: fixed;
