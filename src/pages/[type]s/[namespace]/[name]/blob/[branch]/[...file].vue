@@ -351,20 +351,43 @@
              member preview surface as the file-list icon shortcut
              — only difference is it lives in the page body
              instead of a modal. -->
-          <TarBrowserPanel
+          <div
             v-if="isIndexedTar"
-            :tar-url="fileUrl"
-            :index-url="indexedTarSidecarUrl"
-            :filename="fileName"
-            :tar-tree-entry="indexedTarTreeEntry"
-          />
+            :class="{ 'file-archive-preview': embedded }"
+            :data-arch="archEffective"
+          >
+            <TarBrowserPanel
+              :tar-url="fileUrl"
+              :index-url="indexedTarSidecarUrl"
+              :filename="fileName"
+              :tar-tree-entry="indexedTarTreeEntry"
+            />
+          </div>
           <!-- Zip inline browser: same panel in zip mode. The central
              directory is the index, so no sibling lookup is needed. -->
-          <TarBrowserPanel
+          <div
             v-else-if="isZipArchive"
-            :zip="zipTarget"
-            :filename="fileName"
-          />
+            :class="{ 'file-archive-preview': embedded }"
+            :data-arch="archEffective"
+          >
+            <TarBrowserPanel :zip="zipTarget" :filename="fileName" />
+          </div>
+          <div
+            v-if="isIndexedTar || isZipArchive"
+            class="arch-pill"
+            role="group"
+            aria-label="Archive padding prototype"
+          >
+            <button
+              v-for="o in ARCH_OPTIONS"
+              :key="o"
+              type="button"
+              :aria-pressed="archOption === o"
+              @click="setArchOption(o)"
+            >
+              {{ o }}
+            </button>
+          </div>
           <!-- Parquet: the same metadata view as the file-list icon (rows,
              columns, row groups), range-read from the footer. -->
           <FileMetadataPanel
@@ -620,6 +643,27 @@ const fileContent = ref("");
 const fileSize = ref(null); // null until known; 0 is a real empty file
 const fileHeaders = ref({});
 const markdownView = ref("preview");
+
+// Prototype (?arch=): padding around the inline archive browser, default = today.
+const ARCH_OPTIONS = ["today", "pad", "card"];
+const archOption = ref("today");
+try {
+  const q = new URLSearchParams(window.location.search).get("arch");
+  if (q && ARCH_OPTIONS.includes(q)) sessionStorage.setItem("arch", q);
+  const saved = sessionStorage.getItem("arch");
+  if (saved && ARCH_OPTIONS.includes(saved)) archOption.value = saved;
+} catch {
+  /* sessionStorage unavailable */
+}
+const archEffective = computed(() => archOption.value);
+function setArchOption(v) {
+  try {
+    sessionStorage.setItem("arch", v);
+  } catch {
+    /* ignore */
+  }
+  archOption.value = v;
+}
 const fileWorkbench = ref(null);
 const sidebarOpen = ref(true);
 const sidebarHeight = ref(window.innerHeight);
@@ -1379,6 +1423,48 @@ onUnmounted(() => {
   min-width: 0;
   padding: 24px;
 }
+.file-archive-preview {
+  min-width: 0;
+}
+.file-archive-preview[data-arch="pad"] {
+  padding: 24px;
+}
+.file-archive-preview[data-arch="card"] {
+  padding: 16px;
+  background: var(--el-fill-color-light, rgb(0 0 0 / 0.03));
+}
+.file-archive-preview[data-arch="card"] > :deep(*) {
+  padding: 16px;
+  border: 1px solid var(--site-border);
+  border-radius: 8px;
+  background: var(--el-bg-color, #fff);
+}
+.arch-pill {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--site-border);
+  border-radius: 999px;
+  background: var(--el-bg-color, #fff);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+  font-size: 12px;
+}
+.arch-pill button {
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.arch-pill button[aria-pressed="true"] {
+  background: var(--site-link);
+  color: #fff;
+}
 .file-markdown-preview {
   max-width: 1060px;
   margin: 0 auto;
@@ -1390,6 +1476,10 @@ onUnmounted(() => {
 @media (max-width: 899px) {
   .file-metadata-preview {
     padding: 16px;
+  }
+  .file-archive-preview[data-arch="pad"],
+  .file-archive-preview[data-arch="card"] {
+    padding: 12px;
   }
   .repository-file-workbench {
     grid-template-columns: minmax(0, 1fr);
