@@ -351,20 +351,25 @@
              member preview surface as the file-list icon shortcut
              — only difference is it lives in the page body
              instead of a modal. -->
-          <TarBrowserPanel
+          <div
             v-if="isIndexedTar"
-            :tar-url="fileUrl"
-            :index-url="indexedTarSidecarUrl"
-            :filename="fileName"
-            :tar-tree-entry="indexedTarTreeEntry"
-          />
+            :class="{ 'file-archive-preview': embedded }"
+          >
+            <TarBrowserPanel
+              :tar-url="fileUrl"
+              :index-url="indexedTarSidecarUrl"
+              :filename="fileName"
+              :tar-tree-entry="indexedTarTreeEntry"
+            />
+          </div>
           <!-- Zip inline browser: same panel in zip mode. The central
              directory is the index, so no sibling lookup is needed. -->
-          <TarBrowserPanel
+          <div
             v-else-if="isZipArchive"
-            :zip="zipTarget"
-            :filename="fileName"
-          />
+            :class="{ 'file-archive-preview': embedded }"
+          >
+            <TarBrowserPanel :zip="zipTarget" :filename="fileName" />
+          </div>
           <!-- Parquet: the same metadata view as the file-list icon (rows,
              columns, row groups), range-read from the footer. -->
           <FileMetadataPanel
@@ -1379,6 +1384,12 @@ onUnmounted(() => {
   min-width: 0;
   padding: 24px;
 }
+/* The archive panel is shared with the archive dialog and draws edge to edge;
+   the file page pads it like the other previews inside the bordered box. */
+.file-archive-preview {
+  min-width: 0;
+  padding: 24px;
+}
 /* 1500px of text plus 32px padding on each side. Hugging Face lets the rendered
    file fill a box of about 1500px; ours follows the window, so the text stops
    there and stays centred on very wide screens. */
@@ -1393,6 +1404,9 @@ onUnmounted(() => {
 @media (max-width: 899px) {
   .file-metadata-preview {
     padding: 16px;
+  }
+  .file-archive-preview {
+    padding: 12px;
   }
   .repository-file-workbench {
     grid-template-columns: minmax(0, 1fr);
