@@ -378,6 +378,14 @@
             :resolve-url="metadataResolveUrl"
             :filename="fileName"
           />
+          <!-- ONNX: graph and summary read by Range (head, tail and the weight
+             headers), never the whole model. -->
+          <OnnxPreviewPanel
+            v-else-if="isOnnx"
+            :resolve-url="metadataResolveUrl"
+            :filename="fileName"
+            :page-mode="embedded"
+          />
           <!-- PSD: the flattened image saved in the file, read by Range (the
              head and the composite, not the layers). -->
           <PsdPreview
@@ -562,6 +570,7 @@ import LinkButton from "@/components/common/LinkButton.vue";
 import TarBrowserPanel from "@/components/repo/preview/TarBrowserPanel.vue";
 import FileMetadataPanel from "@/components/repo/preview/FileMetadataPanel.vue";
 import PsdPreview from "@/components/repo/preview/PsdPreview.vue";
+import OnnxPreviewPanel from "@/components/repo/preview/OnnxPreviewPanel.vue";
 import { createHttpRangeSource, isPsdPath } from "@/utils/psd-preview";
 import { hasIndexSibling, tarSidecarPath } from "@/utils/indexed-tar";
 import {
@@ -648,6 +657,7 @@ const isParquet = computed(() => getPreviewKind(filePath.value) === "parquet");
 const isSafetensors = computed(
   () => getPreviewKind(filePath.value) === "safetensors",
 );
+const isOnnx = computed(() => /\.onnx$/i.test(filePath.value));
 const isPsd = computed(() => isPsdPath(filePath.value));
 // One source per file: it remembers the size and the header it has read
 const psdSource = computed(() => createHttpRangeSource(fileUrl.value));
