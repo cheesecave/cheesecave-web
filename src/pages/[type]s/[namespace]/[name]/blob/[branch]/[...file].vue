@@ -1379,8 +1379,11 @@ onUnmounted(() => {
   min-width: 0;
   padding: 24px;
 }
+/* 1500px of text plus 32px padding on each side. Hugging Face lets the rendered
+   file fill a box of about 1500px; ours follows the window, so the text stops
+   there and stays centred on very wide screens. */
 .file-markdown-preview {
-  max-width: 1060px;
+  max-width: 1564px;
   margin: 0 auto;
   padding: 32px;
 }
