@@ -168,6 +168,17 @@
           </span>
         </div>
         <div class="file-detail-actions">
+          <button
+            v-if="
+              isMarkdown && mdwOption === 'toggle' && markdownView === 'preview'
+            "
+            type="button"
+            class="file-action mdw-toggle"
+            :aria-pressed="mdwWide"
+            @click="mdwWide = !mdwWide"
+          >
+            {{ mdwWide ? "Narrow" : "Wide" }}
+          </button>
           <a
             :href="fileUrl"
             target="_blank"
@@ -487,6 +498,7 @@
             <div
               v-if="markdownView === 'preview'"
               :class="{ 'file-markdown-preview': embedded }"
+              :data-mdw="mdwEffective"
             >
               <MarkdownViewer
                 :content="markdownPreviewContent"
@@ -497,6 +509,22 @@
                 :name="name"
                 :branch="branch"
               />
+            </div>
+            <div
+              v-if="isMarkdown"
+              class="mdw-pill"
+              role="group"
+              aria-label="Width prototype"
+            >
+              <button
+                v-for="o in MDW_OPTIONS"
+                :key="o"
+                type="button"
+                :aria-pressed="mdwOption === o"
+                @click="setMdwOption(o)"
+              >
+                {{ o }}
+              </button>
             </div>
             <CodeViewer
               v-else-if="embedded"
@@ -620,6 +648,34 @@ const fileContent = ref("");
 const fileSize = ref(null); // null until known; 0 is a real empty file
 const fileHeaders = ref({});
 const markdownView = ref("preview");
+
+// Prototype (?mdw=): Markdown preview width options, default = today.
+const MDW_OPTIONS = ["today", "wide", "fill", "toggle", "bleed"];
+const mdwOption = ref("today");
+try {
+  const q = new URLSearchParams(window.location.search).get("mdw");
+  if (q && MDW_OPTIONS.includes(q)) sessionStorage.setItem("mdw", q);
+  const saved = sessionStorage.getItem("mdw");
+  if (saved && MDW_OPTIONS.includes(saved)) mdwOption.value = saved;
+} catch {
+  /* sessionStorage unavailable */
+}
+const mdwWide = ref(false);
+const mdwEffective = computed(() =>
+  mdwOption.value === "toggle"
+    ? mdwWide.value
+      ? "fill"
+      : "today"
+    : mdwOption.value,
+);
+function setMdwOption(v) {
+  try {
+    sessionStorage.setItem("mdw", v);
+  } catch {
+    /* ignore */
+  }
+  mdwOption.value = v;
+}
 const fileWorkbench = ref(null);
 const sidebarOpen = ref(true);
 const sidebarHeight = ref(window.innerHeight);
@@ -1386,6 +1442,52 @@ onUnmounted(() => {
 }
 .file-detail-content :deep(.markdown-body) {
   max-width: none;
+}
+.file-markdown-preview[data-mdw="wide"] {
+  max-width: 1400px;
+}
+.file-markdown-preview[data-mdw="fill"] {
+  max-width: none;
+}
+.file-markdown-preview[data-mdw="bleed"] {
+  max-width: none;
+}
+.file-markdown-preview[data-mdw="bleed"] :deep(.markdown-body) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1012px) minmax(0, 1fr);
+}
+.file-markdown-preview[data-mdw="bleed"] :deep(.markdown-body > *) {
+  grid-column: 2;
+}
+.file-markdown-preview[data-mdw="bleed"] :deep(.markdown-body > table),
+.file-markdown-preview[data-mdw="bleed"] :deep(.markdown-body > .code-block) {
+  grid-column: 1 / -1;
+}
+.mdw-pill {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--site-border);
+  border-radius: 999px;
+  background: var(--el-bg-color, #fff);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+  font-size: 12px;
+}
+.mdw-pill button {
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.mdw-pill button[aria-pressed="true"] {
+  background: var(--site-link);
+  color: #fff;
 }
 @media (max-width: 899px) {
   .file-metadata-preview {
