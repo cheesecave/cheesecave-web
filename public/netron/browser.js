@@ -161,7 +161,9 @@ browser.Host = class {
         const search = window.location.search;
         const params = new Map(search ? new window.URLSearchParams(window.location.search) : []);
         const hash = window.location.hash ? window.location.hash.replace(/^#/, '') : '';
-        const url = hash ? hash : params.get('url');
+        // The hub only ever passes a blob: URL; anything else in the link is ignored
+        const given = hash ? hash : params.get('url');
+        const url = given && given.startsWith('blob:') ? given : null;
         if (url) {
             const identifier = params.get('identifier') || null;
             const location = url
