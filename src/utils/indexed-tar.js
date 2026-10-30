@@ -24,6 +24,7 @@
 // the modal can fall back to the shared <ErrorState>.
 
 import { mediaKind, mediaMime } from "@/utils/media-types";
+import { sortByName } from "@/utils/natural-sort";
 
 const SUPPORTED_TOP_LEVEL_KEYS = ["filesize", "hash", "hash_lfs", "files"];
 
@@ -243,8 +244,9 @@ export function normalizeSegments(path) {
 
 /**
  * Resolve a directory by walking the tree along the segments, then return
- * its children split + sorted: folders first, then files, both
- * alphabetically by name. Used by the modal's listing pane.
+ * its children split + sorted: folders first, then files, both in
+ * natural order by name (`img_2` before `img_10`). Used by the modal's
+ * listing pane.
  *
  * @param {ReturnType<typeof buildTreeFromIndex>} root
  * @param {string[]} segments - already-normalized path segments
@@ -267,9 +269,11 @@ export function listDirectory(root, segments) {
     if (child.type === "dir") folders.push(child);
     else files.push(child);
   }
-  folders.sort((a, b) => a.name.localeCompare(b.name));
-  files.sort((a, b) => a.name.localeCompare(b.name));
-  return { folders, files, node: cursor };
+  return {
+    folders: sortByName(folders, (node) => node.name),
+    files: sortByName(files, (node) => node.name),
+    node: cursor,
+  };
 }
 
 /**

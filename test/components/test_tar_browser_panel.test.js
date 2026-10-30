@@ -381,6 +381,37 @@ describe("TarBrowserPanel · listing + navigation", () => {
     expect(body).toContain("3 files in archive");
   });
 
+  it("lists the members in natural order, not in the order the archive stores them", async () => {
+    // Ids of different lengths, stored in descending order like a real dataset shard
+    const archive = buildArchive([
+      ["12575000.jpg", text("a")],
+      ["10000000.png", text("b")],
+      ["9950000.png", text("c")],
+      ["100000.jpg", text("d")],
+      ["1000.jpg", text("e")],
+      ["shard-10/x.txt", text("f")],
+      ["shard-2/x.txt", text("g")],
+    ]);
+    serveArchive(archive);
+
+    const wrapper = mountPanel();
+    await flushPromises();
+    const rows = wrapper
+      .findAll(".cursor-pointer")
+      .map((row) => row.text())
+      .join("\n");
+    const at = (name) => rows.indexOf(name);
+    // Folders first, each in natural order
+    expect(at("shard-2")).toBeGreaterThanOrEqual(0);
+    expect(at("shard-2")).toBeLessThan(at("shard-10"));
+    expect(at("shard-10")).toBeLessThan(at("1000.jpg"));
+    // Files by number
+    expect(at("1000.jpg")).toBeLessThan(at("100000.jpg"));
+    expect(at("100000.jpg")).toBeLessThan(at("9950000.png"));
+    expect(at("9950000.png")).toBeLessThan(at("10000000.png"));
+    expect(at("10000000.png")).toBeLessThan(at("12575000.jpg"));
+  });
+
   it("navigates into a folder when its row is clicked, then back via the breadcrumb root", async () => {
     const archive = buildArchive([
       ["README.md", text("hello")],

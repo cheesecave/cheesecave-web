@@ -171,6 +171,52 @@ describe("buildTreeFromIndex + listDirectory", () => {
     expect(photos.files.map((f) => f.name)).toEqual(["forest.jpg"]);
   });
 
+  it("lists folders and files in natural order, folders first", () => {
+    const tree = buildTreeFromIndex({
+      "shard-10/a.png": { offset: 0, size: 1 },
+      "shard-2/a.png": { offset: 1, size: 1 },
+      "shard-1/a.png": { offset: 2, size: 1 },
+      "10000000.jpg": { offset: 3, size: 1 },
+      "9950000.png": { offset: 4, size: 1 },
+      "1000.jpg": { offset: 5, size: 1 },
+      "Img_3.png": { offset: 6, size: 1 },
+      "img_10.png": { offset: 7, size: 1 },
+      "img_2.png": { offset: 8, size: 1 },
+    });
+    const root = listDirectory(tree, []);
+    expect(root.folders.map((f) => f.name)).toEqual([
+      "shard-1",
+      "shard-2",
+      "shard-10",
+    ]);
+    expect(root.files.map((f) => f.name)).toEqual([
+      "1000.jpg",
+      "9950000.png",
+      "10000000.jpg",
+      "img_2.png",
+      "Img_3.png",
+      "img_10.png",
+    ]);
+  });
+
+  it("does not depend on the order the index lists the members in", () => {
+    const names = ["f10.txt", "f2.txt", "f1.txt", "f100.txt"];
+    const forward = {};
+    const backward = {};
+    names.forEach((n, i) => (forward[n] = { offset: i, size: 1 }));
+    [...names]
+      .reverse()
+      .forEach((n, i) => (backward[n] = { offset: i, size: 1 }));
+    const a = listDirectory(buildTreeFromIndex(forward), []).files.map(
+      (f) => f.name,
+    );
+    const b = listDirectory(buildTreeFromIndex(backward), []).files.map(
+      (f) => f.name,
+    );
+    expect(a).toEqual(["f1.txt", "f2.txt", "f10.txt", "f100.txt"]);
+    expect(b).toEqual(a);
+  });
+
   it("returns empty listings for an unknown segment", () => {
     const tree = buildTreeFromIndex(SAMPLE_INDEX.files);
     expect(listDirectory(tree, ["does-not-exist"]).folders).toEqual([]);
