@@ -105,6 +105,9 @@ export default defineConfig({
       "dayjs/plugin/timezone",
       "dayjs/plugin/utc",
 
+      // Natural order of the names inside an archive (CommonJS: not served as ESM unless pre-bundled)
+      "string-natural-compare",
+
       // Code editor
       "codemirror",
       "@codemirror/commands",
