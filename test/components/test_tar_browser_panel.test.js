@@ -112,7 +112,7 @@ function serveArchive({ buffer, files, totalSize }, indexOverrides = {}) {
 // resolution + parquet fixture decoding into the panel suite.
 const FilePreviewDialogStub = {
   name: "FilePreviewDialog",
-  props: ["visible", "kind", "bytes", "resolveUrl", "filename"],
+  props: ["visible", "kind", "bytes", "source", "resolveUrl", "filename"],
   template: '<div data-stub="FilePreviewDialog" />',
 };
 
@@ -1038,5 +1038,107 @@ describe("TarBrowserPanel · psd members", () => {
     await flushPromises();
     expect(wrapper.findAllComponents({ name: "TarMemberThumbnail" })).toHaveLength(0);
     expect(psdRow(wrapper).exists()).toBe(true);
+  });
+});
+
+// A member of an indexed tar is stored as it is, so the metadata of a
+// safetensors or a parquet member is read from inside the member by Range, and a
+// member of any size can be previewed.
+describe("TarBrowserPanel · data members read in place", () => {
+  const ranges = [];
+
+  // The index says the member is `declared` bytes long; the tar answers any range
+  // with the member's real bytes where they are and zeros after them, so a read of
+  // the whole member would need `declared` bytes and is easy to spot.
+  function serveVirtual(name, content, declared) {
+    const archive = buildArchive([[name, content]]);
+    archive.files[name].size = declared;
+    serveArchive(archive);
+    ranges.length = 0;
+    server.use(
+      http.get(TAR_URL, ({ request }) => {
+        const range = request.headers.get("range");
+        ranges.push(range);
+        const [, a, b] = /^bytes=(\d+)-(\d+)$/.exec(range);
+        const start = Number(a);
+        const end = Number(b);
+        const out = new Uint8Array(end - start + 1);
+        for (let p = start; p <= end && p < content.length; p++) out[p - start] = content[p];
+        return new HttpResponse(out, {
+          status: 206,
+          headers: { "Content-Range": `bytes ${start}-${end}/${declared + 512}` },
+        });
+      }),
+    );
+  }
+
+  async function openMember(wrapper, name) {
+    await flushPromises();
+    await wrapper
+      .findAll(".cursor-pointer")
+      .find((w) => w.text().startsWith(name))
+      .trigger("click");
+    await flushPromises();
+  }
+
+  const openPreview = async (wrapper) => {
+    const button = wrapper
+      .findAll("button")
+      .find((b) => b.text().includes("Open metadata preview"));
+    expect(button).toBeDefined();
+    await button.trigger("click");
+    await flushPromises();
+    return wrapper.findComponent({ name: "FilePreviewDialog" });
+  };
+
+  it("previews a safetensors member of 3 GB without reading any of it", async () => {
+    serveVirtual("big.safetensors", SAFETENSORS_FIXTURE, 3_000_000_000);
+    const wrapper = mountPanel();
+    await openMember(wrapper, "big.safetensors");
+    expect(wrapper.text()).not.toContain("above the inline-preview cap");
+    expect(ranges).toEqual([]);
+
+    const dialog = await openPreview(wrapper);
+    expect(dialog.props("bytes")).toBeFalsy();
+    const source = dialog.props("source");
+    expect(source.size).toBe(3_000_000_000);
+    // Reading through it is a read of the tar at the member's place, no more
+    const head = await source.read(0, 8);
+    expect(Array.from(head)).toEqual(Array.from(SAFETENSORS_FIXTURE.slice(0, 8)));
+    expect(ranges).toEqual(["bytes=0-7"]);
+  });
+
+  it("previews a parquet member of 2 GB without reading any of it", async () => {
+    serveVirtual("big.parquet", PARQUET_FIXTURE, 2_000_000_000);
+    const wrapper = mountPanel();
+    await openMember(wrapper, "big.parquet");
+    expect(wrapper.text()).not.toContain("above the inline-preview cap");
+    expect(ranges).toEqual([]);
+
+    const dialog = await openPreview(wrapper);
+    expect(dialog.props("source").size).toBe(2_000_000_000);
+    expect(dialog.props("bytes")).toBeFalsy();
+  });
+
+  it("downloads such a member by reading it whole, on demand", async () => {
+    const archive = buildArchive([["weights.safetensors", SAFETENSORS_FIXTURE]]);
+    serveArchive(archive);
+    const wrapper = mountPanel();
+    await openMember(wrapper, "weights.safetensors");
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+    try {
+      const downloadBtn = wrapper
+        .findAll("button")
+        .filter((b) => b.text().includes("Download"))[0];
+      await downloadBtn.trigger("click");
+      await flushPromises();
+      expect(clickSpy).toHaveBeenCalled();
+      const blob = URL.createObjectURL.mock.calls.at(-1)[0];
+      expect(blob.size).toBe(SAFETENSORS_FIXTURE.length);
+    } finally {
+      clickSpy.mockRestore();
+    }
   });
 });

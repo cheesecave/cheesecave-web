@@ -94,7 +94,7 @@ async function makeZip(entries, options) {
 
 const FilePreviewDialogStub = {
   name: "FilePreviewDialog",
-  props: ["visible", "kind", "bytes", "resolveUrl", "filename"],
+  props: ["visible", "kind", "bytes", "source", "resolveUrl", "filename"],
   template: '<div data-stub="FilePreviewDialog" />',
 };
 const thumbnails = [];
@@ -558,5 +558,134 @@ describe("TarBrowserPanel · zip mode", () => {
     await flushPromises();
     await new Promise((r) => setTimeout(r, 50));
     expect(wrapper.text()).not.toContain("slow.txt");
+  });
+});
+
+// A zip member stored without compression sits in the archive as it is, so its
+// metadata is read from inside it by Range; a deflated member has to be inflated
+// from the start, so it is extracted whole as before.
+describe("TarBrowserPanel · zip data members read in place", () => {
+  const SAFETENSORS = new Uint8Array(
+    readFileSync(resolve(__dirname, "../fixtures/previews/tiny.safetensors")),
+  );
+
+  async function openMember(wrapper, name) {
+    await until(() => expect(wrapper.text()).toContain("files in archive"));
+    await rowFor(wrapper, name).trigger("click");
+  }
+
+  const previewButton = (wrapper) =>
+    wrapper.findAll("button").find((b) => b.text().includes("Open metadata preview"));
+
+  it("previews a stored safetensors member in place", async () => {
+    serveRepo({
+      "a/weights.zip": await makeZip([["model.safetensors", SAFETENSORS]], { level: 0 }),
+    });
+    const wrapper = mountPanel("a/weights.zip");
+    await openMember(wrapper, "model.safetensors");
+    await until(() => expect(previewButton(wrapper)).toBeDefined());
+    await previewButton(wrapper).trigger("click");
+    await flushPromises();
+    const dialog = wrapper.findComponent({ name: "FilePreviewDialog" });
+    expect(dialog.props("bytes")).toBeFalsy();
+    const source = dialog.props("source");
+    expect(source.size).toBe(SAFETENSORS.length);
+    const head = await source.read(0, 8);
+    expect(Array.from(head)).toEqual(Array.from(SAFETENSORS.slice(0, 8)));
+  });
+
+  it("extracts a deflated safetensors member whole, as before", async () => {
+    serveRepo({
+      "a/weights.zip": await makeZip([["model.safetensors", SAFETENSORS]], { level: 5 }),
+    });
+    const wrapper = mountPanel("a/weights.zip");
+    await openMember(wrapper, "model.safetensors");
+    await until(() => expect(previewButton(wrapper)).toBeDefined());
+    await previewButton(wrapper).trigger("click");
+    await flushPromises();
+    const dialog = wrapper.findComponent({ name: "FilePreviewDialog" });
+    expect(dialog.props("source")).toBeFalsy();
+    expect(Array.from(dialog.props("bytes"))).toEqual(Array.from(SAFETENSORS));
+  });
+
+  it("shows a classified error when the member cannot be read in place", async () => {
+    serveRepo({
+      "a/weights.zip": await makeZip([["model.safetensors", SAFETENSORS]], { level: 0 }),
+    });
+    const wrapper = mountPanel("a/weights.zip");
+    await until(() => expect(wrapper.text()).toContain("files in archive"));
+    // The archive was listed; now its host stops answering
+    server.use(
+      http.get(
+        `${RESOLVE_PREFIX}a/weights.zip`,
+        () => new HttpResponse("down", { status: 503, statusText: "Unavailable" }),
+      ),
+    );
+    await rowFor(wrapper, "model.safetensors").trigger("click");
+    await until(() =>
+      expect(wrapper.findComponent({ name: "ErrorState" }).exists()).toBe(true),
+    );
+    expect(previewButton(wrapper)).toBeUndefined();
+  });
+
+  it("drops the answer for a member the user has already left", async () => {
+    serveRepo({
+      "a/mixed.zip": await makeZip(
+        [
+          ["model.safetensors", SAFETENSORS],
+          ["notes.txt", text("still here\n")],
+        ],
+        { level: 0 },
+      ),
+    });
+    // Hold back the answer of the in-place read of the first member
+    const zipModule = await import("@/utils/zip-archive");
+    const real = zipModule.openRepoZip;
+    let release;
+    const gate = new Promise((resolve) => (release = resolve));
+    const spy = vi.spyOn(zipModule, "openRepoZip").mockImplementation(async (...args) => {
+      const archive = await real(...args);
+      const rangeSource = archive.rangeSource.bind(archive);
+      // The answer arrives late and intact, as if the abort had not reached it
+      archive.rangeSource = async (path) => {
+        const source = await rangeSource(path);
+        await gate;
+        return source;
+      };
+      return archive;
+    });
+    try {
+      const wrapper = mountPanel("a/mixed.zip");
+      await until(() => expect(wrapper.text()).toContain("files in archive"));
+      await rowFor(wrapper, "model.safetensors").trigger("click");
+      // leave it before it answers, and open another member
+      await wrapper.findAll("button").find((b) => b.text().includes("Back")).trigger("click");
+      await rowFor(wrapper, "notes.txt").trigger("click");
+      await until(() => expect(wrapper.text()).toContain("still here"));
+      release();
+      await flushPromises();
+      // the late answer did not turn the view into a metadata preview
+      expect(wrapper.text()).toContain("still here");
+      expect(previewButton(wrapper)).toBeUndefined();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("says a compressed member above the cap has to be fetched whole", async () => {
+    const bytes = await makeZip([["huge.safetensors", text("x")]], { level: 5 });
+    // The central directory says the member is 210 MB long once inflated
+    for (let i = bytes.length - 46; i >= 0; i--) {
+      if (bytes[i] === 0x50 && bytes[i + 1] === 0x4b && bytes[i + 2] === 0x01 && bytes[i + 3] === 0x02) {
+        new DataView(bytes.buffer, bytes.byteOffset).setUint32(i + 24, 210_000_000, true);
+        break;
+      }
+    }
+    serveRepo({ "a/huge.zip": bytes });
+    const wrapper = mountPanel("a/huge.zip");
+    await openMember(wrapper, "huge.safetensors");
+    await until(() => expect(wrapper.text()).toContain("above the inline-preview cap"));
+    expect(wrapper.text()).toContain("has to be fetched and inflated whole");
+    expect(previewButton(wrapper)).toBeUndefined();
   });
 });

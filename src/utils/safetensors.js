@@ -176,6 +176,64 @@ export function parseSafetensorsMetadataFromBuffer(buffer) {
   return decodeSafetensorsHeader(headerBytes);
 }
 
+/**
+ * Parse a safetensors header by reading it from a range source, in place.
+ *
+ * The source is a window of a larger file: a member of an indexed tar, or a stored
+ * member of a zip. Only the head of the member is read, like the URL reader does
+ * (100 KB, then the rest of the header if it is longer), whatever the size of the
+ * member; the member is never fetched whole.
+ *
+ * @param {{size: number, read: (offset: number, length: number, options?: object) => Promise<Uint8Array>}} source
+ * @param {object} [options]
+ * @param {(phase: string, detail?: object) => void} [options.onProgress]
+ *     Same phases as `parseSafetensorsMetadata`.
+ * @param {AbortSignal} [options.signal]
+ * @returns {Promise<{ metadata: object|null, tensors: object }>}
+ */
+export async function parseSafetensorsMetadataFromSource(source, options = {}) {
+  const { onProgress = () => {}, signal } = options;
+
+  onProgress("range-head", { bytes: SAFETENSORS_FIRST_READ_BYTES });
+  const first = await source.read(0, SAFETENSORS_FIRST_READ_BYTES + 1, {
+    signal,
+  });
+  if (first.byteLength < 8) {
+    throw new SafetensorsFormatError(
+      `Truncated member (${first.byteLength} bytes), expected at least 8 for header length prefix`,
+    );
+  }
+  const headerLen = Number(
+    new DataView(first.buffer, first.byteOffset, first.byteLength).getBigUint64(
+      0,
+      /* littleEndian */ true,
+    ),
+  );
+  if (headerLen > SAFETENSORS_MAX_HEADER_LENGTH) {
+    throw new SafetensorsFormatError(
+      `Safetensors header too large: ${headerLen} > ${SAFETENSORS_MAX_HEADER_LENGTH}`,
+    );
+  }
+  if (8 + headerLen > source.size) {
+    throw new SafetensorsFormatError(
+      `Member is shorter than its declared header (need ${8 + headerLen} bytes, have ${source.size})`,
+    );
+  }
+
+  let headerBytes;
+  if (headerLen + 8 <= first.byteLength) {
+    headerBytes = first.subarray(8, 8 + headerLen);
+  } else {
+    onProgress("range-full", { bytes: headerLen });
+    headerBytes = await source.read(8, headerLen, { signal });
+  }
+
+  onProgress("parsing");
+  const result = decodeSafetensorsHeader(headerBytes);
+  onProgress("done");
+  return result;
+}
+
 function decodeSafetensorsHeader(headerBytes) {
   let raw;
   try {

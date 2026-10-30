@@ -23,12 +23,14 @@ import {
   formatHumanReadable,
   parseSafetensorsMetadata,
   parseSafetensorsMetadataFromBuffer,
+  parseSafetensorsMetadataFromSource,
   summarizeSafetensors,
   SafetensorsFetchError,
 } from "@/utils/safetensors";
 import {
   parseParquetMetadata,
   parseParquetMetadataFromBuffer,
+  parseParquetMetadataFromSource,
   summarizeParquetSchema,
 } from "@/utils/parquet";
 import { KIND, decodeError } from "@/errors";
@@ -40,7 +42,7 @@ const props = defineProps({
   active: { type: Boolean, default: true },
   pageMode: { type: Boolean, default: false },
   kind: { type: String, required: true }, // "safetensors" | "parquet"
-  // One of resolveUrl OR bytes is required:
+  // One of resolveUrl, bytes OR source is required:
   //   - resolveUrl: standard /resolve/ URL — Range-read against
   //     S3/MinIO. The default code path used by RepoViewer.
   //   - bytes: a Uint8Array already in memory. Used by
@@ -50,6 +52,10 @@ const props = defineProps({
   //     against the source URL, which `blob:` URLs do not honour.
   resolveUrl: { type: String, default: "" },
   bytes: { type: Object, default: null },
+  //   - source: a range source ({ size, read(offset, length, options) }) over a
+  //     member of an indexed tar or a stored member of a zip. The header or
+  //     footer is read from inside the member, whatever its size.
+  source: { type: Object, default: null },
   filename: { type: String, required: true },
 });
 const state = ref("idle"); // idle | loading | ready | error
@@ -63,7 +69,7 @@ let currentController = null;
 let currentRequestId = 0;
 
 watch(
-  () => [props.active, props.resolveUrl, props.bytes, props.kind],
+  () => [props.active, props.resolveUrl, props.bytes, props.source, props.kind],
   ([active]) => {
     if (active) {
       startLoad();
@@ -104,10 +110,15 @@ async function startLoad() {
     if (props.kind === "safetensors") {
       const header = props.bytes
         ? parseSafetensorsMetadataFromBuffer(props.bytes)
-        : await parseSafetensorsMetadata(props.resolveUrl, {
-            signal: controller.signal,
-            onProgress,
-          });
+        : props.source
+          ? await parseSafetensorsMetadataFromSource(props.source, {
+              signal: controller.signal,
+              onProgress,
+            })
+          : await parseSafetensorsMetadata(props.resolveUrl, {
+              signal: controller.signal,
+              onProgress,
+            });
       result = {
         kind: "safetensors",
         header,
@@ -116,10 +127,15 @@ async function startLoad() {
     } else if (props.kind === "parquet") {
       const metadata = props.bytes
         ? await parseParquetMetadataFromBuffer(props.bytes)
-        : await parseParquetMetadata(props.resolveUrl, {
-            signal: controller.signal,
-            onProgress,
-          });
+        : props.source
+          ? await parseParquetMetadataFromSource(props.source, {
+              signal: controller.signal,
+              onProgress,
+            })
+          : await parseParquetMetadata(props.resolveUrl, {
+              signal: controller.signal,
+              onProgress,
+            });
       result = {
         kind: "parquet",
         metadata,

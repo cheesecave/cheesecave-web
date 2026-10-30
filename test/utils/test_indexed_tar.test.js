@@ -10,6 +10,7 @@ import {
   buildTreeFromIndex,
   classifyMember,
   compareTarHash,
+  createMemberSource,
   downloadBytesAs,
   extractMemberBytes,
   guessMimeType,
@@ -699,5 +700,50 @@ describe("downloadBytesAs", () => {
       URL.createObjectURL = originalCreate;
       URL.revokeObjectURL = originalRevoke;
     }
+  });
+});
+
+describe("createMemberSource", () => {
+  const tar = Uint8Array.from({ length: 4096 }, (_, i) => i % 251);
+  const ranges = [];
+
+  function serveTar() {
+    ranges.length = 0;
+    server.use(
+      http.get(TAR_URL, ({ request }) => {
+        const range = request.headers.get("range");
+        ranges.push(range);
+        const match = /^bytes=(\d+)-(\d+)$/.exec(range || "");
+        if (!match) return new HttpResponse("missing range", { status: 400 });
+        const start = Number(match[1]);
+        const end = Math.min(Number(match[2]), tar.length - 1);
+        return new HttpResponse(tar.slice(start, end + 1), { status: 206 });
+      }),
+    );
+  }
+
+  it("reads inside a member at its place in the tar", async () => {
+    serveTar();
+    const source = createMemberSource(TAR_URL, { offset: 1024, size: 2000 });
+    expect(source.size).toBe(2000);
+    const bytes = await source.read(10, 6);
+    expect(Array.from(bytes)).toEqual(Array.from(tar.slice(1034, 1040)));
+    expect(ranges).toEqual(["bytes=1034-1039"]);
+  });
+
+  it("does not read past the end of the member", async () => {
+    serveTar();
+    const source = createMemberSource(TAR_URL, { offset: 1024, size: 100 });
+    const bytes = await source.read(90, 500);
+    expect(bytes.length).toBe(10);
+    expect(ranges).toEqual(["bytes=1114-1123"]);
+  });
+
+  it("answers a read of an empty member without a request", async () => {
+    serveTar();
+    const source = createMemberSource(TAR_URL, { offset: 1024, size: 0 });
+    expect(source.size).toBe(0);
+    expect((await source.read(0, 16)).length).toBe(0);
+    expect(ranges).toEqual([]);
   });
 });

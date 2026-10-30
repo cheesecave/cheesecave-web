@@ -801,3 +801,125 @@ describe("safetensors utilities", () => {
     expect(summary.parameters).toEqual({ F32: 4, WEIRD_DTYPE: 10 });
   });
 });
+
+// A member of an indexed tar (or a stored member of a zip) is read in place:
+// the header is read from the front of the member, whatever its size, instead of
+// the whole member being fetched first.
+describe("parseSafetensorsMetadataFromSource", () => {
+  async function load() {
+    return import("@/utils/safetensors");
+  }
+  function countingSource(size, content) {
+    const reads = [];
+    return {
+      reads,
+      size,
+      read: async (offset, length, options) => {
+        reads.push({ offset, length, options });
+        const out = new Uint8Array(Math.min(length, size - offset));
+        out.set(content.subarray(offset, offset + out.length));
+        return out;
+      },
+    };
+  }
+
+  function fileWithHeader(header) {
+    const json = new TextEncoder().encode(JSON.stringify(header));
+    const out = new Uint8Array(8 + json.length);
+    new DataView(out.buffer).setBigUint64(0, BigInt(json.length), true);
+    out.set(json, 8);
+    return out;
+  }
+
+  it("gives the same header as parsing the whole file", async () => {
+    const { parseSafetensorsMetadataFromSource, parseSafetensorsMetadataFromBuffer } = await load();
+    const { bytesSource: make } = await import("@/utils/range-source");
+    const fromSource = await parseSafetensorsMetadataFromSource(make(FIXTURE_BYTES));
+    expect(fromSource).toEqual(parseSafetensorsMetadataFromBuffer(FIXTURE_BYTES));
+  });
+
+  it("reads only the head of a member that is gigabytes long", async () => {
+    const { parseSafetensorsMetadataFromSource, parseSafetensorsMetadataFromBuffer } = await load();
+    const source = countingSource(5_000_000_000, FIXTURE_BYTES);
+    const header = await parseSafetensorsMetadataFromSource(source);
+    expect(header).toEqual(parseSafetensorsMetadataFromBuffer(FIXTURE_BYTES));
+    expect(source.reads).toHaveLength(1);
+    expect(source.reads[0].offset).toBe(0);
+    // Not a byte more than the 100 KB the URL reader asks for
+    expect(source.reads[0].length).toBeLessThanOrEqual(100001);
+  });
+
+  it("reads a header longer than the first read in a second read", async () => {
+    const { parseSafetensorsMetadataFromSource } = await load();
+    const tensors = {};
+    for (let i = 0; i < 3000; i++) {
+      tensors[`layer.${i}.weight`] = { dtype: "F32", shape: [2], data_offsets: [i * 8, i * 8 + 8] };
+    }
+    const file = fileWithHeader({ __metadata__: { format: "pt" }, ...tensors });
+    expect(file.length).toBeGreaterThan(100001);
+    const source = countingSource(file.length + 1_000_000, file);
+    const phases = [];
+    const header = await parseSafetensorsMetadataFromSource(source, { onProgress: (p) => phases.push(p) });
+    expect(Object.keys(header.tensors)).toHaveLength(3000);
+    expect(header.metadata).toEqual({ format: "pt" });
+    expect(source.reads).toHaveLength(2);
+    expect(source.reads[1].offset).toBe(8);
+    expect(phases).toEqual(["range-head", "range-full", "parsing", "done"]);
+  });
+
+  it("reports the phases of a short header", async () => {
+    const { parseSafetensorsMetadataFromSource } = await load();
+    const phases = [];
+    await parseSafetensorsMetadataFromSource(countingSource(FIXTURE_BYTES.length, FIXTURE_BYTES), {
+      onProgress: (p) => phases.push(p),
+    });
+    expect(phases).toEqual(["range-head", "parsing", "done"]);
+  });
+
+  it("hands the abort signal to every read", async () => {
+    const { parseSafetensorsMetadataFromSource } = await load();
+    const signal = new AbortController().signal;
+    const source = countingSource(FIXTURE_BYTES.length, FIXTURE_BYTES);
+    await parseSafetensorsMetadataFromSource(source, { signal });
+    expect(source.reads[0].options).toEqual({ signal });
+  });
+
+  it("refuses a member too short to hold the length prefix", async () => {
+    const { parseSafetensorsMetadataFromSource, SafetensorsFormatError } = await load();
+    await expect(
+      parseSafetensorsMetadataFromSource(countingSource(5, new Uint8Array(5))),
+    ).rejects.toBeInstanceOf(SafetensorsFormatError);
+  });
+
+  it("refuses a header length above the limit", async () => {
+    const { parseSafetensorsMetadataFromSource, SafetensorsFormatError } = await load();
+    const prefix = new Uint8Array(16);
+    new DataView(prefix.buffer).setBigUint64(0, BigInt(200 * 1024 * 1024), true);
+    await expect(
+      parseSafetensorsMetadataFromSource(countingSource(prefix.length, prefix)),
+    ).rejects.toThrow(/too large/);
+    await expect(
+      parseSafetensorsMetadataFromSource(countingSource(prefix.length, prefix)),
+    ).rejects.toBeInstanceOf(SafetensorsFormatError);
+  });
+
+  it("refuses a header that runs past the end of the member", async () => {
+    const { parseSafetensorsMetadataFromSource, SafetensorsFormatError } = await load();
+    const prefix = new Uint8Array(40);
+    new DataView(prefix.buffer).setBigUint64(0, 5000n, true);
+    await expect(
+      parseSafetensorsMetadataFromSource(countingSource(prefix.length, prefix)),
+    ).rejects.toBeInstanceOf(SafetensorsFormatError);
+  });
+
+  it("refuses a header that is not JSON", async () => {
+    const { parseSafetensorsMetadataFromSource, SafetensorsFormatError } = await load();
+    const junk = new TextEncoder().encode("not json at all");
+    const file = new Uint8Array(8 + junk.length);
+    new DataView(file.buffer).setBigUint64(0, BigInt(junk.length), true);
+    file.set(junk, 8);
+    await expect(
+      parseSafetensorsMetadataFromSource(countingSource(file.length, file)),
+    ).rejects.toBeInstanceOf(SafetensorsFormatError);
+  });
+});

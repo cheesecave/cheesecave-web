@@ -109,6 +109,53 @@ export async function parseParquetMetadataFromBuffer(buffer) {
   return decodeParquetMetadata(raw, arrayBuffer.byteLength);
 }
 
+/**
+ * hyparquet's view of a range source: `slice(start, end)` reads that part of the
+ * file. The bytes are copied into a buffer of this realm, as the in-memory variant
+ * does, because the metadata reader hands them to a `DataView`.
+ */
+export function asyncBufferFromSource(source, signal) {
+  return {
+    byteLength: source.size,
+    slice: async (start, end) => {
+      const bytes = await source.read(start, (end ?? source.size) - start, {
+        signal,
+      });
+      const copy = new Uint8Array(bytes.byteLength);
+      copy.set(bytes);
+      return copy.buffer;
+    },
+  };
+}
+
+/**
+ * Parse parquet metadata by reading it from a range source, in place.
+ *
+ * The source is a window of a larger file: a member of an indexed tar, or a stored
+ * member of a zip. Only the footer is read, whatever the size of the member.
+ *
+ * @param {{size: number, read: (offset: number, length: number, options?: object) => Promise<Uint8Array>}} source
+ * @param {object} [options]
+ * @param {(phase: string, detail?: object) => void} [options.onProgress]
+ *     Same phases as `parseParquetMetadata`.
+ * @param {AbortSignal} [options.signal]
+ * @returns {Promise<ReturnType<typeof parseParquetMetadata>>}
+ */
+export async function parseParquetMetadataFromSource(source, options = {}) {
+  const { onProgress = () => {}, signal } = options;
+
+  onProgress("head");
+  const buffer = asyncBufferFromSource(source, signal);
+
+  onProgress("footer", { byteLength: buffer.byteLength });
+  const raw = await parquetMetadataAsync(buffer);
+
+  onProgress("parsing");
+  const result = decodeParquetMetadata(raw, buffer.byteLength);
+  onProgress("done");
+  return result;
+}
+
 function decodeParquetMetadata(raw, byteLength) {
   const schemaTree = parquetSchema(raw);
   const keyValueMetadata = (raw.key_value_metadata ?? []).map((kv) => ({

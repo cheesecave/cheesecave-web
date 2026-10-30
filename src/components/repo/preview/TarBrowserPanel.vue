@@ -23,6 +23,7 @@ import {
   parseTarIndex,
   buildTreeFromIndex,
   listDirectory,
+  createMemberSource,
   extractMemberBytes,
   compareTarHash,
   classifyMember,
@@ -197,6 +198,9 @@ async function startLoad() {
           { offset: node.offset + offset, size: length },
           options,
         ),
+      // A range source over the member, to read a header or a footer from
+      // inside it (null when the member cannot be read in place)
+      range: async (node) => createMemberSource(tarUrl, node),
     };
     tree.value = buildTreeFromIndex(payload.files);
     state.value = "ready";
@@ -235,6 +239,8 @@ async function loadZip(requestId) {
       url: archive.url,
       read: (node, size, options) =>
         archive.read(node.path, { limit: size, ...options }),
+      // Only a member stored without compression can be read from the middle
+      range: (node, options) => archive.rangeSource(node.path, options),
     };
     zipVolumes.value = archive.volumes;
     zipLegacyNames.value = archive.legacyNames;
@@ -462,6 +468,28 @@ async function openMember(node) {
       failMember(err);
     }
     return;
+  }
+
+  // The metadata of a safetensors or a parquet is in its head or its footer:
+  // when the member sits in the archive as it is (a tar member, a stored zip
+  // member) it is read from inside the member, so a member of any size can be
+  // previewed without fetching it. A compressed one falls through to the
+  // whole-member path below, and its size cap.
+  if (cls === "safetensors" || cls === "parquet") {
+    try {
+      const source = await memberSource.value.range(node, {
+        signal: controller.signal,
+      });
+      if (memberAbortController !== controller) return; // superseded
+      if (source) {
+        innerPreviewProps.value = { kind: cls, source, filename: node.name };
+        memberView.value.state = "ready";
+        return;
+      }
+    } catch (err) {
+      failMember(err);
+      return;
+    }
   }
 
   if (cls === "text" || cls === "markdown") {
@@ -782,6 +810,12 @@ watch(innerPreviewProps, (val) => {
             Member is {{ formatBytes(memberView.size) }} — above the
             inline-preview cap. Use the download button to save it
             locally.
+          </p>
+          <p v-if="props.zip" class="text-xs text-gray-500 dark:text-gray-400">
+            A zip member compressed with deflate has to be fetched and inflated
+            whole. A member stored without compression, or a member of an
+            indexed tar, is read in place and has no such cap for metadata
+            previews.
           </p>
         </div>
 
@@ -1146,6 +1180,7 @@ watch(innerPreviewProps, (val) => {
     v-model:visible="innerPreviewVisible"
     :kind="innerPreviewProps.kind"
     :bytes="innerPreviewProps.bytes"
+    :source="innerPreviewProps.source"
     :filename="innerPreviewProps.filename"
   />
 </template>

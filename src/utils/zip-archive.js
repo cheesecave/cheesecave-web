@@ -38,6 +38,7 @@ import {
 import { repoAPI } from "@/utils/api";
 import { buildResolveUrl, zipEntryVolume } from "@/utils/file-preview";
 import { normalizeSegments } from "@/utils/indexed-tar";
+import { memberSource } from "@/utils/range-source";
 
 // The decoders run on the main thread like the indexed-tar reader; it
 // also keeps zip.js from spawning blob-URL workers.
@@ -119,6 +120,16 @@ async function rangeBody(response, start, end) {
   }
   return slice;
 }
+
+// Bytes `[start, start + length)` of `url` (fewer at the end of the file)
+async function rangeBytes(url, start, length, signal) {
+  const end = start + length - 1;
+  return rangeBody(await rangeFetch(url, start, end, signal), start, end);
+}
+
+const STORED = 0;
+const LOCAL_HEADER_SIGNATURE = 0x04034b50;
+const LOCAL_HEADER_FIXED_BYTES = 30;
 
 export class RangeReader extends Reader {
   constructor(url, size) {
@@ -651,6 +662,47 @@ class ZipArchive {
     const failed = results.find((r) => r.status === "rejected");
     if (!matches.length && failed) throw failed.reason;
     return matches;
+  }
+
+  /**
+   * A range source over the member at `path` when it can be read in place, else
+   * null. A member stored without compression sits in the archive as it is, so
+   * reading inside it is reading the archive from the start of its data; a
+   * deflated or encrypted member cannot be read that way, and neither can any
+   * member of an archive made of several volumes. The local file header is read
+   * once, to find where the data starts.
+   */
+  async rangeSource(path, { signal } = {}) {
+    const entry = this.entryFor(path);
+    if (
+      entry.compressionMethod !== STORED ||
+      isPasswordProtected(entry) ||
+      this.volumes.length !== 1 ||
+      entry.compressedSize !== entry.uncompressedSize
+    ) {
+      return null;
+    }
+    const total = this.volumes[0].size;
+    const header = await rangeBytes(
+      this.url,
+      entry.offset,
+      LOCAL_HEADER_FIXED_BYTES,
+      signal,
+    );
+    const view = new DataView(header.buffer, header.byteOffset, header.length);
+    if (view.getUint32(0, true) !== LOCAL_HEADER_SIGNATURE) return null;
+    const start =
+      entry.offset +
+      LOCAL_HEADER_FIXED_BYTES +
+      view.getUint16(26, true) + // file name length
+      view.getUint16(28, true); // extra field length
+    if (start + entry.uncompressedSize > total) return null;
+    return memberSource(
+      (offset, length, options) =>
+        rangeBytes(this.url, offset, length, options?.signal),
+      start,
+      entry.uncompressedSize,
+    );
   }
 
   /**
