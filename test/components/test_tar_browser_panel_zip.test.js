@@ -193,6 +193,30 @@ describe("TarBrowserPanel · zip mode", () => {
     await until(() => expect(wrapper.text()).toContain("Readme"));
   });
 
+  it("lists the members in natural order, folders first", async () => {
+    serveRepo({
+      "a/order.zip": await makeZip([
+        ["img_10.png", text("a")],
+        ["img_2.png", text("b")],
+        ["img_1.png", text("c")],
+        ["part-10/a.txt", text("d")],
+        ["part-2/a.txt", text("e")],
+      ]),
+    });
+    const wrapper = mountPanel("a/order.zip");
+    await until(() => expect(wrapper.text()).toContain("5 files in archive"));
+    const rows = wrapper
+      .findAll(".cursor-pointer")
+      .map((row) => row.text())
+      .join("\n");
+    const at = (name) => rows.indexOf(name);
+    expect(at("part-2")).toBeGreaterThanOrEqual(0);
+    expect(at("part-2")).toBeLessThan(at("part-10"));
+    expect(at("part-10")).toBeLessThan(at("img_1.png"));
+    expect(at("img_1.png")).toBeLessThan(at("img_2.png"));
+    expect(at("img_2.png")).toBeLessThan(at("img_10.png"));
+  });
+
   it("asks for the password once at entry, then previews without asking again", async () => {
     serveRepo({ "secret.zip": fixture("crypto-aes256.zip") });
     const wrapper = mountPanel("secret.zip");
