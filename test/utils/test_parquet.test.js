@@ -235,3 +235,69 @@ describe("parquet utilities", () => {
     expect(phases[phases.length - 1]).toBe("done");
   });
 });
+
+// A parquet member of an indexed tar (or a stored member of a zip) is read in
+// place: only its footer is fetched, whatever the size of the member.
+describe("parseParquetMetadataFromSource", () => {
+  // The fixture sits at the end of a file `size` bytes long, as a member's footer
+  // sits at the end of the member; everything before it reads as zeros.
+  function tailSource(size, content) {
+    const reads = [];
+    return {
+      reads,
+      size,
+      read: async (offset, length, options) => {
+        reads.push({ offset, length, options });
+        const end = Math.min(offset + length, size);
+        const out = new Uint8Array(Math.max(0, end - offset));
+        const base = size - content.length;
+        for (let p = Math.max(offset, base); p < end; p++) out[p - offset] = content[p - base];
+        return out;
+      },
+    };
+  }
+
+  it("gives the same metadata as parsing the whole file", async () => {
+    const { parseParquetMetadataFromSource, parseParquetMetadataFromBuffer } = await import("@/utils/parquet");
+    const { bytesSource } = await import("@/utils/range-source");
+    const fromSource = await parseParquetMetadataFromSource(bytesSource(FIXTURE_BYTES));
+    expect(fromSource).toEqual(await parseParquetMetadataFromBuffer(FIXTURE_BYTES));
+  });
+
+  it("reads only the footer of a member that is gigabytes long", async () => {
+    const { parseParquetMetadataFromSource, parseParquetMetadataFromBuffer } = await import("@/utils/parquet");
+    const source = tailSource(3_000_000_000, FIXTURE_BYTES);
+    const metadata = await parseParquetMetadataFromSource(source);
+    const whole = await parseParquetMetadataFromBuffer(FIXTURE_BYTES);
+    expect(metadata.byteLength).toBe(3_000_000_000);
+    expect(metadata.numRows).toBe(whole.numRows);
+    expect(metadata.schema).toEqual(whole.schema);
+    expect(source.reads.length).toBeLessThanOrEqual(3);
+    const total = source.reads.reduce((sum, r) => sum + r.length, 0);
+    expect(total).toBeLessThan(1024 * 1024);
+    // every read is at the end of the member
+    for (const r of source.reads) expect(r.offset + r.length).toBeGreaterThan(3_000_000_000 - 1024 * 1024);
+  });
+
+  it("reports the phases and hands the abort signal to the reads", async () => {
+    const { parseParquetMetadataFromSource } = await import("@/utils/parquet");
+    const phases = [];
+    const signal = new AbortController().signal;
+    const source = tailSource(FIXTURE_BYTES.length, FIXTURE_BYTES);
+    await parseParquetMetadataFromSource(source, { onProgress: (p) => phases.push(p), signal });
+    expect(phases[0]).toBe("head");
+    expect(phases).toContain("footer");
+    expect(phases).toContain("parsing");
+    expect(phases[phases.length - 1]).toBe("done");
+    expect(source.reads.every((r) => r.options?.signal === signal)).toBe(true);
+  });
+
+  it("serves a slice without an end as the rest of the member", async () => {
+    const { asyncBufferFromSource } = await import("@/utils/parquet");
+    const { bytesSource } = await import("@/utils/range-source");
+    const buffer = asyncBufferFromSource(bytesSource(Uint8Array.of(1, 2, 3, 4, 5, 6)));
+    expect(buffer.byteLength).toBe(6);
+    expect(Array.from(new Uint8Array(await buffer.slice(2)))).toEqual([3, 4, 5, 6]);
+    expect(Array.from(new Uint8Array(await buffer.slice(1, 3)))).toEqual([2, 3]);
+  });
+});

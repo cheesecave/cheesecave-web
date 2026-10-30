@@ -16,9 +16,10 @@ import FileMetadataPanel from "@/components/repo/preview/FileMetadataPanel.vue";
 const props = defineProps({
   visible: { type: Boolean, required: true },
   kind: { type: String, required: true }, // "safetensors" | "parquet"
-  // One of resolveUrl OR bytes is required (see FileMetadataPanel)
+  // One of resolveUrl, bytes OR source is required (see FileMetadataPanel)
   resolveUrl: { type: String, default: "" },
   bytes: { type: Object, default: null },
+  source: { type: Object, default: null },
   filename: { type: String, required: true },
 });
 const emit = defineEmits(["update:visible"]);
@@ -53,6 +54,7 @@ const title = computed(() => {
       :kind="kind"
       :resolve-url="resolveUrl"
       :bytes="bytes"
+      :source="source"
       :filename="filename"
     />
 

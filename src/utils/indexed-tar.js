@@ -25,6 +25,7 @@
 
 import { mediaKind, mediaMime } from "@/utils/media-types";
 import { sortByName } from "@/utils/natural-sort";
+import { memberSource } from "@/utils/range-source";
 
 const SUPPORTED_TOP_LEVEL_KEYS = ["filesize", "hash", "hash_lfs", "files"];
 
@@ -292,6 +293,24 @@ export function buildMemberRangeHeader(info) {
     );
   }
   return `bytes=${info.offset}-${info.offset + info.size - 1}`;
+}
+
+/**
+ * A range source over one member of an indexed tar: reading it at `offset` is
+ * reading the tar at `member offset + offset`. A reader of a data format (the
+ * header of a safetensors, the footer of a parquet) takes what it needs from a
+ * member of any size without extracting the member.
+ *
+ * @param {string} tarUrl
+ * @param {{offset: number, size: number}} node - a member of the index
+ */
+export function createMemberSource(tarUrl, node) {
+  return memberSource(
+    (offset, length, options) =>
+      extractMemberBytes(tarUrl, { offset, size: length }, options),
+    node.offset,
+    node.size,
+  );
 }
 
 /**

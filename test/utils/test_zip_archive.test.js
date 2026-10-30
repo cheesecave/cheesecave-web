@@ -1209,3 +1209,156 @@ describe("volumes and damaged archives", () => {
     expect(new ZipArchiveError("y").kind).toBe("format");
   });
 });
+
+// A member stored without compression sits in the archive as it is, so it can be
+// read from the middle like a member of an indexed tar. A deflated member cannot:
+// its bytes have to be inflated from the start.
+describe("rangeSource", () => {
+  const PAYLOAD = Uint8Array.from({ length: 5000 }, (_, i) => (i * 7) % 251);
+
+  const buildStored = () =>
+    makeZip([
+      ["a.txt", text("first member\n"), { level: 0 }],
+      ["dir/model.bin", PAYLOAD, { level: 0 }],
+      ["packed.bin", PAYLOAD, { level: 5 }],
+    ]);
+
+  const spans = () =>
+    requests.map((r) => {
+      const [, a, b] = /^bytes=(\d+)-(\d+)$/.exec(r.range);
+      return { start: Number(a), length: Number(b) - Number(a) + 1 };
+    });
+
+  // Overwrite `bytes` at `at` with the little-endian `value` of `width` bytes
+  function poke(bytes, at, value, width) {
+    for (let i = 0; i < width; i++) bytes[at + i] = (value >> (8 * i)) & 0xff;
+  }
+
+  // Offset of the central directory record of the member called `name`
+  function centralRecord(bytes, name) {
+    const wanted = text(name);
+    for (let i = bytes.length - 46; i >= 0; i--) {
+      if (
+        bytes[i] === 0x50 && bytes[i + 1] === 0x4b &&
+        bytes[i + 2] === 0x01 && bytes[i + 3] === 0x02
+      ) {
+        const len = bytes[i + 28] | (bytes[i + 29] << 8);
+        const found = bytes.slice(i + 46, i + 46 + len);
+        if (found.length === wanted.length && found.every((b, k) => b === wanted[k])) return i;
+      }
+    }
+    throw new Error(`no central record for ${name}`);
+  }
+
+  it("reads inside a stored member at its place in the archive", async () => {
+    serveRepo({ "a/set.zip": await buildStored() });
+    const archive = await open("a/set.zip");
+    requests.length = 0;
+    const source = await archive.rangeSource("dir/model.bin");
+    expect(source.size).toBe(5000);
+    const bytes = await source.read(100, 50);
+    expect(Array.from(bytes)).toEqual(Array.from(PAYLOAD.slice(100, 150)));
+    // the local header (to find where the data starts) and the 50 bytes asked for
+    const made = spans();
+    expect(made.length).toBeLessThanOrEqual(2);
+    expect(made.at(-1).length).toBe(50);
+    expect(made.reduce((sum, r) => sum + r.length, 0)).toBeLessThan(400);
+  });
+
+  it("reads a whole stored member, the first one of the archive included", async () => {
+    serveRepo({ "a/set.zip": await buildStored() });
+    const archive = await open("a/set.zip");
+    const model = await archive.rangeSource("dir/model.bin");
+    expect(Array.from(await model.read(0, 5000))).toEqual(Array.from(PAYLOAD));
+    const first = await archive.rangeSource("a.txt");
+    expect(decode(await first.read(0, 100))).toBe("first member\n");
+  });
+
+  it("hands the abort signal of a read to the request", async () => {
+    serveRepo({ "a/set.zip": await buildStored() });
+    const archive = await open("a/set.zip");
+    const source = await archive.rangeSource("dir/model.bin");
+    const controller = new AbortController();
+    const bytes = await source.read(0, 4, { signal: controller.signal });
+    expect(Array.from(bytes)).toEqual(Array.from(PAYLOAD.slice(0, 4)));
+    controller.abort();
+    await expect(source.read(0, 4, { signal: controller.signal })).rejects.toMatchObject({
+      name: "AbortError",
+    });
+  });
+
+  it("does not read past the end of the member", async () => {
+    serveRepo({ "a/set.zip": await buildStored() });
+    const archive = await open("a/set.zip");
+    const source = await archive.rangeSource("dir/model.bin");
+    expect((await source.read(4990, 100)).length).toBe(10);
+    expect((await source.read(5000, 100)).length).toBe(0);
+  });
+
+  it("has no range source for a deflated member", async () => {
+    serveRepo({ "a/set.zip": await buildStored() });
+    const archive = await open("a/set.zip");
+    expect(await archive.rangeSource("packed.bin")).toBeNull();
+  });
+
+  it("has no range source for a stored member that is encrypted", async () => {
+    serveRepo({
+      "a/crypt.zip": await makeZip([
+        ["secret.bin", PAYLOAD, { level: 0, password: "pw", zipCrypto: true }],
+      ]),
+    });
+    const archive = await open("a/crypt.zip");
+    expect(await archive.rangeSource("secret.bin")).toBeNull();
+  });
+
+  it("has no range source for an archive made of several volumes", async () => {
+    serveRepo({
+      "sets/split-infozip.z01": fixture("split-infozip.z01"),
+      "sets/split-infozip.z02": fixture("split-infozip.z02"),
+      "sets/split-infozip.zip": fixture("split-infozip.zip"),
+    });
+    const archive = await open("sets/split-infozip.zip");
+    expect(archive.volumes.length).toBeGreaterThan(1);
+    expect(await archive.rangeSource("blob.bin")).toBeNull();
+  });
+
+  it("names a member that is not in the archive", async () => {
+    serveRepo({ "a/set.zip": await buildStored() });
+    const archive = await open("a/set.zip");
+    await expect(archive.rangeSource("nope.bin")).rejects.toBeInstanceOf(ZipArchiveError);
+  });
+
+  it("has no range source when the local header is not a local header", async () => {
+    const bytes = await buildStored();
+    poke(bytes, 0, 0, 4); // the first member's local header signature
+    serveRepo({ "a/set.zip": bytes });
+    const archive = await open("a/set.zip");
+    expect(await archive.rangeSource("a.txt")).toBeNull();
+  });
+
+  it("has no range source when the data would end past the archive", async () => {
+    const bytes = await buildStored();
+    poke(bytes, 26, 0xffff, 2); // the first member's local file name length
+    serveRepo({ "a/set.zip": bytes });
+    const archive = await open("a/set.zip");
+    expect(await archive.rangeSource("a.txt")).toBeNull();
+  });
+
+  it("has no range source when the sizes of a stored member disagree", async () => {
+    const bytes = await buildStored();
+    poke(bytes, centralRecord(bytes, "a.txt") + 24, 99, 4); // uncompressed size
+    serveRepo({ "a/set.zip": bytes });
+    const archive = await open("a/set.zip");
+    expect(await archive.rangeSource("a.txt")).toBeNull();
+  });
+
+  it("stops when the caller aborts", async () => {
+    serveRepo({ "a/set.zip": await buildStored() });
+    const archive = await open("a/set.zip");
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      archive.rangeSource("dir/model.bin", { signal: controller.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  });
+});

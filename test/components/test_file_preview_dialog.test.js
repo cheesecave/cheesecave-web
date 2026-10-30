@@ -133,6 +133,17 @@ vi.mock("@/utils/safetensors", () => ({
       },
     },
   })),
+  parseSafetensorsMetadataFromSource: vi.fn(async () => ({
+    metadata: null,
+    tensors: {
+      "w.bias": {
+        dtype: "F16",
+        shape: [3],
+        parameters: 3,
+        data_offsets: [0, 6],
+      },
+    },
+  })),
   // Compute totals from the actual header so tests exercising the
   // human-readable toggle see a number large enough to render
   // differently under the two formats ("1.23B" vs "1,234,567,890").
@@ -233,6 +244,12 @@ vi.mock("@/utils/parquet", () => ({
     createdBy: null,
     rowGroups: [{ numRows: 7, totalByteSize: 40 }],
   })),
+  parseParquetMetadataFromSource: vi.fn(async () => ({
+    byteLength: 64,
+    numRows: 7,
+    createdBy: null,
+    rowGroups: [{ numRows: 7, totalByteSize: 40 }],
+  })),
   summarizeParquetSchema: vi.fn(() => ({
     columnCount: 1,
     columns: [
@@ -253,10 +270,12 @@ import {
   buildTensorTree,
   summarizeSafetensors,
   parseSafetensorsMetadataFromBuffer,
+  parseSafetensorsMetadataFromSource,
 } from "@/utils/safetensors";
 import {
   summarizeParquetSchema,
   parseParquetMetadataFromBuffer,
+  parseParquetMetadataFromSource,
 } from "@/utils/parquet";
 
 function mountDialog(props) {
@@ -832,6 +851,49 @@ describe("FileMetadataPanel", () => {
     wrapper.unmount();
   });
 
+  it("reads safetensors in place from a range source, without a request of its own", async () => {
+    const source = { size: 5_000_000_000, read: vi.fn() };
+    const wrapper = mountPanel({ kind: "safetensors", source });
+    await flushPromises();
+    expect(parseSafetensorsMetadataFromSource).toHaveBeenCalledTimes(1);
+    const [given, options] = parseSafetensorsMetadataFromSource.mock.calls[0];
+    // a prop is wrapped in a reactive proxy: compare what it carries
+    expect(given.size).toBe(source.size);
+    expect(given.read).toBe(source.read);
+    expect(options.signal).toBeInstanceOf(AbortSignal);
+    expect(typeof options.onProgress).toBe("function");
+    expect(parseSafetensorsMetadataFromBuffer).not.toHaveBeenCalled();
+    expect(safetensorsCtrl.calls).toHaveLength(0);
+    expect(wrapper.text()).toContain("Total parameters");
+    wrapper.unmount();
+  });
+
+  it("reads parquet in place from a range source, without a request of its own", async () => {
+    const source = { size: 5_000_000_000, read: vi.fn() };
+    const wrapper = mountPanel({ kind: "parquet", source });
+    await flushPromises();
+    expect(parseParquetMetadataFromSource).toHaveBeenCalledTimes(1);
+    const [given, options] = parseParquetMetadataFromSource.mock.calls[0];
+    // a prop is wrapped in a reactive proxy: compare what it carries
+    expect(given.size).toBe(source.size);
+    expect(given.read).toBe(source.read);
+    expect(options.signal).toBeInstanceOf(AbortSignal);
+    expect(parseParquetMetadataFromBuffer).not.toHaveBeenCalled();
+    expect(parquetCtrl.calls).toHaveLength(0);
+    expect(wrapper.text()).toContain("Row groups");
+    wrapper.unmount();
+  });
+
+  it("prefers the bytes when a member was already extracted", async () => {
+    const bytes = new Uint8Array(4);
+    const source = { size: 4, read: vi.fn() };
+    const wrapper = mountPanel({ kind: "safetensors", bytes, source });
+    await flushPromises();
+    expect(parseSafetensorsMetadataFromBuffer).toHaveBeenCalledWith(bytes);
+    expect(parseSafetensorsMetadataFromSource).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
   it("reads parquet from in-memory bytes without a request", async () => {
     const bytes = new Uint8Array(4);
     const wrapper = mountPanel({ kind: "parquet", bytes });
@@ -974,6 +1036,22 @@ describe("FileMetadataPanel", () => {
     expect(wrapper.vm.parquetColumnRows).toEqual([
       { name: "group", physicalType: "", logicalType: "", repetition: "" },
     ]);
+    wrapper.unmount();
+  });
+});
+
+describe("FilePreviewDialog with a range source", () => {
+  it("hands the source to the panel, which reads in place", async () => {
+    vi.clearAllMocks();
+    const source = { size: 5_000_000_000, read: vi.fn() };
+    const wrapper = mountDialog({
+      kind: "safetensors",
+      source,
+      filename: "model.safetensors",
+    });
+    await flushPromises();
+    expect(parseSafetensorsMetadataFromSource).toHaveBeenCalledTimes(1);
+    expect(parseSafetensorsMetadataFromSource.mock.calls[0][0].read).toBe(source.read);
     wrapper.unmount();
   });
 });
