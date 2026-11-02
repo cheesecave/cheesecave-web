@@ -1280,6 +1280,87 @@ export const likesAPI = {
       .then(normalizeLikersResponse),
 };
 
+// A collection slug comes from the address bar (a route parameter) and from answers of the server, and goes into the
+// path of requests that change things (delete, upvote, add). It is checked and encoded segment by segment, so a crafted
+// link such as /collections/..%2F..%2Fapi/x cannot make the signed-in user's session reach another endpoint.
+const SLUG_SEGMENT = /^[\p{L}\p{N}][\p{L}\p{N}._-]*$/u;
+const ITEM_ID = /^[0-9a-f]{24}$/i;
+
+function notFound() {
+  return Object.assign(new Error("Collection not found"), {
+    response: { status: 404, data: { error: "Collection not found" }, headers: {} },
+  });
+}
+
+function slugPath(slug) {
+  const parts = typeof slug === "string" ? slug.split("/") : [];
+  if (parts.length !== 2 || !parts.every((part) => SLUG_SEGMENT.test(part))) {
+    throw notFound();
+  }
+  return parts.map(encodeURIComponent).join("/");
+}
+
+function itemIdPath(itemId) {
+  if (typeof itemId !== "string" || !ITEM_ID.test(itemId)) throw notFound();
+  return itemId;
+}
+
+/** Runs a request builder; a refused slug becomes a rejected promise, not an exception in the caller */
+function guarded(run) {
+  try {
+    return run();
+  } catch (err) {
+    return Promise.reject(err);
+  }
+}
+
+/**
+ * Collections API (the Hugging Face routes, plus upvotes and `sort=position`)
+ */
+export const collectionsAPI = {
+  /** params: owner (a name or a list), item ("models/a/b"), q, sort, limit, cursor, expand */
+  list: (params = {}) => {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      for (const one of Array.isArray(value) ? value : [value]) {
+        if (one !== undefined && one !== null && one !== "") query.append(key, one);
+      }
+    }
+    return api.get(`/api/collections?${query.toString()}`);
+  },
+  get: (slug) => guarded(() => api.get(`/api/collections/${slugPath(slug)}`)),
+  create: (body) => api.post("/api/collections", body),
+  update: (slug, body) =>
+    guarded(() => api.patch(`/api/collections/${slugPath(slug)}`, body)),
+  remove: (slug) =>
+    guarded(() => api.delete(`/api/collections/${slugPath(slug)}`)),
+  addItem: (slug, item, note) =>
+    guarded(() =>
+      api.post(`/api/collections/${slugPath(slug)}/items`, { item, note }),
+    ),
+  updateItem: (slug, itemId, body) =>
+    guarded(() =>
+      api.patch(
+        `/api/collections/${slugPath(slug)}/items/${itemIdPath(itemId)}`,
+        body,
+      ),
+    ),
+  removeItem: (slug, itemId) =>
+    guarded(() =>
+      api.delete(
+        `/api/collections/${slugPath(slug)}/items/${itemIdPath(itemId)}`,
+      ),
+    ),
+  batchItems: (slug, actions) =>
+    guarded(() =>
+      api.post(`/api/collections/${slugPath(slug)}/items/batch`, actions),
+    ),
+  upvote: (slug) =>
+    guarded(() => api.post(`/api/collections/${slugPath(slug)}/upvote`)),
+  removeUpvote: (slug) =>
+    guarded(() => api.delete(`/api/collections/${slugPath(slug)}/upvote`)),
+};
+
 /**
  * Stats API
  */

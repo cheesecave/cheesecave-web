@@ -1,3 +1,6 @@
-import { setupServer } from "@/testing/msw";
+import { http, HttpResponse, setupServer } from "@/testing/msw";
 
-export const server = setupServer();
+// Every profile page asks for the owner's collections; tests that care override this
+export const server = setupServer(
+  http.get("*/api/collections", () => HttpResponse.json([])),
+);

@@ -89,6 +89,7 @@ describe("TheHeader", () => {
     ["Models", "/models", "i-carbon-model", "text-blue-500"],
     ["Datasets", "/datasets", "i-carbon-data-table", "text-green-500"],
     ["Spaces", "/spaces", "i-carbon-application", "text-purple-500"],
+    ["Collections", "/collections", "i-carbon-folder", "text-amber-500"],
     ["Organizations", "/organizations", "i-carbon-group", "text-orange-500"],
   ];
 
@@ -218,14 +219,17 @@ describe("TheHeader", () => {
     expect(
       drawer.findAll(".cursor-pointer").map((item) => item.text()),
     ).toEqual([...creationLabels, ...accountLabels]);
-    navigationEntries.forEach(([, , icon, color], index) => {
-      for (const item of [
-        desktopMenus[0].findAll("button")[index],
-        mobileAction(drawer, creationLabels[index]),
-      ]) {
-        expect(item.get(`.${icon}`).classes()).toContain(color);
-      }
-    });
+    // Collections has no "New ..." entry in the creation menu
+    navigationEntries
+      .filter(([label]) => label !== "Collections")
+      .forEach(([, , icon, color], index) => {
+        for (const item of [
+          desktopMenus[0].findAll("button")[index],
+          mobileAction(drawer, creationLabels[index]),
+        ]) {
+          expect(item.get(`.${icon}`).classes()).toContain(color);
+        }
+      });
     expect(mobileAction(drawer, "Logout").classes()).toContain("text-red-600");
     wrapper.unmount();
   });
