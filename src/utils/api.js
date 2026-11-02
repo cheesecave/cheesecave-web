@@ -1281,6 +1281,36 @@ export const likesAPI = {
 };
 
 /**
+ * Collections API (the Hugging Face routes, plus upvotes and `sort=position`)
+ */
+export const collectionsAPI = {
+  /** params: owner (a name or a list), item ("models/a/b"), q, sort, limit, cursor, expand */
+  list: (params = {}) => {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      for (const one of Array.isArray(value) ? value : [value]) {
+        if (one !== undefined && one !== null && one !== "") query.append(key, one);
+      }
+    }
+    return api.get(`/api/collections?${query.toString()}`);
+  },
+  get: (slug) => api.get(`/api/collections/${slug}`),
+  create: (body) => api.post("/api/collections", body),
+  update: (slug, body) => api.patch(`/api/collections/${slug}`, body),
+  remove: (slug) => api.delete(`/api/collections/${slug}`),
+  addItem: (slug, item, note) =>
+    api.post(`/api/collections/${slug}/items`, { item, note }),
+  updateItem: (slug, itemId, body) =>
+    api.patch(`/api/collections/${slug}/items/${itemId}`, body),
+  removeItem: (slug, itemId) =>
+    api.delete(`/api/collections/${slug}/items/${itemId}`),
+  batchItems: (slug, actions) =>
+    api.post(`/api/collections/${slug}/items/batch`, actions),
+  upvote: (slug) => api.post(`/api/collections/${slug}/upvote`),
+  removeUpvote: (slug) => api.delete(`/api/collections/${slug}/upvote`),
+};
+
+/**
  * Stats API
  */
 export const statsAPI = {

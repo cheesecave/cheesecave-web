@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from "vue";
 import LinkButton from "@/components/common/LinkButton.vue";
+import AddToCollectionMenu from "@/components/collections/AddToCollectionMenu.vue";
 import { externalRepoUrl } from "@/utils/external-repo";
 import { getRepositoryType } from "@/utils/repository-types";
 
@@ -101,6 +102,11 @@ const tabIcons = {
                 <span>{{ likesCount }} likes</span>
               </span>
             </template>
+            <AddToCollectionMenu
+              v-if="repoInfo && signedIn && !repoInfo.private"
+              :repo-type="repoType"
+              :repo-id="`${namespace}/${name}`"
+            />
             <button
               type="button"
               class="repository-copy"
