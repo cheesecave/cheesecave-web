@@ -182,7 +182,8 @@ onMounted(load);
         :style="{ '--theme': themeColor(collection.theme) }"
       >
         <div class="flex flex-wrap items-start gap-3">
-          <div class="flex-1 min-w-0">
+          <!-- At least 16rem wide, so on a phone the buttons wrap below instead of squeezing the title -->
+          <div class="flex-1" style="min-width: min(100%, 16rem)">
             <div class="text-xs uppercase tracking-wide text-gray-500 mb-1">
               Collection
             </div>
