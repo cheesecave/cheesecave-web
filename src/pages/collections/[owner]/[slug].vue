@@ -258,7 +258,7 @@ onMounted(load);
         </header>
 
         <aside class="card collection-menu" aria-label="Collection menu">
-          <div class="flex flex-wrap gap-2">
+          <div class="collection-menu-actions">
             <el-button
               :type="collection.isUpvotedByUser ? 'primary' : 'default'"
               :aria-pressed="collection.isUpvotedByUser"
@@ -282,7 +282,7 @@ onMounted(load);
               <div
                 role="radiogroup"
                 aria-labelledby="theme-label"
-                class="flex gap-2"
+                class="theme-swatches"
               >
                 <button
                   v-for="name in THEME_NAMES"
@@ -409,6 +409,21 @@ onMounted(load);
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+}
+.collection-menu-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.collection-menu :deep(.el-button) {
+  width: 100%;
+  margin: 0;
+}
+.theme-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.375rem;
 }
 .theme-swatch {
   width: 1.25rem;
