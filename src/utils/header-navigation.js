@@ -44,6 +44,12 @@ export const HEADER_CREATION_ITEMS = [
     icon: repositoryIcon(repository),
     to: `/new?type=${repository.type}`,
   })),
+  // opens the dialog of a new collection on the page of all of them (a link, like the others)
+  {
+    ...collectionEntry,
+    label: "New Collection",
+    to: "/collections?new=1",
+  },
   {
     ...organizationEntry,
     label: "New Organization",

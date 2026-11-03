@@ -339,6 +339,20 @@ describe("workspace sections", () => {
     expect(wrapper.get('[aria-label="Private"]').exists()).toBe(true);
   });
 
+  it("has a place for collections, with a way to make one and a way to see them all", () => {
+    const wrapper = render(WorkspaceSidebar, { username: "alice" });
+    const section = wrapper.get('[aria-label="Your collections"]');
+    expect(section.get("h2").text()).toBe("Your collections");
+    const links = section
+      .findAll("a")
+      .map((a) => [a.text(), a.attributes("href")]);
+    expect(links).toEqual([
+      ["+ New", "/collections?new=1"],
+      ["View all collections →", "/alice/collections"],
+    ]);
+    expect(section.get("a").attributes("aria-label")).toBe("Create collection");
+  });
+
   it("bounds the personal sidebar to seven repositories and three organizations with incremental organization loading", async () => {
     const repositories = Array.from({ length: 10 }, (_, index) => ({
       id: `alice/repo-${index}`,

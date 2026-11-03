@@ -62,11 +62,24 @@ function go(query) {
   router.replace({ path: "/collections", query: { ...route.query, ...query } });
 }
 
+// The "New Collection" of the menus is a link here with `?new=1`: it opens the dialog, and the mark leaves the address so that
+// a reload (or the next visit by the back button) does not open it again
+function openFromAddress() {
+  if (!auth.isAuthenticated || route.query.new === undefined) return;
+  creating.value = true;
+  const { new: _mark, ...rest } = route.query;
+  router.replace({ path: "/collections", query: rest });
+}
+
 watch(
   () => [route.query.sort, route.query.q],
   () => load(),
 );
-onMounted(() => load());
+watch(() => route.query.new, openFromAddress);
+onMounted(() => {
+  load();
+  openFromAddress();
+});
 </script>
 
 <template>

@@ -12,7 +12,7 @@
         <el-radio-group
           v-model="form.type"
           size="large"
-          class="w-full grid grid-cols-1 sm:grid-cols-3 gap-2"
+          class="repository-type-picker"
         >
           <el-radio-button
             v-for="item in REPOSITORY_TYPES"
@@ -74,8 +74,8 @@
       </el-input>
       <div class="text-xs text-gray-500 mt-1">
         <div class="i-carbon-information inline-block mr-1" />
-        1 to 96 letters, numbers, hyphens, underscores and dots; no -- or ..,
-        no hyphen or dot at either end, not ending in .git
+        1 to 96 letters, numbers, hyphens, underscores and dots; no -- or .., no
+        hyphen or dot at either end, not ending in .git
       </div>
     </el-form-item>
 
@@ -116,7 +116,7 @@
 
     <!-- Actions -->
     <div
-      class="flex flex-col-reverse sm:flex-row gap-3 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700"
+      class="create-actions flex flex-col-reverse sm:flex-row gap-3 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700"
     >
       <el-button size="large" @click="cancel" class="w-full sm:w-auto">
         Cancel
@@ -273,3 +273,25 @@ onBeforeUnmount(() => {
   createSequence++;
 });
 </script>
+
+<style scoped>
+/* The gap spaces the buttons; Element Plus also puts a margin-left on a button after a button, which doubled the space on
+   a wide screen and pushed the second button 12px to the right of the first when they are stacked on a phone */
+.create-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+/* One joined control of three equal parts (Element Plus makes a radio group inline-flex, and its buttons are meant to touch) */
+.repository-type-picker {
+  display: flex;
+  width: 100%;
+}
+.repository-type-picker :deep(.el-radio-button) {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.repository-type-picker :deep(.el-radio-button__inner) {
+  width: 100%;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+</style>

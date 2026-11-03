@@ -68,6 +68,21 @@ describe("shared repository creation form", () => {
     expect(help.classes()).toEqual(expect.arrayContaining(["w-full", "mt-1"]));
   });
 
+  it("lays the three repository types out as one control of equal parts, not with utilities Element Plus overrides", async () => {
+    // Element Plus makes a radio group `display: inline-flex`, so the `grid grid-cols-3` that was here never applied: the
+    // buttons took the width of their text, kept the joined look (round corners only at the ends, no left border) and
+    // sat apart by the gap. The group has a class of its own, which the component styles, and no grid utilities.
+    const wrapper = mountForm();
+    await flushPromises();
+    const group = wrapper.findComponent({ name: "ElRadioGroup" });
+    expect(group.classes()).toContain("repository-type-picker");
+    expect(group.classes()).not.toEqual(expect.arrayContaining(["grid"]));
+    expect(group.classes().some((name) => name.startsWith("gap-"))).toBe(false);
+    expect(wrapper.findAllComponents({ name: "ElRadioButton" })).toHaveLength(
+      3,
+    );
+  });
+
   it("uses the same organization, visibility, validation and fallback redirect for a fixed type", async () => {
     mocks.getUserOrgs.mockResolvedValue({
       data: {
@@ -147,7 +162,9 @@ describe("shared repository creation form", () => {
     await flushPromises();
     expect(mocks.error).toHaveBeenCalledWith(
       expect.objectContaining({
-        message: expect.stringContaining("Failed to create space: Quota exceeded"),
+        message: expect.stringContaining(
+          "Failed to create space: Quota exceeded",
+        ),
       }),
     );
     expect(
@@ -160,7 +177,8 @@ describe("shared repository creation form", () => {
   });
 
   describe("the SDK of a Space", () => {
-    const sdkSelect = (wrapper) => wrapper.find('select[aria-label="Select SDK"]');
+    const sdkSelect = (wrapper) =>
+      wrapper.find('select[aria-label="Select SDK"]');
 
     it("asks for an SDK, Gradio unless chosen otherwise, only when creating a Space", async () => {
       const space = mountForm({ fixedType: "space" });
@@ -170,7 +188,11 @@ describe("shared repository creation form", () => {
 
       expect(sdkSelect(space).exists()).toBe(true);
       expect(sdkSelect(space).element.value).toBe("gradio");
-      expect(sdkSelect(space).findAll("option").map((o) => [o.element.value, o.text()])).toEqual([
+      expect(
+        sdkSelect(space)
+          .findAll("option")
+          .map((o) => [o.element.value, o.text()]),
+      ).toEqual([
         ["gradio", "Gradio"],
         ["streamlit", "Streamlit"],
         ["docker", "Docker"],
@@ -183,18 +205,32 @@ describe("shared repository creation form", () => {
     it("sends the chosen SDK, so the Space starts with the card that names it", async () => {
       const wrapper = mountForm({ fixedType: "space" });
       await flushPromises();
-      await wrapper.get('input[placeholder="my-space"], input[placeholder="my-awesome-space"]').setValue("demo");
+      await wrapper
+        .get(
+          'input[placeholder="my-space"], input[placeholder="my-awesome-space"]',
+        )
+        .setValue("demo");
       await sdkSelect(wrapper).setValue("static");
       await button(wrapper, "Create Space").trigger("click");
       await flushPromises();
 
-      expect(mocks.create).toHaveBeenCalledWith({ type: "space", name: "demo", organization: null, private: false, sdk: "static" });
+      expect(mocks.create).toHaveBeenCalledWith({
+        type: "space",
+        name: "demo",
+        organization: null,
+        private: false,
+        sdk: "static",
+      });
     });
 
     it("sends Gradio when the choice was not touched", async () => {
       const wrapper = mountForm({ fixedType: "space" });
       await flushPromises();
-      await wrapper.get('input[placeholder="my-space"], input[placeholder="my-awesome-space"]').setValue("demo");
+      await wrapper
+        .get(
+          'input[placeholder="my-space"], input[placeholder="my-awesome-space"]',
+        )
+        .setValue("demo");
       await button(wrapper, "Create Space").trigger("click");
       await flushPromises();
 
@@ -206,12 +242,21 @@ describe("shared repository creation form", () => {
       await flushPromises();
       await sdkSelect(wrapper).setValue("docker");
       await wrapper.setProps({ initialType: "model" });
-      await wrapper.get('input[placeholder="my-model"], input[placeholder="my-awesome-model"]').setValue("m");
+      await wrapper
+        .get(
+          'input[placeholder="my-model"], input[placeholder="my-awesome-model"]',
+        )
+        .setValue("m");
       await button(wrapper, "Create Model").trigger("click");
       await flushPromises();
 
       expect(sdkSelect(wrapper).exists()).toBe(false);
-      expect(mocks.create).toHaveBeenCalledWith({ type: "model", name: "m", organization: null, private: false });
+      expect(mocks.create).toHaveBeenCalledWith({
+        type: "model",
+        name: "m",
+        organization: null,
+        private: false,
+      });
     });
 
     it("goes back to Gradio when the form is cancelled", async () => {

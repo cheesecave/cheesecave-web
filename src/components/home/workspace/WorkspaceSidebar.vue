@@ -152,6 +152,23 @@ watch([() => props.username, view], () => {
           <RouterLink :to="`/${username}`" class="all-repositories"
             >View all repositories <span aria-hidden="true">→</span></RouterLink
           >
+          <section class="sidebar-section" aria-label="Your collections">
+            <div class="sidebar-heading">
+              <h2>Your collections</h2>
+              <RouterLink
+                to="/collections?new=1"
+                class="workspace-create"
+                aria-label="Create collection"
+                ><span aria-hidden="true">+</span> New</RouterLink
+              >
+            </div>
+            <RouterLink
+              :to="`/${username}/collections`"
+              class="all-repositories"
+              >View all collections
+              <span aria-hidden="true">→</span></RouterLink
+            >
+          </section>
           <section class="sidebar-section">
             <div class="sidebar-heading">
               <h2>Your organizations</h2>
