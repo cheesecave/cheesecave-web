@@ -137,6 +137,9 @@ function onKey(event) {
   color: var(--el-color-primary);
   background: var(--el-fill-color-light, rgba(0, 0, 0, 0.05));
 }
+.inline-edit-form {
+  min-width: min(100%, 24rem);
+}
 .inline-edit-actions {
   display: flex;
   gap: 0.5rem;
