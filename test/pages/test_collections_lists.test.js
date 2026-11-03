@@ -204,6 +204,42 @@ describe("the page of all collections", () => {
   });
 });
 
+describe("the new collection asked for by the address (the menus of the header and of the sidebar)", () => {
+  const open = async () => {
+    const wrapper = mount(CollectionsIndex, { global: { stubs } });
+    await flushPromises();
+    return wrapper;
+  };
+  const dialogOf = (wrapper) =>
+    wrapper.findComponent({ name: "CollectionFormDialog" });
+
+  it("opens the new collection and takes the mark out of the address, keeping the rest of it", async () => {
+    mocks.route.query = { new: "1", sort: "upvotes" };
+    const wrapper = await open();
+    expect(dialogOf(wrapper).props("modelValue")).toBe(true);
+    expect(mocks.router.replace).toHaveBeenCalledWith({
+      path: "/collections",
+      query: { sort: "upvotes" },
+    });
+  });
+
+  it("opens it when the address changes while the page is already there", async () => {
+    const wrapper = await open();
+    expect(dialogOf(wrapper).props("modelValue")).toBe(false);
+    mocks.route.query = { new: "1" };
+    await flushPromises();
+    expect(dialogOf(wrapper).props("modelValue")).toBe(true);
+  });
+
+  it("opens nothing for someone who is not signed in, and leaves the address alone", async () => {
+    mocks.auth.isAuthenticated = false;
+    mocks.route.query = { new: "1" };
+    const wrapper = await open();
+    expect(dialogOf(wrapper).props("modelValue")).toBe(false);
+    expect(mocks.router.replace).not.toHaveBeenCalled();
+  });
+});
+
 describe("the collections of one owner", () => {
   const open = async () => {
     const wrapper = mount(OwnerCollections, { global: { stubs } });

@@ -97,6 +97,7 @@ describe("TheHeader", () => {
     ["New Model", "/new?type=model"],
     ["New Dataset", "/new?type=dataset"],
     ["New Space", "/new?type=space"],
+    ["New Collection", "/collections?new=1"],
     ["New Organization", "/organizations/new"],
   ];
 
@@ -219,17 +220,14 @@ describe("TheHeader", () => {
     expect(
       drawer.findAll(".cursor-pointer").map((item) => item.text()),
     ).toEqual([...creationLabels, ...accountLabels]);
-    // Collections has no "New ..." entry in the creation menu
-    navigationEntries
-      .filter(([label]) => label !== "Collections")
-      .forEach(([, , icon, color], index) => {
-        for (const item of [
-          desktopMenus[0].findAll("button")[index],
-          mobileAction(drawer, creationLabels[index]),
-        ]) {
-          expect(item.get(`.${icon}`).classes()).toContain(color);
-        }
-      });
+    navigationEntries.forEach(([, , icon, color], index) => {
+      for (const item of [
+        desktopMenus[0].findAll("button")[index],
+        mobileAction(drawer, creationLabels[index]),
+      ]) {
+        expect(item.get(`.${icon}`).classes()).toContain(color);
+      }
+    });
     expect(mobileAction(drawer, "Logout").classes()).toContain("text-red-600");
     wrapper.unmount();
   });
