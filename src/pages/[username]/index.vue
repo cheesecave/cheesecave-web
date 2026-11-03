@@ -402,6 +402,16 @@
               </RouterLink>
 
               <RouterLink
+                :to="`/${username}/collections`"
+                class="profile-nav-link"
+              >
+                <div class="flex items-center gap-2 text-sm">
+                  <div class="i-carbon-folder text-amber-500" />
+                  <span>Collections</span>
+                </div>
+              </RouterLink>
+
+              <RouterLink
                 :to="profileLink(`/${username}/spaces`)"
                 class="profile-nav-link"
               >
@@ -472,6 +482,21 @@
           <IncompleteNotice :sources="incompleteSources" />
 
           <!-- Models Section -->
+          <section v-if="profileCollections.length" class="mb-8" aria-label="Collections">
+            <div class="profile-section-header">
+              <div class="profile-section-title">
+                <div class="i-carbon-folder text-amber-500" />
+                <h2>Collections</h2>
+              </div>
+              <RouterLink :to="`/${username}/collections`" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                All collections
+              </RouterLink>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <CollectionCard v-for="one in profileCollections" :key="one.slug" :collection="one" />
+            </div>
+          </section>
+
           <section class="mb-8" :aria-busy="repoLoading.model">
             <div class="profile-section-header">
               <div class="profile-section-title">
@@ -707,9 +732,10 @@
 <script setup>
 import Unlimited from "@/components/common/Unlimited.vue";
 import UnlimitedMeter from "@/components/common/UnlimitedMeter.vue";
-import { repoAPI, orgAPI, settingsAPI } from "@/utils/api";
+import { repoAPI, orgAPI, settingsAPI, collectionsAPI } from "@/utils/api";
 import LinkButton from "@/components/common/LinkButton.vue";
 import ProfileRepoCard from "@/components/profile/ProfileRepoCard.vue";
+import CollectionCard from "@/components/collections/CollectionCard.vue";
 import EntityAvatar from "@/components/common/EntityAvatar.vue";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import SocialLinks from "@/components/profile/SocialLinks.vue";
@@ -1054,9 +1080,21 @@ function reloadLookup() {
   return checkUserExists();
 }
 
+// The first two collections, in the owner's own order, as on Hugging Face (private ones only for those who may see them)
+const profileCollections = ref([]);
+async function loadCollections() {
+  try {
+    const { data } = await collectionsAPI.list({ owner: username.value, sort: "position", limit: 2 });
+    profileCollections.value = data;
+  } catch {
+    profileCollections.value = [];
+  }
+}
+
 function load() {
   // Every content region starts independently of profile and namespace lookup.
   void checkUserExists();
+  void loadCollections();
   for (const type of repoTypes) void loadRepoType(type);
   void loadUserCard();
   void loadQuotaInfo();

@@ -24,8 +24,16 @@ const organizationEntry = {
   to: "/organizations",
 };
 
+const collectionEntry = {
+  id: "collection",
+  label: "Collections",
+  icon: "i-carbon-folder text-amber-500",
+  to: "/collections",
+};
+
 export const HEADER_NAVIGATION_ITEMS = [
   ...repositoryEntries,
+  collectionEntry,
   organizationEntry,
 ];
 
