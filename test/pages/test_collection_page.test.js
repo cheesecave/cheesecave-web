@@ -1,4 +1,4 @@
-import { reactive } from "vue";
+import { defineComponent, h, reactive } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ElementPlusStubs, RouterLinkStub } from "../helpers/vue";
@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
     remove: vi.fn(),
     removeItem: vi.fn(),
     updateItem: vi.fn(),
+    update: vi.fn(),
   },
   auth: { isAuthenticated: true, username: "alice", organizations: [] },
   success: vi.fn(),
@@ -82,8 +83,19 @@ const stubs = {
     template:
       '<div data-error="true">{{ error.message }}<button data-retry @click="retry">retry</button></div>',
   },
-  CollectionFormDialog: true,
   AddItemDialog: true,
+  ElSwitch: defineComponent({
+    name: "ElSwitch",
+    props: { modelValue: { type: Boolean, default: false } },
+    emits: ["change"],
+    setup:
+      (props, { emit }) =>
+      () =>
+        h("button", {
+          "data-switch": String(props.modelValue),
+          onClick: () => emit("change", !props.modelValue),
+        }),
+  }),
 };
 
 async function mountPage(collection = COLLECTION()) {
@@ -94,6 +106,8 @@ async function mountPage(collection = COLLECTION()) {
   await flushPromises();
   return wrapper;
 }
+const pencil = (wrapper, what = "title") =>
+  wrapper.find(`button[aria-label="Edit the ${what}"]`);
 const button = (wrapper, text) =>
   wrapper.findAll("button").find((b) => b.text().includes(text));
 
@@ -155,24 +169,27 @@ describe("the collection page", () => {
     expect(button(await mountPage(), "Add to the collection")).toBeUndefined();
     mocks.auth.isAuthenticated = true;
     mocks.auth.username = "mika";
-    expect(button(await mountPage(), "Edit")).toBeUndefined();
+    expect(
+      (await mountPage())
+        .find('[aria-label="Collection menu"] [role=radiogroup]')
+        .exists(),
+    ).toBe(false);
+    expect(pencil(await mountPage()).exists()).toBe(false);
     mocks.auth.organizations = [{ name: "lab", roleInOrg: "member" }];
     expect(
-      button(
+      pencil(
         await mountPage(COLLECTION({ owner: { name: "lab", type: "org" } })),
-        "Edit",
-      ),
-    ).toBeDefined();
+      ).exists(),
+    ).toBe(true);
     mocks.auth.organizations = [{ name: "lab", roleInOrg: "visitor" }];
     expect(
-      button(
+      pencil(
         await mountPage(COLLECTION({ owner: { name: "lab", type: "org" } })),
-        "Edit",
-      ),
-    ).toBeUndefined();
+      ).exists(),
+    ).toBe(false);
     mocks.auth.username = "alice";
     mocks.auth.organizations = [];
-    expect(button(await mountPage(), "Edit")).toBeDefined();
+    expect(pencil(await mountPage()).exists()).toBe(true);
   });
 
   it("explains an empty collection, to the owner and to a visitor", async () => {
@@ -281,37 +298,20 @@ describe("upvoting and sharing", () => {
 });
 
 describe("changing the collection", () => {
-  it("opens the dialogs for editing and for adding", async () => {
+  it("opens the dialog for adding", async () => {
     const wrapper = await mountPage();
-    await button(wrapper, "Edit").trigger("click");
-    expect(
-      wrapper
-        .findComponent({ name: "CollectionFormDialog" })
-        .props("modelValue"),
-    ).toBe(true);
     await button(wrapper, "Add to the collection").trigger("click");
     expect(
       wrapper.findComponent({ name: "AddItemDialog" }).props("modelValue"),
     ).toBe(true);
   });
 
-  it("reloads after an item is added, and after an edit lands on the address of the new slug", async () => {
+  it("reloads after an item is added", async () => {
     const wrapper = await mountPage();
     mocks.api.get.mockClear();
     wrapper.findComponent({ name: "AddItemDialog" }).vm.$emit("added");
     await flushPromises();
     expect(mocks.api.get).toHaveBeenCalledTimes(1);
-    mocks.api.get.mockResolvedValue({
-      data: COLLECTION({
-        slug: "alice/renamed-6ae8b2220654892215f0a71c",
-        title: "Renamed",
-      }),
-    });
-    wrapper.findComponent({ name: "CollectionFormDialog" }).vm.$emit("saved");
-    await flushPromises();
-    expect(mocks.router.replace).toHaveBeenCalledWith(
-      "/collections/alice/renamed-6ae8b2220654892215f0a71c",
-    );
   });
 
   it("deletes the collection after a confirmation, and goes to the list of its owner", async () => {
@@ -485,5 +485,127 @@ describe("moving cards", () => {
     mocks.auth.isAuthenticated = false;
     const wrapper = await mountPage();
     expect(wrapper.findAll("[draggable='true']")).toHaveLength(0);
+  });
+});
+
+describe("changing the collection where it is shown", () => {
+  const field = (wrapper, label) =>
+    wrapper
+      .findAllComponents({ name: "InlineEdit" })
+      .find((c) => c.props("label") === label);
+  const RENAMED = "alice/renamed-6ae8b2220654892215f0a71c";
+
+  it("renames it in place: the title, the address and the tab follow the slug the server answers", async () => {
+    mocks.api.update.mockResolvedValue({
+      data: { data: COLLECTION({ slug: RENAMED, title: "Renamed" }) },
+    });
+    const wrapper = await mountPage();
+    const saved = await field(wrapper, "title").props("save")("Renamed");
+    await flushPromises();
+    expect(saved).toBe(true);
+    expect(mocks.api.update).toHaveBeenCalledExactlyOnceWith(SLUG, {
+      title: "Renamed",
+    });
+    expect(wrapper.find("h1").text()).toBe("Renamed");
+    expect(document.title).toBe("Renamed - collection");
+    expect(mocks.router.replace).toHaveBeenCalledWith(
+      `/collections/${RENAMED}`,
+    );
+  });
+
+  it("changes the description without touching the address", async () => {
+    mocks.api.update.mockResolvedValue({
+      data: { data: COLLECTION({ description: "New text" }) },
+    });
+    const wrapper = await mountPage();
+    mocks.router.replace.mockClear();
+    expect(await field(wrapper, "description").props("save")("New text")).toBe(
+      true,
+    );
+    expect(mocks.api.update).toHaveBeenCalledWith(SLUG, {
+      description: "New text",
+    });
+    expect(wrapper.text()).toContain("New text");
+    expect(mocks.router.replace).not.toHaveBeenCalled();
+  });
+
+  it("says why a change was refused, and keeps the field open", async () => {
+    const wrapper = await mountPage();
+    mocks.api.update.mockRejectedValueOnce(
+      Object.assign(new Error("x"), { response: { status: 409, data: {} } }),
+    );
+    expect(await field(wrapper, "title").props("save")("Taken")).toBe(false);
+    expect(mocks.error).toHaveBeenLastCalledWith(
+      "You already have a collection with this title",
+    );
+    mocks.api.update.mockRejectedValueOnce(
+      Object.assign(new Error("x"), {
+        response: { status: 400, data: { error: "title must be 1 to 60" } },
+      }),
+    );
+    expect(await field(wrapper, "title").props("save")("")).toBe(false);
+    expect(mocks.error).toHaveBeenLastCalledWith("title must be 1 to 60");
+  });
+
+  it("shows the six colours, marks the one it has, and changes it with one click", async () => {
+    mocks.api.update.mockResolvedValue({
+      data: { data: COLLECTION({ theme: "blue" }) },
+    });
+    const wrapper = await mountPage();
+    const swatches = wrapper.findAll("[role=radio]");
+    expect(swatches).toHaveLength(6);
+    expect(
+      swatches
+        .filter((s) => s.attributes("aria-checked") === "true")
+        .map((s) => s.attributes("aria-label")),
+    ).toEqual(["Theme orange"]);
+    await swatches
+      .find((s) => s.attributes("aria-label") === "Theme orange")
+      .trigger("click");
+    expect(mocks.api.update).not.toHaveBeenCalled(); // it is the colour it has
+    await swatches
+      .find((s) => s.attributes("aria-label") === "Theme blue")
+      .trigger("click");
+    await flushPromises();
+    expect(mocks.api.update).toHaveBeenCalledExactlyOnceWith(SLUG, {
+      theme: "blue",
+    });
+    expect(
+      wrapper
+        .findAll("[role=radio]")
+        .filter((s) => s.attributes("aria-checked") === "true")
+        .map((s) => s.attributes("aria-label")),
+    ).toEqual(["Theme blue"]);
+  });
+
+  it("makes it private and public again with the switch", async () => {
+    mocks.api.update.mockResolvedValueOnce({
+      data: { data: COLLECTION({ private: true }) },
+    });
+    const wrapper = await mountPage();
+    expect(wrapper.find("[data-switch]").attributes("data-switch")).toBe(
+      "true",
+    );
+    await wrapper.find("[data-switch]").trigger("click");
+    await flushPromises();
+    expect(mocks.api.update).toHaveBeenLastCalledWith(SLUG, { private: true });
+    expect(wrapper.find("[data-switch]").attributes("data-switch")).toBe(
+      "false",
+    );
+    mocks.api.update.mockResolvedValueOnce({
+      data: { data: COLLECTION({ private: false }) },
+    });
+    await wrapper.find("[data-switch]").trigger("click");
+    await flushPromises();
+    expect(mocks.api.update).toHaveBeenLastCalledWith(SLUG, { private: false });
+  });
+
+  it("offers none of it to someone who may not change the collection", async () => {
+    mocks.auth.username = "mika";
+    const wrapper = await mountPage();
+    expect(wrapper.findAll("[role=radio]")).toHaveLength(0);
+    expect(wrapper.find("[data-switch]").exists()).toBe(false);
+    expect(pencil(wrapper, "description").exists()).toBe(false);
+    expect(button(wrapper, "Delete")).toBeUndefined();
   });
 });

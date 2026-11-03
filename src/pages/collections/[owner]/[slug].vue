@@ -6,7 +6,7 @@ import EntityAvatar from "@/components/common/EntityAvatar.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import PrivateBadge from "@/components/repo/PrivateBadge.vue";
 import CollectionItemCard from "@/components/collections/CollectionItemCard.vue";
-import CollectionFormDialog from "@/components/collections/CollectionFormDialog.vue";
+import InlineEdit from "@/components/collections/InlineEdit.vue";
 import AddItemDialog from "@/components/collections/AddItemDialog.vue";
 import { collectionsAPI } from "@/utils/api";
 import { useAuthStore } from "@/stores/auth";
@@ -15,8 +15,13 @@ import {
   canWriteFor,
   collectionPath,
   themeColor,
+  COLLECTION_THEMES,
+  DESCRIPTION_MAX,
   NOTE_MAX,
+  TITLE_MAX,
 } from "@/utils/collections";
+
+const THEME_NAMES = Object.keys(COLLECTION_THEMES);
 
 const route = useRoute();
 const router = useRouter();
@@ -25,7 +30,6 @@ const auth = useAuthStore();
 const collection = ref(null);
 const loading = ref(true);
 const error = ref(null);
-const editDialog = ref(false);
 const addDialog = ref(false);
 const noteTarget = ref(null);
 const noteText = ref("");
@@ -84,6 +88,26 @@ async function share() {
     ElMessage.success("Link copied");
   } catch {
     ElMessage.info(url);
+  }
+}
+
+// Title, description, colour and visibility are changed where they are shown, one at a time, as on Hugging Face.
+// The answer is the whole collection; the slug follows the title, the id at its end stays.
+async function change(patch) {
+  try {
+    const { data } = await collectionsAPI.update(collection.value.slug, patch);
+    collection.value = data.data;
+    document.title = `${data.data.title} - collection`;
+    const canonical = collectionPath(data.data.slug);
+    if (route.path !== canonical) router.replace(canonical);
+    return true;
+  } catch (err) {
+    ElMessage.error(
+      err?.response?.status === 409
+        ? "You already have a collection with this title"
+        : problem(err),
+    );
+    return false;
   }
 }
 
@@ -177,52 +201,63 @@ onMounted(load);
     />
 
     <template v-else-if="collection">
-      <header
-        class="card collection-head"
-        :style="{ '--theme': themeColor(collection.theme) }"
-      >
-        <div class="flex flex-wrap items-start gap-3">
-          <!-- At least 16rem wide, so on a phone the buttons wrap below instead of squeezing the title -->
-          <div class="flex-1" style="min-width: min(100%, 16rem)">
-            <div class="text-xs uppercase tracking-wide text-gray-500 mb-1">
-              Collection
-            </div>
-            <h1 class="text-3xl font-bold flex items-center gap-3 flex-wrap">
-              {{ collection.title }}
-              <PrivateBadge v-if="collection.private" />
-            </h1>
-            <p
-              v-if="collection.description"
-              class="text-gray-600 dark:text-gray-400 mt-2"
-            >
-              {{ collection.description }}
-            </p>
-            <div
-              class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-sm text-gray-600 dark:text-gray-400"
-            >
-              <RouterLink
-                :to="`/${collection.owner.name}`"
-                class="flex items-center gap-2 hover:underline"
-              >
-                <EntityAvatar
-                  :username="collection.owner.name"
-                  :is-org="collection.owner.type === 'org'"
-                  :name="collection.owner.name"
-                  :size="22"
-                />
-                {{ collection.owner.name }}
-              </RouterLink>
-              <span
-                >{{ items.length }} item{{
-                  items.length === 1 ? "" : "s"
-                }}</span
-              >
-              <span
-                >Updated
-                {{ formatRelativeTime(collection.lastUpdated, "never") }}</span
-              >
-            </div>
+      <div class="collection-layout">
+        <header
+          class="card collection-head"
+          :style="{ '--theme': themeColor(collection.theme) }"
+        >
+          <div class="text-xs uppercase tracking-wide text-gray-500 mb-1">
+            Collection
           </div>
+          <div class="flex items-center gap-3 flex-wrap">
+            <InlineEdit
+              :model-value="collection.title"
+              label="title"
+              tag="h1"
+              text-class="text-3xl font-bold"
+              required
+              :can-edit="canEdit"
+              :maxlength="TITLE_MAX"
+              :save="(text) => change({ title: text })"
+            />
+            <PrivateBadge v-if="collection.private" />
+          </div>
+          <InlineEdit
+            class="mt-2"
+            :model-value="collection.description || ''"
+            label="description"
+            multiline
+            :can-edit="canEdit"
+            :maxlength="DESCRIPTION_MAX"
+            placeholder="Add a description"
+            :save="(text) => change({ description: text })"
+          />
+          <div
+            class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-sm text-gray-600 dark:text-gray-400"
+          >
+            <RouterLink
+              :to="`/${collection.owner.name}`"
+              class="flex items-center gap-2 hover:underline"
+            >
+              <EntityAvatar
+                :username="collection.owner.name"
+                :is-org="collection.owner.type === 'org'"
+                :name="collection.owner.name"
+                :size="22"
+              />
+              {{ collection.owner.name }}
+            </RouterLink>
+            <span
+              >{{ items.length }} item{{ items.length === 1 ? "" : "s" }}</span
+            >
+            <span
+              >Updated
+              {{ formatRelativeTime(collection.lastUpdated, "never") }}</span
+            >
+          </div>
+        </header>
+
+        <aside class="card collection-menu" aria-label="Collection menu">
           <div class="flex flex-wrap gap-2">
             <el-button
               :type="collection.isUpvotedByUser ? 'primary' : 'default'"
@@ -237,63 +272,81 @@ onMounted(load);
               <span class="i-carbon-share mr-1" aria-hidden="true" /> Share
             </el-button>
           </div>
-        </div>
-        <div
-          v-if="canEdit"
-          class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700"
-        >
-          <el-button type="primary" @click="addDialog = true">
-            <span class="i-carbon-add mr-1" aria-hidden="true" /> Add to the
-            collection
-          </el-button>
-          <el-button @click="editDialog = true">
-            <span class="i-carbon-edit mr-1" aria-hidden="true" /> Edit
-          </el-button>
-          <el-button type="danger" plain @click="removeCollection">
-            <span class="i-carbon-trash-can mr-1" aria-hidden="true" /> Delete
-          </el-button>
-        </div>
-      </header>
-
-      <section class="mt-6" aria-label="Items">
-        <p v-if="!items.length" class="text-gray-500 text-center py-10">
-          Nothing here yet.
-          <template v-if="canEdit"
-            >Use "Add to the collection", or "Add to collection" on any
-            repository page.</template
-          >
-        </p>
-        <div class="grid gap-3 md:grid-cols-2">
-          <div
-            v-for="(item, index) in items"
-            :key="item._id"
-            :draggable="canEdit"
-            @dragstart="dragFrom = index"
-            @dragover.prevent
-            @drop.prevent="onDrop(index)"
-            @dragend="dragFrom = null"
-          >
-            <CollectionItemCard
-              :item="item"
-              :editable="canEdit"
-              :dragging="dragFrom === index"
-              :can-move-up="index > 0"
-              :can-move-down="index < items.length - 1"
-              @edit-note="editNote(item)"
-              @remove="removeItem(item)"
-              @move="moveTo(index, index + $event)"
-            />
+          <div v-if="canEdit" class="collection-menu-owner">
+            <el-button type="primary" @click="addDialog = true">
+              <span class="i-carbon-add mr-1" aria-hidden="true" /> Add to the
+              collection
+            </el-button>
+            <div class="collection-menu-row">
+              <span id="theme-label">Theme</span>
+              <div
+                role="radiogroup"
+                aria-labelledby="theme-label"
+                class="flex gap-2"
+              >
+                <button
+                  v-for="name in THEME_NAMES"
+                  :key="name"
+                  type="button"
+                  role="radio"
+                  class="theme-swatch"
+                  :class="{ 'theme-swatch-on': collection.theme === name }"
+                  :style="{ background: themeColor(name) }"
+                  :aria-checked="collection.theme === name"
+                  :aria-label="`Theme ${name}`"
+                  :title="name"
+                  @click="collection.theme !== name && change({ theme: name })"
+                />
+              </div>
+            </div>
+            <div class="collection-menu-row">
+              <span aria-hidden="true">Public</span>
+              <el-switch
+                :model-value="!collection.private"
+                aria-label="Public"
+                @change="change({ private: !$event })"
+              />
+            </div>
+            <el-button type="danger" plain @click="removeCollection">
+              <span class="i-carbon-trash-can mr-1" aria-hidden="true" /> Delete
+              the collection
+            </el-button>
           </div>
-        </div>
-      </section>
+        </aside>
 
-      <CollectionFormDialog
-        v-model="editDialog"
-        :collection="collection"
-        @saved="
-          load().then(() => router.replace(collectionPath(collection.slug)))
-        "
-      />
+        <section class="collection-items" aria-label="Items">
+          <p v-if="!items.length" class="text-gray-500 text-center py-10">
+            Nothing here yet.
+            <template v-if="canEdit"
+              >Use "Add to the collection", or "Add to collection" on any
+              repository page.</template
+            >
+          </p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div
+              v-for="(item, index) in items"
+              :key="item._id"
+              :draggable="canEdit"
+              @dragstart="dragFrom = index"
+              @dragover.prevent
+              @drop.prevent="onDrop(index)"
+              @dragend="dragFrom = null"
+            >
+              <CollectionItemCard
+                :item="item"
+                :editable="canEdit"
+                :dragging="dragFrom === index"
+                :can-move-up="index > 0"
+                :can-move-down="index < items.length - 1"
+                @edit-note="editNote(item)"
+                @remove="removeItem(item)"
+                @move="moveTo(index, index + $event)"
+              />
+            </div>
+          </div>
+        </section>
+      </div>
+
       <AddItemDialog
         v-model="addDialog"
         :slug="collection.slug"
@@ -324,6 +377,50 @@ onMounted(load);
 </template>
 
 <style scoped>
+.collection-layout {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 1024px) {
+  .collection-layout {
+    grid-template-columns: minmax(0, 1fr) 16rem;
+    align-items: start;
+  }
+  .collection-menu {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+.collection-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.collection-menu-owner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--el-border-color-lighter, #e5e7eb);
+}
+.collection-menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.theme-swatch {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+.theme-swatch-on {
+  border-color: var(--el-text-color-primary, #111827);
+  box-shadow: 0 0 0 2px var(--el-bg-color, #fff);
+}
 .collection-head {
   position: relative;
 }
