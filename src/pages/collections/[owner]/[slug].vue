@@ -277,7 +277,7 @@ onMounted(load);
               <span class="i-carbon-add mr-1" aria-hidden="true" /> Add to the
               collection
             </el-button>
-            <div class="collection-menu-row">
+            <div class="collection-menu-row collection-menu-theme">
               <span id="theme-label">Theme</span>
               <div
                 role="radiogroup"
@@ -419,10 +419,13 @@ onMounted(load);
   width: 100%;
   margin: 0;
 }
+.collection-menu-theme {
+  flex-direction: column;
+  align-items: flex-start;
+}
 .theme-swatches {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
   gap: 0.375rem;
 }
 .theme-swatch {
