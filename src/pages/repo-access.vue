@@ -12,7 +12,7 @@
       >Sign in to bind a code</RouterLink
     >
     <p v-if="bindingNotice" role="status">{{ bindingNotice }}</p>
-    <template>
+    <div class="space-y-5">
       <el-select v-model="repository.type" aria-label="Repository type"
         ><el-option label="Model" value="model" /><el-option
           label="Dataset"
@@ -53,7 +53,7 @@
         class="text-blue-500"
         >Open repository</RouterLink
       >
-    </template>
+    </div>
   </section>
 </template>
 <script setup>
