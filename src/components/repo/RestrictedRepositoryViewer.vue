@@ -7,6 +7,7 @@ import { formatRelativeTime } from "@/utils/datetime";
 import { decodeError, notifyError } from "@/errors";
 import ErrorState from "@/components/common/ErrorState.vue";
 import RepositoryAccessLayout from "./RepositoryAccessLayout.vue";
+import RepositoryFiles from "./RepositoryFiles.vue";
 import BlobFilePage from "@/pages/[type]s/[namespace]/[name]/blob/[branch]/[...file].vue";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import GuestRepositorySidebar from "./GuestRepositorySidebar.vue";
@@ -20,6 +21,7 @@ const props = defineProps({
   path: { type: String, default: "" },
   filePath: { type: String, default: "" },
   branch: { type: String, default: "main" },
+  commitId: { type: [String, Array], default: "" },
 });
 const emit = defineEmits([
   "changed",
@@ -149,6 +151,48 @@ const sortedEntries = computed(() =>
       a.path.localeCompare(b.path, undefined, { numeric: true }),
   ),
 );
+const directoryEntries = computed(() =>
+  sortedEntries.value.map((entry) => ({
+    ...entry,
+    lastCommit: entry.last_commit
+      ? { ...entry.last_commit, date: entry.last_commit.timestamp }
+      : null,
+  })),
+);
+const directorySource = computed(() => {
+  const latest = commits.value[0];
+  const error = commitsError.value;
+  const count =
+    commitsLoaded.value && !commitsHasMore.value ? commits.value.length : null;
+  return {
+    latestCommit: async () => {
+      if (error) throw error;
+      return latest
+        ? {
+            ...latest,
+            title: latest.message.split("\n")[0],
+            date: latest.timestamp,
+          }
+        : null;
+    },
+    commitCount: async () => {
+      if (error) throw error;
+      return count;
+    },
+    reload: () => loadCommits(),
+    onAccessDenied: recheckRevokedAccess,
+  };
+});
+const repositorySize = computed(() => {
+  const size = overview.value?.used_storage;
+  return Number.isFinite(size) && size >= 0
+    ? formatSize(size)
+    : "Size unavailable";
+});
+function directoryCommitPath(id) {
+  const repo = props.repository;
+  return `/${repo.type}s/${encodeURIComponent(repo.namespace)}/${encodeURIComponent(repo.name)}/commits/main?commit=${encodeURIComponent(id)}`;
+}
 function formatSize(size) {
   if (!Number.isFinite(size) || size < 0) return "—";
   if (size < 1000) return `${size} B`;
@@ -443,10 +487,6 @@ function ensureView() {
   )
     loadCommits();
 }
-function showCommit(commit) {
-  navigate("commits");
-  selectedCommit.value = commit;
-}
 function navigate(view) {
   activeView.value = view;
   selectedCommit.value = null;
@@ -511,6 +551,20 @@ watch(
       loadTree(path);
     } else ensureView();
   },
+);
+// A URL may select only metadata already returned by the authorized history
+// request. Unknown or malformed IDs never trigger ordinary commit/diff APIs.
+watch(
+  [() => props.commitId, activeView, commits],
+  ([id, view, history]) => {
+    selectedCommit.value =
+      view === "commits" &&
+      typeof id === "string" &&
+      /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/i.test(id)
+        ? history.find((commit) => commit.id === id) || null
+        : null;
+  },
+  { immediate: true },
 );
 watch(selectedPath, () => fileMetadataCache.clear(), { flush: "sync" });
 onBeforeUnmount(() => {
@@ -578,124 +632,28 @@ defineExpose({ leave, navigate });
           </div></template
         >
         <template v-else-if="activeView === 'files'">
-          <div class="guest-files-toolbar">
-            <span class="guest-branch"
-              ><span class="i-carbon-branch" aria-hidden="true" />{{
-                branch
-              }}</span
-            ><el-input
-              v-model="query"
-              aria-label="Filter files by name prefix"
-              placeholder="Filter files by name prefix…"
-              clearable
-              @input="queueSearch"
-            /><button
-              type="button"
-              class="guest-text-action"
-              @click="navigate('commits')"
-            >
-              <span class="i-carbon-change-catalog" aria-hidden="true" />History
-            </button>
-          </div>
-          <div v-if="currentPath" class="guest-directory-toolbar">
-            <h2 class="font-semibold">{{ currentPath }}</h2>
-            <button
-              type="button"
-              class="guest-text-action"
-              @click="openFolder(currentPath.split('/').slice(0, -1).join('/'))"
-            >
-              <span class="i-carbon-arrow-up" aria-hidden="true" />Parent folder
-            </button>
-          </div>
-          <ErrorState
-            v-if="treeError"
-            :error="treeError"
-            mode="inline-panel"
-            :retry="() => loadTree(currentPath)"
+          <RepositoryFiles
+            :repo-type="repository.type"
+            :namespace="repository.namespace"
+            :name="repository.name"
+            :branch="branch"
+            v-model:search="query"
+            :current-path="currentPath"
+            :repository-size="repositorySize"
+            :file-tree="directoryEntries"
+            :files-loading="treeLoading && !entries.length"
+            :tree-error="treeError"
+            :file-list-has-more="treeHasMore"
+            :file-list-loading-more="treeLoading"
+            :get-entry-href="entryURL"
+            :get-commit-path="directoryCommitPath"
+            :source="directorySource"
+            @update:search="queueSearch"
+            @reload="loadTree(currentPath)"
+            @load-more="loadTree(currentPath, true)"
+            @entry-click="followEntry"
           />
-          <div v-if="treeLoading && !entries.length" role="status">
-            Loading files…
-          </div>
           <p v-if="treeMessage" class="guest-note">{{ treeMessage }}</p>
-          <div class="guest-file-list">
-            <section class="guest-latest-commit" aria-label="Latest commit">
-              <template v-if="commits[0]">
-                <span class="i-carbon-user-avatar" aria-hidden="true" />
-                <span>{{ commits[0].author }}</span>
-                <button
-                  type="button"
-                  class="guest-text-action guest-latest-title"
-                  @click="showCommit(commits[0])"
-                >
-                  {{ commits[0].message.split("\n")[0] }}
-                </button>
-                <span class="font-mono">{{ commits[0].id.slice(0, 7) }}</span>
-                <span class="guest-latest-date">{{
-                  formatRelativeTime(commits[0].timestamp, "—")
-                }}</span>
-              </template>
-              <span v-else
-                >Latest commit<span
-                  v-if="overview?.head"
-                  class="font-mono ml-2"
-                  >{{ overview.head.slice(0, 7) }}</span
-                ></span
-              >
-            </section>
-            <table aria-label="Repository files" class="guest-file-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Last commit</th>
-                  <th>Updated</th>
-                  <th>Size</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="entry in sortedEntries" :key="entry.path">
-                  <td>
-                    <span
-                      :class="
-                        entry.type === 'directory'
-                          ? 'i-carbon-folder guest-folder-icon'
-                          : 'i-carbon-document'
-                      "
-                      class="guest-entry-icon"
-                      aria-hidden="true"
-                    /><a
-                      :href="entryURL(entry)"
-                      class="guest-entry-name"
-                      :aria-label="entry.path"
-                      @click="followEntry($event, entry)"
-                    >
-                      {{ entry.path.split("/").pop() }}
-                    </a>
-                  </td>
-                  <td class="guest-entry-metadata">
-                    {{ entry.last_commit?.title || "—" }}
-                  </td>
-                  <td class="guest-entry-updated">
-                    {{ formatRelativeTime(entry.last_commit?.timestamp, "—") }}
-                  </td>
-                  <td class="guest-entry-size">
-                    {{
-                      entry.type === "directory" ? "—" : formatSize(entry.size)
-                    }}
-                  </td>
-                </tr>
-                <tr v-if="!treeLoading && !entries.length">
-                  <td colspan="4" class="guest-empty">No files found</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div v-if="treeHasMore" class="text-center pt-4">
-            <el-button
-              :loading="treeLoading"
-              @click="loadTree(currentPath, true)"
-              >Load More Files</el-button
-            >
-          </div>
           <article
             v-if="!currentPath && !query && overview?.readme"
             class="card mt-6"
@@ -826,18 +784,12 @@ defineExpose({ leave, navigate });
     padding: 20px 16px;
   }
 }
-.guest-files-toolbar,
 .guest-directory-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
-}
-.guest-files-toolbar :deep(.el-input) {
-  width: 300px;
-  max-width: 55%;
-  margin-left: auto;
 }
 .guest-branch {
   display: inline-flex;
@@ -872,121 +824,6 @@ defineExpose({ leave, navigate });
   outline: 2px solid var(--site-primary);
   outline-offset: 3px;
 }
-.guest-file-list {
-  border: 1px solid var(--site-border);
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--site-card);
-}
-.guest-latest-commit {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px;
-  background: var(--site-hover);
-  font-size: 13px;
-  color: var(--site-muted);
-}
-.guest-latest-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--site-card-text);
-}
-.guest-latest-date {
-  margin-left: auto;
-  white-space: nowrap;
-}
-.guest-file-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-.guest-file-table th {
-  padding: 12px;
-  background: var(--site-hover);
-  color: var(--site-muted);
-  font-size: 13px;
-  font-weight: 500;
-  text-align: left;
-}
-.guest-file-table th:first-child {
-  width: 42%;
-}
-.guest-file-table th:last-child {
-  width: 100px;
-  text-align: right;
-}
-.guest-file-table td {
-  padding: 12px;
-  border-top: 1px solid var(--site-border);
-}
-.guest-file-table tbody tr {
-  position: relative;
-}
-.guest-file-table tbody tr:hover {
-  background: var(--site-hover);
-}
-.guest-file-table td:first-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.guest-entry-icon {
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  margin-right: 12px;
-  vertical-align: middle;
-  color: var(--site-muted);
-}
-.guest-folder-icon {
-  color: var(--site-link);
-}
-.guest-entry-name {
-  text-decoration: none;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--site-card-text);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-}
-.guest-entry-name::after {
-  position: absolute;
-  inset: 0;
-  content: "";
-}
-.guest-entry-name:hover {
-  color: var(--site-link);
-}
-.guest-entry-name:focus-visible {
-  outline: none;
-}
-.guest-entry-name:focus-visible::after {
-  outline: 2px solid var(--site-primary);
-  outline-offset: -2px;
-}
-.guest-entry-metadata,
-.guest-entry-size,
-.guest-entry-updated,
-.guest-note {
-  color: var(--site-muted);
-  font-size: 13px;
-}
-.guest-entry-size {
-  text-align: right;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.guest-empty {
-  color: var(--site-muted);
-  text-align: center;
-}
 .guest-commit-row {
   display: flex;
   gap: 12px;
@@ -1018,26 +855,6 @@ defineExpose({ leave, navigate });
 @media (max-width: 1023px) {
   .guest-repository-body {
     grid-template-columns: minmax(0, 1fr);
-  }
-}
-@media (max-width: 600px) {
-  .guest-latest-date {
-    display: none;
-  }
-  .guest-file-table th:nth-child(2),
-  .guest-file-table th:nth-child(3),
-  .guest-entry-updated,
-  .guest-entry-metadata {
-    display: none;
-  }
-  .guest-file-table th:last-child {
-    width: 84px;
-  }
-  .guest-files-toolbar {
-    gap: 10px;
-  }
-  .guest-files-toolbar :deep(.el-input) {
-    max-width: 55%;
   }
 }
 </style>

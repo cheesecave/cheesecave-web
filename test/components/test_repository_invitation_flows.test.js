@@ -32,7 +32,9 @@ import CodeViewer from "@/components/common/CodeViewer.vue";
 import BindPage from "@/pages/repo-access.vue";
 const repo = { type: "model", namespace: "owner", name: "demo" };
 const fileLink = (w, text) =>
-  w.findAll("a.guest-entry-name").find((link) => link.text() === text);
+  w
+    .findAll('a[data-testid="filelist-row-link"]')
+    .find((link) => link.text() === text);
 const button = (w, text) => w.findAll("button").find((b) => b.text() === text);
 const mountView = (component, props = {}) =>
   mount(component, {

@@ -50,6 +50,9 @@
     :path="guestLocation.path"
     :file-path="guestLocation.filePath"
     :branch="guestLocation.branch"
+    :commit-id="
+      typeof route.query?.commit === 'string' ? route.query.commit : ''
+    "
     @overview="guestOverview = $event"
     @navigate="navigateGuest"
     @open-file="openGuestFile"
