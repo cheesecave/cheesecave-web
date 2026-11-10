@@ -14,9 +14,9 @@
       <MetadataHeader
         :metadata="headerMetadata"
         :repo-type="repository.type"
-        :libraries="fullHeader?.tagGroups?.libraries || []"
-        :others="fullHeader?.tagGroups?.others || []"
-        :arxiv="fullHeader?.tagGroups?.arxiv || []"
+        :libraries="headerTagGroups.libraries"
+        :others="headerTagGroups.others"
+        :arxiv="headerTagGroups.arxiv"
         @navigate-to-metadata="navigateGuest('metadata')"
       />
     </template>
@@ -74,6 +74,7 @@ import {
   repositoryFromRoute,
   guestRepositoryTabs,
 } from "@/utils/repository-access";
+import { splitTags } from "@/utils/repo-derived";
 import { copyToClipboard } from "@/utils/clipboard";
 import { decodeError } from "@/errors";
 import ErrorState from "@/components/common/ErrorState.vue";
@@ -144,6 +145,17 @@ const headerMetadata = computed(() => {
       : null;
   return metadata && Object.keys(metadata).length ? metadata : null;
 });
+const headerTagGroups = computed(
+  () =>
+    fullHeader.value?.tagGroups ||
+    (repository.value?.type === "model" && headerMetadata.value
+      ? splitTags(headerMetadata.value.tags, {
+          libraryName: headerMetadata.value.library_name,
+          pipelineTag: headerMetadata.value.pipeline_tag,
+          languages: [].concat(headerMetadata.value.language || []),
+        })
+      : { libraries: [], others: [], arxiv: [] }),
+);
 const headerProps = computed(() => {
   const normal = fullHeader.value;
   const target = repository.value;

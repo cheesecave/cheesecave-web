@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   guestCommits: vi.fn(),
   guestFileInfo: vi.fn(),
 }));
+vi.mock("@/stores/markdownStyle", () => ({
+  useMarkdownStyleStore: () => ({ resolved: "github" }),
+}));
 vi.mock("@/utils/api", () => ({ repositoryAccessAPI: mocks }));
 import Visitor from "@/components/repo/RestrictedRepositoryViewer.vue";
 const repository = { type: "model", namespace: "owner", name: "demo" };

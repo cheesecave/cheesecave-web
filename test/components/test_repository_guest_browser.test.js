@@ -10,6 +10,9 @@ const api = vi.hoisted(() => ({
   guestFileInfo: vi.fn(),
   leaveGuest: vi.fn(),
 }));
+vi.mock("@/stores/markdownStyle", () => ({
+  useMarkdownStyleStore: () => ({ resolved: "github" }),
+}));
 vi.mock("@/utils/api", () => ({ repositoryAccessAPI: api }));
 import Viewer from "@/components/repo/RestrictedRepositoryViewer.vue";
 import CodeViewer from "@/components/common/CodeViewer.vue";
