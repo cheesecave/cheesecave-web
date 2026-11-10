@@ -39,10 +39,14 @@
         <el-button v-if="requestState" :disabled="busy" @click="loadRequest"
           >Refresh application status</el-button
         >
+        <el-button
+          text
+          type="primary"
+          class="invitation-code-trigger"
+          @click="codeDialogOpen = true"
+          >Have an Invitation?</el-button
+        >
       </div>
-      <el-button class="invitation-code-trigger" @click="codeDialogOpen = true"
-        >Repository invitation</el-button
-      >
     </template>
   </RepositoryAccessLayout>
   <el-dialog

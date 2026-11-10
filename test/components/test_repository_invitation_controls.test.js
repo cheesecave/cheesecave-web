@@ -54,7 +54,7 @@ describe("invitation controls follow application state", () => {
     async (signedIn) => {
       mocks.auth.isAuthenticated = signedIn;
       const wrapper = mountInvitation();
-      await action(wrapper, "Repository invitation").trigger("click");
+      await action(wrapper, "Have an Invitation?").trigger("click");
       expect(
         wrapper.find('[data-el-dialog="Repository invitation"]').exists(),
       ).toBe(true);
@@ -99,7 +99,7 @@ describe("invitation controls follow application state", () => {
 
   it("clears the invitation secret on dialog close and repository change", async () => {
     const wrapper = mountInvitation();
-    await action(wrapper, "Repository invitation").trigger("click");
+    await action(wrapper, "Have an Invitation?").trigger("click");
     await wrapper
       .get('input[aria-label="Repository invitation code"]')
       .setValue("private-code");
@@ -107,7 +107,7 @@ describe("invitation controls follow application state", () => {
       .findComponent({ name: "ElDialog" })
       .vm.$emit("update:modelValue", false);
     await flushPromises();
-    await action(wrapper, "Repository invitation").trigger("click");
+    await action(wrapper, "Have an Invitation?").trigger("click");
     expect(
       wrapper.get('input[aria-label="Repository invitation code"]').element
         .value,
@@ -117,6 +117,14 @@ describe("invitation controls follow application state", () => {
       .setValue("other-code");
     await wrapper.setProps({ repository: { ...repository, name: "other" } });
     expect(wrapper.find("[data-el-dialog]").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("keeps the invitation text action inside the Request access panel", () => {
+    const wrapper = mountInvitation();
+    const panel = wrapper.get(".invitation-panel");
+    expect(panel.get("h2").text()).toBe("Request access");
+    expect(action(panel, "Have an Invitation?")).toBeDefined();
     wrapper.unmount();
   });
 });

@@ -97,7 +97,7 @@ describe("invitation and controlled visitor flows", () => {
     await button(w, "Submit application").trigger("click");
     await flushPromises();
     expect(mocks.api.request).toHaveBeenCalledWith(repo, { message: "" });
-    await button(w, "Repository invitation").trigger("click");
+    await button(w, "Have an Invitation?").trigger("click");
     await w
       .get('input[aria-label="Repository invitation code"]')
       .setValue("repo_secret");
@@ -112,7 +112,7 @@ describe("invitation and controlled visitor flows", () => {
     localStorage.setItem("hf_token", "existing-personal-token");
     const w = mountView(Invitation, { repository: repo, access: {} });
     await flushPromises();
-    await button(w, "Repository invitation").trigger("click");
+    await button(w, "Have an Invitation?").trigger("click");
     await w
       .get('input[aria-label="Repository invitation code"]')
       .setValue("repo_secret");
@@ -124,7 +124,7 @@ describe("invitation and controlled visitor flows", () => {
     expect(
       w.find('input[aria-label="Repository invitation code"]').exists(),
     ).toBe(false);
-    await button(w, "Repository invitation").trigger("click");
+    await button(w, "Have an Invitation?").trigger("click");
     expect(
       w.get('input[aria-label="Repository invitation code"]').element.value,
     ).toBe("");
@@ -251,7 +251,7 @@ describe("invitation and controlled visitor flows", () => {
     mocks.api.bind.mockResolvedValue({ data: { grant } });
     const invitation = mountView(Invitation, { repository: repo, access: {} });
     await flushPromises();
-    await button(invitation, "Repository invitation").trigger("click");
+    await button(invitation, "Have an Invitation?").trigger("click");
     await invitation
       .get('input[aria-label="Repository invitation code"]')
       .setValue("repo_old");
