@@ -158,7 +158,7 @@ const tabIcons = {
         /></a>
         <span v-else class="repository-source">{{ repoInfo._source }}</span>
       </div>
-      <div class="repository-metadata">
+      <div v-if="$slots.metadata" class="repository-metadata">
         <slot name="metadata" />
       </div>
       <nav
@@ -194,6 +194,8 @@ const tabIcons = {
 <style scoped>
 .repo-composite-header {
   --repository-tag-height: 24px;
+  --repo-tabs-surface: var(--site-card, #fffdf7);
+  --repo-tabs-text: var(--site-card-text, #2c332b);
   background: var(--site-card);
   color: var(--site-card-text);
   border-bottom: 1px solid var(--site-border);

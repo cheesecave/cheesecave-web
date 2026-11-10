@@ -16,61 +16,72 @@
           @click="$emit('changed')"
           >Check approved access</el-button
         >
-        <p v-if="auth.isAuthenticated">
-          Applying as {{ auth.username }}. Approval grants this account read
-          access to this repository.
-        </p>
-        <el-input
-          v-else
-          v-model="email"
-          type="email"
-          placeholder="Email required for anonymous requests"
-          aria-label="Application email"
-        />
-        <el-input
-          v-model="message"
-          type="textarea"
-          placeholder="Tell the manager why you need access"
-          aria-label="Application message"
-          maxlength="4000"
-        />
-        <el-button type="primary" :loading="busy" @click="apply"
-          >Submit application</el-button
-        >
-        <el-button :disabled="busy" @click="loadRequest"
+        <template v-if="!requestState || requestState.status === 'rejected'">
+          <p v-if="auth.isAuthenticated">Applying as {{ auth.username }}</p>
+          <el-input
+            v-else
+            v-model="email"
+            type="email"
+            placeholder="Email address"
+            aria-label="Application email"
+          />
+          <el-input
+            v-model="message"
+            type="textarea"
+            placeholder="Reason for access"
+            aria-label="Application message"
+            maxlength="4000"
+          />
+          <el-button type="primary" :loading="busy" @click="apply"
+            >Submit application</el-button
+          >
+        </template>
+        <el-button v-if="requestState" :disabled="busy" @click="loadRequest"
           >Refresh application status</el-button
         >
       </div>
-      <div class="card invitation-panel space-y-3">
-        <h2 class="text-lg font-semibold">Repository invitation</h2>
-        <p v-if="bindingNotice" role="status">{{ bindingNotice }}</p>
-        <el-input
-          v-model="token"
-          type="password"
-          show-password
-          autocomplete="off"
-          placeholder="Repository invitation code"
-          aria-label="Repository invitation code"
-        />
+      <el-button class="invitation-code-trigger" @click="codeDialogOpen = true"
+        >Repository invitation</el-button
+      >
+    </template>
+  </RepositoryAccessLayout>
+  <el-dialog
+    v-model="codeDialogOpen"
+    title="Repository invitation"
+    width="min(440px, calc(100vw - 32px))"
+    destroy-on-close
+  >
+    <div class="space-y-3">
+      <p v-if="bindingNotice" role="status">{{ bindingNotice }}</p>
+      <label for="repository-invitation-code">Invitation code</label>
+      <el-input
+        id="repository-invitation-code"
+        v-model="token"
+        type="password"
+        show-password
+        autocomplete="off"
+        placeholder="Invitation code"
+        aria-label="Repository invitation code"
+      />
+    </div>
+    <template #footer>
+      <div class="invitation-actions">
         <el-button
+          type="primary"
           v-if="auth.isAuthenticated"
           :loading="busy"
           @click="redeem(false)"
           >Bind to my account</el-button
         >
         <RouterLink v-else :to="{ path: '/register' }" class="text-blue-500"
-          >Create an account, then enter your repository code</RouterLink
+          >Create an account</RouterLink
         >
         <el-button :loading="busy" @click="redeem(true)"
           >Open temporary web preview</el-button
         >
-        <p class="text-sm text-gray-500">
-          Temporary previews do not allow original files or bulk downloads.
-          Displayed content may still be copied or saved.
-        </p>
       </div>
     </template>
-  </RepositoryAccessLayout>
+  </el-dialog>
 </template>
 <script setup>
 import { computed, ref, watch, onBeforeUnmount } from "vue";
@@ -97,6 +108,17 @@ const token = ref("");
 const busy = ref(false);
 const requestState = ref(null);
 const bindingNotice = ref("");
+const codeDialogOpen = ref(false);
+watch(
+  codeDialogOpen,
+  (open) => {
+    if (!open) {
+      token.value = "";
+      bindingNotice.value = "";
+    }
+  },
+  { flush: "sync" },
+);
 let generation = 0;
 let statusSequence = 0;
 const receiptKey = computed(
@@ -105,7 +127,7 @@ const receiptKey = computed(
 const markdown = computed(() =>
   renderPublicInviteMarkdown(
     props.access.invite_markdown ||
-      "# Request repository access\nThis private repository accepts access applications. Submit an application below.",
+      "# Request repository access\nApply for access or use a repository invitation.",
   ),
 );
 async function loadRequest() {
@@ -172,6 +194,7 @@ async function redeem(guest) {
       ElMessage.warning(INACTIVE_GRANT_NOTICE);
       return;
     }
+    codeDialogOpen.value = false;
     emit("changed");
   } catch (error) {
     if (owner === generation)
@@ -188,6 +211,7 @@ watch(
     generation++;
     requestState.value = null;
     bindingNotice.value = "";
+    codeDialogOpen.value = false;
     token.value = "";
     busy.value = false;
     loadRequest();
@@ -207,8 +231,18 @@ onBeforeUnmount(() => {
   width: 100%;
   margin-left: 0;
 }
-.invitation-panel > a {
-  display: block;
-  font-size: 14px;
+.invitation-code-trigger {
+  width: 100%;
+  margin: 0;
+}
+.invitation-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.invitation-actions :deep(.el-button) {
+  margin-left: 0;
 }
 </style>
