@@ -21,6 +21,16 @@ User authentication, registration, API token management, and email verification.
 **Query Parameters:**
 - `invitation_token` (optional): Required if server is in invitation-only mode
 
+The body may additionally contain `repo_invitation_token`. This grants the new
+account read access to that single repository, including normal downloads. Supply
+it even when site registration is open. It does not replace a site registration
+invitation when the site is invitation-only, join an organization, create a
+temporary account, or issue a Hugging Face access token.
+
+Existing accounts can bind a repository code at `/repo-access`. Temporary web
+preview access uses a separate repository visitor cookie and leaves the normal
+login and personal token unchanged.
+
 **Request Body:**
 ```json
 {

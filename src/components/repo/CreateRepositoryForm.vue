@@ -102,14 +102,18 @@
 
     <!-- Visibility -->
     <el-form-item label="Visibility">
-      <el-checkbox v-model="form.private"
-        >Make this {{ form.type }} private</el-checkbox
-      >
+      <el-select v-model="form.visibility" aria-label="Repository visibility">
+        <el-option label="Public" value="public" />
+        <el-option label="Private" value="private" />
+        <el-option label="Invite" value="invite" />
+      </el-select>
       <p class="w-full mt-1 text-xs text-gray-600 dark:text-gray-400">
         {{
-          form.private
-            ? "You choose who can see and commit to this repository"
-            : "Anyone on the internet can see this repository"
+          form.visibility === "public"
+            ? "Anyone on the internet can see this repository"
+            : form.visibility === "invite"
+              ? "Only the invitation page is public; repository content requires access"
+              : "You choose who can see and commit to this repository"
         }}
       </p>
     </el-form-item>
@@ -142,6 +146,7 @@ import { storeToRefs } from "pinia";
 import { repoAPI, orgAPI } from "@/utils/api";
 import { useAuthStore } from "@/stores/auth";
 import { ElMessage } from "element-plus";
+import { visibilityPayload } from "@/utils/repository-access";
 import { createRepositoryNameRules } from "@/utils/repo-creation";
 import { notifyError } from "@/errors";
 import {
@@ -172,7 +177,7 @@ const form = reactive({
   type: props.fixedType || props.initialType,
   owner: currentUser.value,
   name: "",
-  private: false,
+  visibility: "public",
   sdk: DEFAULT_SPACE_SDK,
 });
 const rules = {
@@ -195,7 +200,7 @@ const typeLabel = computed(() => repositoryType.value?.label || "Repository");
 function reset() {
   form.name = "";
   form.owner = currentUser.value;
-  form.private = false;
+  form.visibility = "public";
   form.sdk = DEFAULT_SPACE_SDK;
   formRef.value?.clearValidate?.();
 }
@@ -246,7 +251,7 @@ async function handleSubmit() {
       type: form.type,
       name: form.name,
       organization: form.owner !== currentUser.value ? form.owner : null,
-      private: form.private,
+      ...visibilityPayload(form.visibility),
       // only a Space has one: the backend writes the card that names it
       ...(form.type === "space" ? { sdk: form.sdk } : {}),
     };

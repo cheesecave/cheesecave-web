@@ -57,16 +57,19 @@ describe("auth pages", () => {
   it.each([
     ["login", LoginPage, "/login"],
     ["register", RegisterPage, "/register"],
-  ])("says so when the %s page cannot load the site settings", async (_, page, path) => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    axios.get.mockRejectedValueOnce(new Error("down"));
-    const router = await createTestRouter(path);
-    mountPage(page, router);
-    await flushPromises();
-    expect(notify).toHaveBeenCalledWith(expect.any(Error), {
-      fallback: "Failed to load site settings",
-    });
-  });
+  ])(
+    "says so when the %s page cannot load the site settings",
+    async (_, page, path) => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      axios.get.mockRejectedValueOnce(new Error("down"));
+      const router = await createTestRouter(path);
+      mountPage(page, router);
+      await flushPromises();
+      expect(notify).toHaveBeenCalledWith(expect.any(Error), {
+        fallback: "Failed to load site settings",
+      });
+    },
+  );
 
   it.each(["//evil.example/x", "/\\evil.example", "https://evil.example/x"])(
     "does not follow a return URL to another origin (%s)",
@@ -345,6 +348,44 @@ describe("auth pages", () => {
     );
   });
 
+  it("sends a manually supplied repository code during open registration", async () => {
+    const router = await createTestRouter("/register");
+    const authStore = useAuthStore();
+    authStore.register = vi.fn().mockResolvedValue({ email_verified: false });
+    const w = mountPage(RegisterPage, router);
+    await flushPromises();
+    await w.get('input[placeholder="Choose a username"]').setValue("reader");
+    await w
+      .get('input[placeholder="your@email.com"]')
+      .setValue("reader@example.com");
+    await w
+      .get('input[placeholder="Create a password"]')
+      .setValue("long-enough-password");
+    await w
+      .get('input[placeholder="Optional repository invitation code"]')
+      .setValue("repo_secret");
+    await w
+      .findAll("button")
+      .find((b) => b.text().includes("Sign Up"))
+      .trigger("click");
+    await flushPromises();
+    expect(authStore.register).toHaveBeenCalledWith(
+      expect.objectContaining({ repo_invitation_token: "repo_secret" }),
+    );
+    w.unmount();
+  });
+  it("does not treat a repository-code link as a site registration invitation", async () => {
+    const router = await createTestRouter("/register?invitation=repo_private");
+    axios.get.mockResolvedValueOnce({ data: { invitation_only: true } });
+    const w = mountPage(RegisterPage, router);
+    await flushPromises();
+    expect(w.text()).toContain("Registration is Invitation-Only");
+    expect(w.find('input[placeholder="Choose a username"]').exists()).toBe(
+      false,
+    );
+    w.unmount();
+  });
+
   it("registers invited users without a return URL and routes them home", async () => {
     const router = await createTestRouter("/register?invitation=invite-123");
     const pushSpy = vi.spyOn(router, "push");
@@ -567,7 +608,9 @@ describe("auth pages", () => {
       return result?.message ?? null;
     };
 
-    expect(await check("sixsix")).toBe("Password must be at least 8 characters");
+    expect(await check("sixsix")).toBe(
+      "Password must be at least 8 characters",
+    );
     expect(await check("a".repeat(73))).toMatch(/at most 72 bytes/);
     expect(await check("long-enough-1")).toBeNull();
   });

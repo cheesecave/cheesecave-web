@@ -64,60 +64,18 @@
             <h2 class="text-xl font-semibold mb-4">Visibility</h2>
             <el-form label-position="top">
               <el-form-item label="Repository Visibility">
-                <div class="visibility-options">
-                  <div
-                    :class="[
-                      'visibility-option',
-                      { selected: !settings.private },
-                    ]"
-                    @click="settings.private = false"
-                  >
-                    <div class="option-radio">
-                      <div
-                        :class="[
-                          'radio-circle',
-                          { checked: !settings.private },
-                        ]"
-                      >
-                        <div v-if="!settings.private" class="radio-dot" />
-                      </div>
-                    </div>
-                    <div class="option-icon">
-                      <div class="i-carbon-unlocked text-xl" />
-                    </div>
-                    <div class="option-content">
-                      <div class="option-title">Public</div>
-                      <div class="option-description">
-                        Anyone can see this repository
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    :class="[
-                      'visibility-option',
-                      { selected: settings.private },
-                    ]"
-                    @click="settings.private = true"
-                  >
-                    <div class="option-radio">
-                      <div
-                        :class="['radio-circle', { checked: settings.private }]"
-                      >
-                        <div v-if="settings.private" class="radio-dot" />
-                      </div>
-                    </div>
-                    <div class="option-icon">
-                      <div class="i-carbon-locked text-xl" />
-                    </div>
-                    <div class="option-content">
-                      <div class="option-title">Private</div>
-                      <div class="option-description">
-                        Only you and collaborators can see this repository
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <el-select
+                  v-model="settings.visibility"
+                  aria-label="Repository visibility"
+                >
+                  <el-option label="Public" value="public" />
+                  <el-option label="Private" value="private" />
+                  <el-option label="Invite" value="invite" />
+                </el-select>
+                <p class="mt-2 text-sm text-gray-500">
+                  Invite keeps content private and publishes only the invitation
+                  page.
+                </p>
               </el-form-item>
 
               <el-button type="primary" @click="saveGeneralSettings">
@@ -606,11 +564,28 @@
           </div>
         </div>
       </el-tab-pane>
+      <el-tab-pane
+        v-if="accessContext?.can_manage"
+        label="Repository access"
+        name="access"
+      >
+        <RepositoryAccessManager
+          v-if="activeTab === 'access'"
+          :repository="{
+            type: repoType,
+            namespace: route.params.namespace,
+            name: route.params.name,
+          }"
+        />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
 
 <script setup>
+import { inject } from "vue";
+import { visibilityPayload } from "@/utils/repository-access";
+import RepositoryAccessManager from "@/components/repo/RepositoryAccessManager.vue";
 import { NAMESPACE_UNLIMITED, UNLIMITED_BRACKET } from "@/utils/unlimited";
 import { useRoute, useRouter } from "vue-router";
 import { repoAPI, settingsAPI, validationAPI, quotaAPI } from "@/utils/api";
@@ -625,9 +600,11 @@ const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 
+const accessContext = inject("repositoryAccess", ref(null));
+const reloadAccess = inject("reloadRepositoryAccess", () => {});
 const activeTab = ref("general");
 const settings = ref({
-  private: false,
+  visibility: "private",
 });
 const moveToRepo = ref("");
 const moveToRepoValidation = ref({
@@ -698,7 +675,8 @@ async function loadRepoInfo() {
       route.params.name,
       ["private"],
     );
-    settings.value.private = data.private || false;
+    settings.value.visibility =
+      accessContext.value?.visibility || (data.private ? "private" : "public");
     moveToRepo.value = repoId.value;
     infoReady.value = true;
   } catch (err) {
@@ -730,10 +708,11 @@ async function saveGeneralSettings() {
       route.params.namespace,
       route.params.name,
       {
-        private: settings.value.private,
+        ...visibilityPayload(settings.value.visibility),
       },
     );
     ElMessage.success("Settings updated successfully");
+    reloadAccess();
   } catch (err) {
     console.error("Failed to update settings:", err);
     notifyError(err, { fallback: "Failed to update settings" });

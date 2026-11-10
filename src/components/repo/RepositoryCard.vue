@@ -77,7 +77,7 @@ const metadata = computed(() => {
         aria-hidden="true"
       />
       <h3 :title="repo.id">{{ repo.id }}</h3>
-      <PrivateBadge v-if="repo.private" />
+      <PrivateBadge v-if="repo.private" :invite="repo.invite_mode" />
     </div>
     <div v-if="metadata.length" class="repo-card-metadata">
       <span

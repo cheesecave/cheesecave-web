@@ -159,7 +159,7 @@
             <div class="flex items-center gap-2 flex-wrap">
               <el-tag v-if="repoInfo?.private" type="warning">
                 <div class="i-carbon-locked inline-block mr-1" />
-                Private
+                {{ repositoryAccess?.visibility === 'invite' ? 'Invite' : 'Private' }}
               </el-tag>
               <el-tag v-else type="success">
                 <div class="i-carbon-unlocked inline-block mr-1" />
@@ -1152,6 +1152,7 @@ const detailActive = ref(true);
 
 const router = useRouter();
 const authStore = useAuthStore();
+const repositoryAccess = inject("repositoryAccess", ref(null));
 
 // State
 const repoInfo = ref(null);
