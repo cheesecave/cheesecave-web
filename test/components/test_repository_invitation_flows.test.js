@@ -1,5 +1,6 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { reactive } from "vue";
+import { screen } from "@testing-library/vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ElementPlusStubs, RouterLinkStub } from "../helpers/vue";
 const mocks = vi.hoisted(() => ({
@@ -204,6 +205,29 @@ describe("invitation and controlled visitor flows", () => {
     expect(mocks.auth.isAuthenticated).toBe(false);
     w.unmount();
   });
+  it.each([false, true])(
+    "exposes the global redemption form to users when signed in is %s",
+    (signedIn) => {
+      mocks.auth.isAuthenticated = signedIn;
+      const w = mount(BindPage, {
+        attachTo: document.body,
+        global: { stubs: { ...ElementPlusStubs, RouterLink: RouterLinkStub } },
+      });
+      expect(
+        screen.getByRole("textbox", { name: "Repository namespace" }),
+      ).toBeDefined();
+      expect(
+        screen.getByRole("textbox", { name: "Repository name" }),
+      ).toBeDefined();
+      expect(
+        screen.getByRole("button", { name: "Open temporary web preview" }),
+      ).toBeDefined();
+      expect(
+        screen.queryByRole("button", { name: "Bind to my account" }) !== null,
+      ).toBe(signedIn);
+      w.unmount();
+    },
+  );
   it.each([
     { revoked_at: "2026-01-01T00:00:00Z", expires_at: null },
     { revoked_at: null, expires_at: "2020-01-01T00:00:00Z" },
