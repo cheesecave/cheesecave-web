@@ -3,6 +3,11 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import MarkdownIt from "markdown-it";
 import { repositoryAccessAPI } from "@/utils/api";
 import "@/markdown-styles/base.css";
+import {
+  loadMarkdownStyle,
+  markdownStyleClasses,
+} from "@/markdown-styles/registry";
+import { useMarkdownStyleStore } from "@/stores/markdownStyle";
 const props = defineProps({
   repository: { type: Object, required: true },
   source: { type: String, default: "" },
@@ -10,8 +15,31 @@ const props = defineProps({
 });
 const emit = defineEmits(["open-file", "access-denied"]);
 const thumbnails = ref({});
+const styleStore = useMarkdownStyleStore();
+const styleClasses = computed(() => markdownStyleClasses(styleStore.resolved));
+const styleReady = ref(false);
+watch(
+  () => styleStore.resolved,
+  async (id) => {
+    styleReady.value = false;
+    try {
+      await loadMarkdownStyle(id);
+    } catch (error) {
+      console.error("Markdown style failed to load:", error);
+    }
+    if (id === styleStore.resolved) styleReady.value = true;
+  },
+  { immediate: true },
+);
 let generation = 0;
 const markdown = new MarkdownIt({ html: true, linkify: true });
+// Repository pages already have their own h1, just like the ordinary card view.
+markdown.core.ruler.push("repository_heading_offset", (state) => {
+  for (const token of state.tokens) {
+    if (token.type === "heading_open" || token.type === "heading_close")
+      token.tag = `h${Math.min(6, Number(token.tag[1]) + 1)}`;
+  }
+});
 // Raw HTML is discarded before a browser can interpret resource-bearing tags.
 markdown.renderer.rules.html_inline = () => "";
 markdown.renderer.rules.html_block = () => "";
@@ -180,4 +208,11 @@ onBeforeUnmount(() => {
   generation++;
 });
 </script>
-<template><div class="mdx" @click="followLink" v-html="html" /></template>
+<template>
+  <div
+    class="markdown-body markdown-container"
+    :class="[styleClasses, { 'mdx-loading': !styleReady }]"
+    @click="followLink"
+    v-html="html"
+  />
+</template>

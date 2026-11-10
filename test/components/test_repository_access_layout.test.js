@@ -19,6 +19,9 @@ const mocks = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
 }));
+vi.mock("@/stores/markdownStyle", () => ({
+  useMarkdownStyleStore: () => ({ resolved: "github" }),
+}));
 vi.mock("@/utils/api", () => ({
   repositoryAccessAPI: {
     getAccess: mocks.getAccess,
@@ -230,6 +233,27 @@ describe("restricted repository pages share the normal repository header", () =>
       expect(wrapper.findComponent(Invitation).exists()).toBe(false);
     },
   );
+
+  it("shows the ordinary model tag chips from controlled card metadata", async () => {
+    mocks.getAccess.mockResolvedValue({
+      data: { access: "guest", visibility: "invite" },
+    });
+    mocks.guestOverview.mockResolvedValue({
+      data: {
+        metadata: { license: "mit", tags: ["invitation-demo"] },
+        readme: null,
+      },
+    });
+    const wrapper = mountView(Gate, {
+      route: { path: "/models/owner/invited" },
+    });
+    await flushPromises();
+    const header = wrapper.get('[aria-label="Repository header"]').element;
+    expect(
+      within(header).getByRole("link", { name: "invitation-demo" }),
+    ).toBeDefined();
+    expect(mocks.ordinaryRead).not.toHaveBeenCalled();
+  });
 
   it("updates the public header identity when the repository changes", async () => {
     const wrapper = mountView(Invitation, {

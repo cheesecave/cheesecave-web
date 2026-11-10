@@ -19,6 +19,9 @@ const mocks = vi.hoisted(() => ({
     guestFileInfo: vi.fn(),
   },
 }));
+vi.mock("@/stores/markdownStyle", () => ({
+  useMarkdownStyleStore: () => ({ resolved: "github" }),
+}));
 vi.mock("@/utils/api", () => ({ repositoryAccessAPI: mocks.api }));
 vi.mock("@/stores/auth", () => ({ useAuthStore: () => mocks.auth }));
 vi.mock("@/errors/notify", () => ({ notifyError: mocks.notify }));

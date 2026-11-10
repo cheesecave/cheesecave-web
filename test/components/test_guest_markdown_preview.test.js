@@ -1,6 +1,18 @@
 import { mount, flushPromises } from "@vue/test-utils";
+import { reactive } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ guestPreview: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  guestPreview: vi.fn(),
+  loadStyle: vi.fn(),
+  style: null,
+}));
+vi.mock("@/stores/markdownStyle", () => ({
+  useMarkdownStyleStore: () => mocks.style,
+}));
+vi.mock("@/markdown-styles/registry", async (importOriginal) => ({
+  ...(await importOriginal()),
+  loadMarkdownStyle: mocks.loadStyle,
+}));
 vi.mock("@/utils/api", () => ({ repositoryAccessAPI: mocks }));
 import Markdown from "@/components/repo/GuestMarkdownPreview.vue";
 const repo = { type: "model", namespace: "owner", name: "demo" };
@@ -15,6 +27,8 @@ const mountMarkdown = (props = {}) => {
 describe("controlled guest Markdown resources", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.style = reactive({ resolved: "github" });
+    mocks.loadStyle.mockResolvedValue("github");
     mocks.guestPreview.mockResolvedValue({
       data: { kind: "image", data_url: "data:image/png;base64,AA==" },
     });
@@ -121,5 +135,43 @@ describe("controlled guest Markdown resources", () => {
     await flushPromises();
     expect(wrapper.emitted("access-denied")).toHaveLength(1);
     expect(wrapper.find("img").exists()).toBe(false);
+  });
+  it("applies the ordinary selected Markdown theme and waits for its stylesheet", async () => {
+    let resolveStyle;
+    mocks.loadStyle.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveStyle = resolve;
+      }),
+    );
+    const wrapper = mountMarkdown();
+    expect(mocks.loadStyle).toHaveBeenCalledWith("github");
+    expect(wrapper.classes()).toEqual(
+      expect.arrayContaining([
+        "markdown-body",
+        "markdown-container",
+        "mdx",
+        "s-github",
+        "mdx-loading",
+      ]),
+    );
+    resolveStyle("github");
+    await flushPromises();
+    expect(wrapper.classes()).not.toContain("mdx-loading");
+    mocks.style.resolved = "gitlab";
+    await flushPromises();
+    expect(mocks.loadStyle).toHaveBeenLastCalledWith("gitlab");
+    expect(wrapper.classes()).toEqual(
+      expect.arrayContaining(["mdx", "s-gitlab", "bar"]),
+    );
+    expect(wrapper.classes()).not.toContain("s-github");
+  });
+  it("demotes repository headings by one level and caps their depth at h6", () => {
+    const wrapper = mountMarkdown({
+      source: "# Model card\n## Introduction\n###### Detail",
+    });
+    expect(wrapper.find("h1").exists()).toBe(false);
+    expect(wrapper.get("h2").text()).toBe("Model card");
+    expect(wrapper.get("h3").text()).toBe("Introduction");
+    expect(wrapper.get("h6").text()).toBe("Detail");
   });
 });
