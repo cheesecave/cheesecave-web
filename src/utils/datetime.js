@@ -63,6 +63,27 @@ export function formatRelativeTime(value, fallback = "never") {
   return parsed.isValid() ? parsed.fromNow() : fallback;
 }
 
+// A list of a thousand rows renders the same few timestamps again and again
+// (every row of one commit shares one), and the timezone-aware parse is the
+// expensive part. The words only change by the minute, so reuse them briefly.
+const RELATIVE_TIME_TTL_MS = 15_000;
+const RELATIVE_TIME_MAX_ENTRIES = 2000;
+const relativeTimeCache = new Map();
+
+export function formatRelativeTimeCached(value, fallback = "never") {
+  if (!value) return fallback;
+  const key = `${value}\u0000${fallback}`;
+  const now = Date.now();
+  const hit = relativeTimeCache.get(key);
+  if (hit && now - hit.at < RELATIVE_TIME_TTL_MS) return hit.text;
+  const text = formatRelativeTime(value, fallback);
+  if (relativeTimeCache.size >= RELATIVE_TIME_MAX_ENTRIES) {
+    relativeTimeCache.clear();
+  }
+  relativeTimeCache.set(key, { at: now, text });
+  return text;
+}
+
 export function formatUnixRelativeTime(value, fallback = "Unknown") {
   if (!value) return fallback;
 

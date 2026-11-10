@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { RETRY_WAITS, isTransientFetchFailure, withRetry } from "@/utils/retry";
+import {
+  RETRY_WAITS,
+  isTransientFetchFailure,
+  runLimited,
+  withRetry,
+} from "@/utils/retry";
 
 describe("isTransientFetchFailure", () => {
   it("treats a network-level fetch failure (TypeError) as transient", () => {
@@ -110,5 +115,37 @@ describe("withRetry", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("runLimited", () => {
+  it("runs every task and returns the results in the order of the tasks", async () => {
+    const tasks = [1, 2, 3, 4, 5].map((n) => async () => n * 10);
+    await expect(runLimited(tasks, 2)).resolves.toEqual([10, 20, 30, 40, 50]);
+  });
+
+  it("never runs more than `limit` tasks at once", async () => {
+    let running = 0;
+    let peak = 0;
+    const tasks = Array.from({ length: 10 }, () => async () => {
+      running += 1;
+      peak = Math.max(peak, running);
+      await new Promise((r) => setTimeout(r, 2));
+      running -= 1;
+    });
+    await runLimited(tasks, 4);
+    expect(peak).toBe(4);
+  });
+
+  it("copes with no tasks and with a limit larger than the number of tasks", async () => {
+    await expect(runLimited([], 4)).resolves.toEqual([]);
+    await expect(runLimited([async () => "a"], 4)).resolves.toEqual(["a"]);
+  });
+
+  it("rejects with the first failure", async () => {
+    const boom = new Error("boom");
+    await expect(
+      runLimited([async () => 1, async () => { throw boom; }, async () => 3], 2),
+    ).rejects.toBe(boom);
   });
 });

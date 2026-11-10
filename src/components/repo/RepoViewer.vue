@@ -1068,7 +1068,11 @@ huggingface-cli download {{ repoInfo?.id }}</pre
 import { defineAsyncComponent } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import axios from "axios";
-import { formatRelativeTime, formatUnixRelativeTime } from "@/utils/datetime";
+import {
+  formatRelativeTime,
+  formatRelativeTimeCached,
+  formatUnixRelativeTime,
+} from "@/utils/datetime";
 
 import { useAuthStore } from "@/stores/auth";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -1107,7 +1111,12 @@ import {
   isLaterZipVolume,
   zipEntryVolume,
 } from "@/utils/file-preview";
-import { tarSidecarPath } from "@/utils/indexed-tar";
+import {
+  lastKeyOf,
+  sidecarKnownAbsent,
+  tarSidecarPath,
+} from "@/utils/indexed-tar";
+import { runLimited, withRetry } from "@/utils/retry";
 
 // Fixed batch size for the file-list Load More button. The earlier
 // numbered-pager UI had a 50/100/200 selector, but with Load More the
@@ -1212,6 +1221,20 @@ let commitsRequestId = 0;
 const fileListNextCursor = ref(null);
 const fileListLoadingMore = ref(false);
 const fileListHasMore = computed(() => fileListNextCursor.value !== null);
+// The greatest key the server has returned so far: pages are contiguous in key
+// order, so every key up to it is loaded (see sidecarKnownAbsent).
+const fileListLastKey = ref(null);
+
+// The file paths of the loaded rows, as a Set built once per change of the
+// list. The per-row "has a sidecar" checks ask this Set (O(1)) instead of
+// scanning every loaded row (O(n) per row, O(n^2) per render).
+const loadedFilePaths = computed(() => {
+  const paths = new Set();
+  for (const entry of fileTree.value) {
+    if (entry && entry.type !== "directory") paths.add(entry.path);
+  }
+  return paths;
+});
 
 // Indexed-tar sibling-icon probe state. The sync `hasIndexSibling`
 // lookup runs against the loaded page first (cheap); when a `.tar`
@@ -1254,7 +1277,7 @@ function previewIconClass(file) {
   if (isLaterZipVolume(file.path)) return "i-carbon-link opacity-60 scale-85";
   const kind = getPreviewKind(
     file.path,
-    fileTree.value,
+    loadedFilePaths.value,
     confirmedIndexedTars.value,
   );
   return PREVIEW_ICON_BY_KIND[kind] || "i-carbon-chart-line-data";
@@ -1263,7 +1286,7 @@ function previewIconClass(file) {
 function previewIconTitle(file) {
   const kind = getPreviewKind(
     file.path,
-    fileTree.value,
+    loadedFilePaths.value,
     confirmedIndexedTars.value,
   );
   if (kind === "indexed-tar") {
@@ -1280,7 +1303,7 @@ function previewIconTitle(file) {
 }
 
 function canPreviewFileRow(file) {
-  return canPreviewFile(file, fileTree.value, confirmedIndexedTars.value);
+  return canPreviewFile(file, loadedFilePaths.value, confirmedIndexedTars.value);
 }
 
 function buildResolveForPath(path) {
@@ -1297,7 +1320,7 @@ function buildResolveForPath(path) {
 function openFilePreview(file) {
   const kind = getPreviewKind(
     file.path,
-    fileTree.value,
+    loadedFilePaths.value,
     confirmedIndexedTars.value,
   );
   if (!kind) return;
@@ -1506,7 +1529,10 @@ function getEntryCommitTitle(file) {
 }
 
 function getEntryUpdatedAt(file) {
-  return formatRelativeTime(file.lastCommit?.date || file.lastModified, "-");
+  return formatRelativeTimeCached(
+    file.lastCommit?.date || file.lastModified,
+    "-",
+  );
 }
 
 function getFileName(path) {
@@ -1861,6 +1887,7 @@ async function fetchFileTree({ resetPagination = true } = {}, context) {
     fileTree.value = sortedEntries;
     fileTreeContext = context;
     fileListNextCursor.value = page.nextCursor || null;
+    fileListLastKey.value = lastKeyOf(page.entries);
 
     if (sortedEntries.length === 0) {
       return;
@@ -1871,6 +1898,7 @@ async function fetchFileTree({ resetPagination = true } = {}, context) {
       fileTreeContext = context;
       fileTree.value = [];
       fileListNextCursor.value = null;
+      fileListLastKey.value = null;
       treeError.value = decodeError(err);
     }
   } finally {
@@ -1929,6 +1957,7 @@ async function loadMoreFileTree() {
     appendedEntries = page.entries || [];
     fileTree.value = sortFileEntries([...fileTree.value, ...appendedEntries]);
     fileListNextCursor.value = page.nextCursor || null;
+    fileListLastKey.value = lastKeyOf(appendedEntries) ?? fileListLastKey.value;
   } catch (err) {
     console.error("Failed to load more file tree entries:", err);
     // A failed Load More leaves the already-rendered listing alone —
@@ -1955,61 +1984,82 @@ function resetIndexedTarProbeMemo() {
   rejectedIndexedTars.value = new Set();
 }
 
+// One HEAD for the sidecar, tried a second time after 300 ms when it fails.
+// A failure that survives the retry is `error`: nothing is known.
+async function probeSidecar(sidecar) {
+  try {
+    return await withRetry(
+      async () => {
+        const result = await repoAPI.probeFile(
+          props.repoType,
+          props.namespace,
+          props.name,
+          currentBranch.value,
+          sidecar,
+        );
+        if (result.state === "error") {
+          throw new Error(`sidecar probe failed (${result.status})`);
+        }
+        return result;
+      },
+      { waits: [300], isTransient: () => true },
+    );
+  } catch {
+    return { state: "error", status: null };
+  }
+}
+
+// Which `.tar` rows need to ask the server for their sidecar? Only those whose
+// `.json` is neither among the loaded rows nor provably absent (the pages are
+// contiguous in key order, and `x.json` sorts before `x.tar`, so for ordinary
+// names a sidecar that is not loaded does not exist). Those few are probed
+// four at a time, and an answer that is not a clear yes or no is not recorded:
+// the icon simply stays off until the listing is loaded again.
 async function probeMissingIndexedTarSiblings(entries, requestId) {
   // Probe just the supplied entries; the memoized confirmed/rejected
   // sets are kept across Load More batches so previously-resolved
   // siblings stay sticky. (They are reset by `loadFileTree` on a
   // genuine listing reset — branch / path / name_prefix change.)
   const probeId = pendingIndexedTarProbeId;
-
-  // Already-rendered files satisfy the sibling check too — Load More
-  // can introduce a `.tar` whose `.json` was loaded in a prior batch,
-  // and vice versa.
-  const loadedSiblings = new Set(
-    fileTree.value
-      .filter((entry) => entry && entry.type !== "directory")
-      .map((entry) => entry.path),
-  );
+  const loaded = loadedFilePaths.value;
+  const hasMore = fileListHasMore.value;
+  const lastKey = fileListLastKey.value;
 
   const pending = [];
   for (const entry of entries) {
     if (!entry || entry.type === "directory") continue;
     const sidecar = tarSidecarPath(entry.path);
     if (!sidecar) continue;
-    if (loadedSiblings.has(sidecar)) continue;
+    if (loaded.has(sidecar)) continue;
     if (confirmedIndexedTars.value.has(entry.path)) continue;
     if (rejectedIndexedTars.value.has(entry.path)) continue;
+    if (sidecarKnownAbsent(sidecar, lastKey, hasMore)) continue;
     pending.push({ tarPath: entry.path, sidecar });
   }
   if (pending.length === 0) return;
 
-  await Promise.all(
-    pending.map(async ({ tarPath, sidecar }) => {
-      const exists = await repoAPI.fileExists(
-        props.repoType,
-        props.namespace,
-        props.name,
-        currentBranch.value,
-        sidecar,
-      );
+  await runLimited(
+    pending.map(({ tarPath, sidecar }) => async () => {
+      const { state } = await probeSidecar(sidecar);
       if (
         probeId !== pendingIndexedTarProbeId ||
         requestId !== fileTreeRequestId.value
       ) {
         return;
       }
-      if (exists) {
+      if (state === "yes") {
         // Reassign the Set so reactivity picks the change up — Vue
         // tracks the ref binding, not the in-place .add() mutation.
         const next = new Set(confirmedIndexedTars.value);
         next.add(tarPath);
         confirmedIndexedTars.value = next;
-      } else {
+      } else if (state === "no") {
         const next = new Set(rejectedIndexedTars.value);
         next.add(tarPath);
         rejectedIndexedTars.value = next;
       }
     }),
+    4,
   );
 }
 

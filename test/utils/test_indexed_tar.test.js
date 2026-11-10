@@ -16,8 +16,10 @@ import {
   guessMimeType,
   hasIndexSibling,
   hasIndexSiblingWithProbe,
+  lastKeyOf,
   listDirectory,
   parseTarIndex,
+  sidecarKnownAbsent,
   tarSidecarPath,
 } from "@/utils/indexed-tar";
 
@@ -678,6 +680,77 @@ describe("hasIndexSibling", () => {
   it("returns false for non-tar paths", () => {
     expect(hasIndexSibling("bundle.json", [])).toBe(false);
     expect(hasIndexSibling("bundle.zip", [])).toBe(false);
+  });
+});
+
+describe("hasIndexSibling with a Set of loaded file paths", () => {
+  const loaded = new Set(["a.json", "a.tar", "b.tar"]);
+
+  it("answers from the Set: present sidecar, missing sidecar", () => {
+    expect(hasIndexSibling("a.tar", loaded)).toBe(true);
+    expect(hasIndexSibling("b.tar", loaded)).toBe(false);
+  });
+
+  it("still rejects a path that is not a .tar", () => {
+    expect(hasIndexSibling("a.json", loaded)).toBe(false);
+    expect(hasIndexSibling(undefined, loaded)).toBe(false);
+  });
+
+  it("matches the iterable-of-entries answer on the same data", () => {
+    const entries = [
+      { type: "file", path: "a.json" },
+      { type: "file", path: "a.tar" },
+      { type: "file", path: "b.tar" },
+      { type: "directory", path: "c.json" },
+      { type: "file", path: "c.tar" },
+    ];
+    const set = new Set(entries.filter((e) => e.type !== "directory").map((e) => e.path));
+    for (const e of entries) {
+      expect(hasIndexSibling(e.path, set)).toBe(hasIndexSibling(e.path, entries));
+    }
+  });
+});
+
+describe("lastKeyOf", () => {
+  it("is the greatest path of a page, whatever order it arrives in", () => {
+    expect(lastKeyOf([{ path: "b" }, { path: "c" }, { path: "a" }])).toBe("c");
+  });
+
+  it("is null for an empty or missing page", () => {
+    expect(lastKeyOf([])).toBeNull();
+    expect(lastKeyOf(null)).toBeNull();
+    expect(lastKeyOf(undefined)).toBeNull();
+  });
+
+  it("compares by code unit, like the server's key order does for these names", () => {
+    expect(lastKeyOf([{ path: "Z" }, { path: "a" }])).toBe("a");
+  });
+});
+
+describe("sidecarKnownAbsent", () => {
+  it("is true for any sidecar once the whole folder is loaded (no further page)", () => {
+    expect(sidecarKnownAbsent("x.json", "a", false)).toBe(true);
+    expect(sidecarKnownAbsent("x.json", null, false)).toBe(true);
+  });
+
+  it("is true when the sidecar sorts at or before the last loaded key: the page already passed it", () => {
+    expect(sidecarKnownAbsent("data/pack-0001.json", "data/pack-0500.tar", true)).toBe(true);
+    expect(sidecarKnownAbsent("data/pack-0500.tar", "data/pack-0500.tar", true)).toBe(true);
+  });
+
+  it("is false when the sidecar sorts after the last loaded key: it may be on a later page", () => {
+    // 'j' (0x6a) sorts after 'T' (0x54): X.json comes after X.TAR
+    expect(sidecarKnownAbsent("X.json", "X.TAR", true)).toBe(false);
+    expect(sidecarKnownAbsent("m.json", "a.tar", true)).toBe(false);
+  });
+
+  it("does not decide when there is no last key to compare with", () => {
+    expect(sidecarKnownAbsent("a.json", null, true)).toBe(false);
+  });
+
+  it("does not decide for non-ASCII names (the server orders by UTF-8 bytes)", () => {
+    expect(sidecarKnownAbsent("é.json", "z", true)).toBe(false);
+    expect(sidecarKnownAbsent("a.json", "ü", true)).toBe(false);
   });
 });
 
