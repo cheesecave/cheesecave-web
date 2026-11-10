@@ -7,6 +7,9 @@ const mocks = vi.hoisted(() => ({
   guestTree: vi.fn(),
   guestPreview: vi.fn(),
   leaveGuest: vi.fn(),
+  guestOverview: vi.fn(),
+  guestCommits: vi.fn(),
+  guestFileInfo: vi.fn(),
 }));
 vi.mock("@/utils/api", () => ({ repositoryAccessAPI: mocks }));
 import Visitor from "@/components/repo/RestrictedRepositoryViewer.vue";
@@ -14,7 +17,7 @@ const repository = { type: "model", namespace: "owner", name: "demo" };
 const wrappers = [];
 function mountVisitor() {
   const wrapper = mount(Visitor, {
-    props: { repository },
+    props: { repository, view: "files" },
     attachTo: document.body,
     global: {
       stubs: {
@@ -33,11 +36,37 @@ const queries = (wrapper) => within(wrapper.element);
 describe("controlled guest file rows", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.guestOverview.mockResolvedValue({
+      data: {
+        id: "owner/demo",
+        author: "owner",
+        default_branch: "main",
+        metadata: {},
+        readme: null,
+      },
+    });
+    mocks.guestFileInfo.mockImplementation((_repo, path) =>
+      Promise.resolve({ data: { path, size: null, last_modified: null } }),
+    );
+    mocks.guestCommits.mockResolvedValue({
+      data: { commits: [], has_more: false },
+    });
     mocks.guestTree.mockResolvedValue({
       data: {
         path: "",
         entries: [
-          { path: "notes.txt", type: "file", preview_kind: "text", size: 1536 },
+          {
+            path: "notes.txt",
+            type: "file",
+            preview_kind: "text",
+            size: 1536,
+            last_commit: {
+              id: "abc1234",
+              title: "Update notes",
+              timestamp: "2026-11-10T06:00:00Z",
+              author: "owner",
+            },
+          },
           { path: "folder", type: "directory", size: 0 },
           {
             path: "manual.pdf",
@@ -64,16 +93,23 @@ describe("controlled guest file rows", () => {
       within(table)
         .getAllByRole("columnheader")
         .map((cell) => cell.textContent.trim()),
-    ).toEqual(["Name", "Preview", "Size"]);
+    ).toEqual(["Name", "Last commit", "Updated", "Size"]);
     const note = within(table).getByRole("row", { name: /notes.txt/ });
-    expect(note.textContent).toContain("Text");
+    expect(note.textContent).toContain("Update notes");
     expect(note.textContent).toContain("1.5 KB");
     const pdf = within(table).getByRole("row", { name: /manual.pdf/ });
-    expect(pdf.textContent).toContain("Metadata only");
+    expect(within(pdf).getAllByRole("cell")).toHaveLength(4);
     expect(pdf.textContent).toContain("512 B");
+    expect(wrapper.findAll("a[download],video,audio,iframe")).toHaveLength(0);
     expect(
-      wrapper.findAll("a[href],a[download],video,audio,iframe"),
-    ).toHaveLength(0);
+      wrapper
+        .findAll("a[href]")
+        .every((link) =>
+          /^\/(?:owner$|models\/owner\/demo\/(?:tree|blob)\/main\/(?:notes\.txt|manual\.pdf|folder))$/.test(
+            link.attributes("href"),
+          ),
+        ),
+    ).toBe(true);
     expect(wrapper.html()).not.toMatch(/\/resolve\/|https?:\/\//);
     expect(
       queries(wrapper).queryByRole("button", { name: /download|clone/i }),
@@ -97,16 +133,18 @@ describe("controlled guest file rows", () => {
       },
     });
     await queries(wrapper)
-      .getByRole("button", { name: "folder", exact: true })
+      .getByRole("link", { name: "folder", exact: true })
       .click();
     await flushPromises();
-    expect(mocks.guestTree).toHaveBeenLastCalledWith(repository, "folder");
+    expect(mocks.guestTree).toHaveBeenLastCalledWith(repository, "folder", {
+      search: "",
+    });
     const table = queries(wrapper).getByRole("table", {
       name: "Repository files",
     });
     expect(
       within(table)
-        .getByRole("button", { name: "folder/nested.txt", exact: true })
+        .getByRole("link", { name: "folder/nested.txt", exact: true })
         .textContent.trim(),
     ).toBe("nested.txt");
     expect(
@@ -116,7 +154,9 @@ describe("controlled guest file rows", () => {
       .getByRole("button", { name: "Parent folder", exact: true })
       .click();
     await flushPromises();
-    expect(mocks.guestTree).toHaveBeenLastCalledWith(repository, "");
+    expect(mocks.guestTree).toHaveBeenLastCalledWith(repository, "", {
+      search: "",
+    });
     expect(mocks.guestPreview).not.toHaveBeenCalled();
   });
 
@@ -124,7 +164,7 @@ describe("controlled guest file rows", () => {
     const wrapper = mountVisitor();
     await flushPromises();
     await queries(wrapper)
-      .getByRole("button", { name: "notes.txt", exact: true })
+      .getByRole("link", { name: "notes.txt", exact: true })
       .click();
     await flushPromises();
     expect(mocks.guestPreview).toHaveBeenCalledExactlyOnceWith(
@@ -137,11 +177,24 @@ describe("controlled guest file rows", () => {
     expect(preview.textContent).toContain("Limited excerpt");
     expect(preview.textContent).toContain("This preview is limited");
     expect(
-      queries(wrapper)
-        .getByRole("button", { name: "notes.txt", exact: true })
-        .getAttribute("aria-pressed"),
-    ).toBe("true");
-    expect(wrapper.findAll("a[href],a[download]")).toHaveLength(0);
+      queries(wrapper).getByRole("heading", { name: "notes.txt", exact: true }),
+    ).toBeDefined();
+    expect(
+      queries(wrapper).getByRole("button", { name: "Back to Files" }),
+    ).toBeDefined();
+    expect(
+      queries(wrapper).queryByRole("table", { name: "Repository files" }),
+    ).toBeNull();
+    expect(wrapper.findAll("a[download]")).toHaveLength(0);
+    expect(
+      wrapper
+        .findAll("a[href]")
+        .every((link) =>
+          /^\/(?:owner$|models\/owner\/demo\/(?:tree|blob)\/main\/(?:notes\.txt|manual\.pdf|folder))$/.test(
+            link.attributes("href"),
+          ),
+        ),
+    ).toBe(true);
   });
 
   it("displays only supplied preview metadata, including large and unknown file sizes", async () => {
@@ -179,13 +232,13 @@ describe("controlled guest file rows", () => {
     });
     expect(
       within(table).getByRole("row", { name: /rows.csv/ }).textContent,
-    ).toMatch(/Data rows.*2.5 MB/);
+    ).toContain("2.5 MB");
     expect(
       within(table).getByRole("row", { name: /photo.png/ }).textContent,
-    ).toMatch(/Thumbnail.*1.5 KB/);
+    ).toContain("1.5 KB");
     expect(
       within(table).getByRole("row", { name: /weights.bin/ }).textContent,
-    ).toMatch(/Metadata only.*2.5 GB/);
+    ).toContain("2.5 GB");
     expect(
       within(table).getByRole("row", { name: /unknown.bin/ }).textContent,
     ).toContain("—");

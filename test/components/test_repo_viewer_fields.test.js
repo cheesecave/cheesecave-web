@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { defineComponent, h, ref } from "vue";
+import { defineComponent, h, ref, shallowRef } from "vue";
 
 import { http, HttpResponse } from "@/testing/msw";
 import { ElementPlusStubs, RouterLinkStub } from "../helpers/vue";
@@ -30,7 +30,7 @@ const SidebarRelationshipsCardProbe = defineComponent({
     }),
 });
 
-function mountViewer(repoType, visibility = null) {
+function mountViewer(repoType, visibility = null, bridge = null) {
   return mount(RepoViewer, {
     props: {
       repoType,
@@ -41,7 +41,10 @@ function mountViewer(repoType, visibility = null) {
       tab: "files",
     },
     global: {
-      provide: { repositoryAccess: ref(visibility ? { visibility } : null) },
+      provide: {
+        repositoryAccess: ref(visibility ? { visibility } : null),
+        ...(bridge ? { repositoryHeaderBridge: bridge } : {}),
+      },
       stubs: {
         ...ElementPlusStubs,
         ElTooltip: true,
@@ -115,6 +118,24 @@ describe("RepoViewer asks repo info for the fields of its kind", () => {
     expect(infos[0]).toEqual(expect.arrayContaining(CORE));
     expect(infos[0]).not.toContain("downloads");
   });
+  it.each(["model", "space"])(
+    "publishes the authorized %s header without mounting a second header",
+    async (kind) => {
+      const bridge = { enabled: ref(true), state: shallowRef(null) };
+      const wrapper = mountViewer(kind, "invite", bridge);
+      await flushPromises();
+      expect(bridge.state.value.repoInfo.id).toBe("acme/thing");
+      expect(bridge.state.value.tabs.length).toBeGreaterThan(0);
+      expect(typeof bridge.state.value.copy).toBe("function");
+      expect(wrapper.find('[aria-label="Repository header"]').exists()).toBe(
+        false,
+      );
+      if (kind === "space")
+        expect(wrapper.find(".repo-header").exists()).toBe(false);
+      wrapper.unmount();
+      expect(bridge.state.value).toBeNull();
+    },
+  );
   it("labels a private Space in invitation mode as Invite", async () => {
     answers.push(
       jsonResponse({ ...cloneFixture(uiApiFixtures.repo.info), private: true }),

@@ -6,7 +6,7 @@
     "
   >
     <RepositoryHeader
-      v-if="isCompositeHeader"
+      v-if="isCompositeHeader && !externalHeader"
       :repo-type="repoType"
       :namespace="namespace"
       :name="name"
@@ -121,7 +121,10 @@
       <!-- Main Content -->
       <main class="min-w-0">
         <!-- Repo Header -->
-        <div v-if="!isCompositeHeader" class="card repo-header mb-6">
+        <div
+          v-if="!isCompositeHeader && !externalHeader"
+          class="card repo-header mb-6"
+        >
           <div
             class="flex flex-col sm:flex-row items-start justify-between gap-4 mb-4"
           >
@@ -159,7 +162,11 @@
             <div class="flex items-center gap-2 flex-wrap">
               <el-tag v-if="repoInfo?.private" type="warning">
                 <div class="i-carbon-locked inline-block mr-1" />
-                {{ repositoryAccess?.visibility === 'invite' ? 'Invite' : 'Private' }}
+                {{
+                  repositoryAccess?.visibility === "invite"
+                    ? "Invite"
+                    : "Private"
+                }}
               </el-tag>
               <el-tag v-else type="success">
                 <div class="i-carbon-unlocked inline-block mr-1" />
@@ -255,7 +262,7 @@
 
         <!-- Metadata Header (Key badges) -->
         <MetadataHeader
-          v-if="!isCompositeHeader && hasMetadataHeader"
+          v-if="!isCompositeHeader && !externalHeader && hasMetadataHeader"
           :metadata="displayMetadata"
           :libraries="tagGroups.libraries"
           :others="tagGroups.others"
@@ -266,7 +273,7 @@
 
         <!-- Navigation Tabs: real links, so "Open in new tab" works on each of them -->
         <nav
-          v-if="!isCompositeHeader"
+          v-if="!isCompositeHeader && !externalHeader"
           class="repo-tabs mb-6 -mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto"
           aria-label="Repository sections"
         >
@@ -1065,7 +1072,12 @@ huggingface-cli download {{ repoInfo?.id }}</pre
 </template>
 
 <script setup>
-import { defineAsyncComponent } from "vue";
+import {
+  defineAsyncComponent,
+  inject,
+  watchEffect,
+  onBeforeUnmount,
+} from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import axios from "axios";
 import { formatRelativeTime, formatUnixRelativeTime } from "@/utils/datetime";
@@ -1573,6 +1585,45 @@ const headerTabs = computed(() =>
     .filter((item) => item.key !== "commits")
     .map((item) => ({ ...item, to: tabTarget(item.key) })),
 );
+
+// A repository that entered through an invitation keeps its existing header
+// when access changes. Only an authorized RepoViewer publishes normal header
+// data; the access gate clears this bridge before identity/access rechecks.
+const headerBridge = inject("repositoryHeaderBridge", null);
+const externalHeader = computed(() => Boolean(headerBridge?.enabled.value));
+const headerOwner = Symbol("repository-header");
+watchEffect(
+  () => {
+    if (!externalHeader.value) return;
+    headerBridge.state.value = {
+      owner: headerOwner,
+      repoInfo: error.value ? null : repoInfo.value,
+      namespaceLink: namespaceLink.value,
+      signedIn: authStore.isAuthenticated,
+      isOwner: isOwner.value,
+      liked: isLiked.value,
+      likesCount: likesCount.value,
+      liking: likingInProgress.value,
+      tabs: headerTabs.value,
+      activeTab: activeTab.value === "commits" ? "files" : activeTab.value,
+      metadata: displayMetadata.value,
+      tagGroups: tagGroups.value,
+      hasMetadataHeader: !error.value && hasMetadataHeader.value,
+      copy: copyRepoId,
+      clone: () => {
+        showCloneDialog.value = true;
+      },
+      download: downloadRepo,
+      like: toggleLike,
+      navigate: navigateToTab,
+    };
+  },
+  { flush: "post" },
+);
+onBeforeUnmount(() => {
+  if (headerBridge?.state.value?.owner === headerOwner)
+    headerBridge.state.value = null;
+});
 
 const sourceRepoUrl = computed(() =>
   repoInfo.value

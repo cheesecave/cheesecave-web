@@ -1,5 +1,9 @@
 <template>
-  <RepositoryAccessLayout :repository="repository" :access="access">
+  <RepositoryAccessLayout
+    :repository="repository"
+    :access="access"
+    :embedded="embedded"
+  >
     <article
       class="card mdx"
       aria-label="Public invitation instructions"
@@ -103,6 +107,7 @@ import "@/markdown-styles/base.css";
 const props = defineProps({
   repository: { type: Object, required: true },
   access: { type: Object, required: true },
+  embedded: { type: Boolean, default: false },
 });
 const emit = defineEmits(["changed"]);
 const auth = useAuthStore();

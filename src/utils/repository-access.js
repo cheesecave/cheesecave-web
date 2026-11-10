@@ -1,4 +1,19 @@
 import MarkdownIt from "markdown-it";
+import { getRepositoryType } from "./repository-types";
+
+export function guestRepositoryTabs(repository) {
+  const path = `/${repository.type}s/${encodeURIComponent(repository.namespace)}/${encodeURIComponent(repository.name)}`;
+  return [
+    {
+      key: "card",
+      label: `${getRepositoryType(repository.type).label} Card`,
+      to: path,
+    },
+    { key: "files", label: "Files", to: `${path}/tree/main` },
+    { key: "commits", label: "Commits", to: `${path}/commits/main` },
+    { key: "metadata", label: "Metadata", to: `${path}?tab=metadata` },
+  ];
+}
 
 export function repositoryFromRoute(route) {
   const match = /^\/(models|datasets|spaces)\/([^/]+)\/([^/]+)(?:\/|$)/.exec(
