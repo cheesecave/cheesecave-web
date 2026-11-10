@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { defineComponent, h } from "vue";
+import { defineComponent, h, ref } from "vue";
 
 import { http, HttpResponse } from "@/testing/msw";
 import { ElementPlusStubs, RouterLinkStub } from "../helpers/vue";
@@ -30,7 +30,7 @@ const SidebarRelationshipsCardProbe = defineComponent({
     }),
 });
 
-function mountViewer(repoType) {
+function mountViewer(repoType, visibility = null) {
   return mount(RepoViewer, {
     props: {
       repoType,
@@ -41,6 +41,7 @@ function mountViewer(repoType) {
       tab: "files",
     },
     global: {
+      provide: { repositoryAccess: ref(visibility ? { visibility } : null) },
       stubs: {
         ...ElementPlusStubs,
         ElTooltip: true,
@@ -113,6 +114,17 @@ describe("RepoViewer asks repo info for the fields of its kind", () => {
     expect(infos).toHaveLength(1);
     expect(infos[0]).toEqual(expect.arrayContaining(CORE));
     expect(infos[0]).not.toContain("downloads");
+  });
+  it("labels a private Space in invitation mode as Invite", async () => {
+    answers.push(
+      jsonResponse({ ...cloneFixture(uiApiFixtures.repo.info), private: true }),
+    );
+    const w = mountViewer("space", "invite");
+    await flushPromises();
+    expect(w.findAll("[data-el-tag]").map((tag) => tag.text())).toContain(
+      "Invite",
+    );
+    w.unmount();
   });
 
   it.each(["model", "dataset"])(

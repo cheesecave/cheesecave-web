@@ -99,6 +99,43 @@ export const workspaceAPI = {
 
 export default api;
 
+const repositoryAccessBase = ({ type, namespace, name }) =>
+  `/api/${encodeURIComponent(type)}s/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/access`;
+
+export const repositoryAccessAPI = {
+  getAccess: (repo) => api.get(repositoryAccessBase(repo)),
+  request: (repo, data) =>
+    api.post(`${repositoryAccessBase(repo)}/requests`, data),
+  getRequest: (repo, receipt) =>
+    api.get(`${repositoryAccessBase(repo)}/request`, {
+      headers: receipt ? { "X-Repository-Request-Receipt": receipt } : {},
+    }),
+  manage: (repo, params = {}) =>
+    api.get(`${repositoryAccessBase(repo)}/manage`, { params }),
+  review: (repo, id, data) =>
+    api.post(`${repositoryAccessBase(repo)}/requests/${id}/review`, data),
+  issue: (repo, data) =>
+    api.post(`${repositoryAccessBase(repo)}/invites`, data),
+  revokeInvitation: (repo, id) =>
+    api.post(`${repositoryAccessBase(repo)}/invites/${id}/revoke`),
+  grant: (repo, data) => api.post(`${repositoryAccessBase(repo)}/grants`, data),
+  revokeGrant: (repo, id) =>
+    api.post(`${repositoryAccessBase(repo)}/grants/${id}/revoke`),
+  revokeGuest: (repo, id) =>
+    api.post(`${repositoryAccessBase(repo)}/guests/${id}/revoke`),
+  bind: (repo, token) =>
+    api.post(`${repositoryAccessBase(repo)}/bind`, { token }),
+  guest: (repo, token) =>
+    api.post(`${repositoryAccessBase(repo)}/guest`, { token }),
+  leaveGuest: (repo) => api.delete(`${repositoryAccessBase(repo)}/guest`),
+  guestTree: (repo, path = "") =>
+    api.get(`${repositoryAccessBase(repo)}/guest/tree`, { params: { path } }),
+  guestPreview: (repo, path) =>
+    api.get(`${repositoryAccessBase(repo)}/guest/preview`, {
+      params: { path },
+    }),
+};
+
 // RFC 8288: `<url>; rel="next"`, possibly with other relations and parameters
 function getNextLinkFromHeader(linkHeader) {
   if (!linkHeader) return null;
@@ -1288,7 +1325,11 @@ const ITEM_ID = /^[0-9a-f]{24}$/i;
 
 function notFound() {
   return Object.assign(new Error("Collection not found"), {
-    response: { status: 404, data: { error: "Collection not found" }, headers: {} },
+    response: {
+      status: 404,
+      data: { error: "Collection not found" },
+      headers: {},
+    },
   });
 }
 
@@ -1323,7 +1364,8 @@ export const collectionsAPI = {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
       for (const one of Array.isArray(value) ? value : [value]) {
-        if (one !== undefined && one !== null && one !== "") query.append(key, one);
+        if (one !== undefined && one !== null && one !== "")
+          query.append(key, one);
       }
     }
     return api.get(`/api/collections?${query.toString()}`);
@@ -1405,5 +1447,8 @@ export const preferencesAPI = {
   get: (username) =>
     api.get(`/api/users/${encodeURIComponent(username)}/preferences`),
   update: (username, preferences) =>
-    api.put(`/api/users/${encodeURIComponent(username)}/preferences`, preferences),
+    api.put(
+      `/api/users/${encodeURIComponent(username)}/preferences`,
+      preferences,
+    ),
 };

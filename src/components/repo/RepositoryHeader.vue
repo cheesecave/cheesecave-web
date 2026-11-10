@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from "vue";
+import { computed, inject, ref } from "vue";
 import LinkButton from "@/components/common/LinkButton.vue";
 import AddToCollectionMenu from "@/components/collections/AddToCollectionMenu.vue";
 import { externalRepoUrl } from "@/utils/external-repo";
@@ -19,6 +19,10 @@ const props = defineProps({
   tabs: { type: Array, required: true },
   activeTab: { type: String, required: true },
 });
+const access = inject("repositoryAccess", ref(null));
+const visibilityLabel = computed(() =>
+  access.value?.visibility === "invite" ? "Invite" : "Private",
+);
 defineEmits(["copy", "clone", "download", "like"]);
 const repoPath = computed(
   () => `/${props.repoType}s/${props.namespace}/${props.name}`,
@@ -70,9 +74,10 @@ const tabIcons = {
               <span
                 v-if="repoInfo.private"
                 class="repository-visibility"
-                aria-label="Private repository"
+                :aria-label="`${visibilityLabel} repository`"
               >
-                <span class="i-carbon-locked" aria-hidden="true" /> Private
+                <span class="i-carbon-locked" aria-hidden="true" />
+                {{ visibilityLabel }}
               </span>
               <button
                 v-else-if="signedIn"

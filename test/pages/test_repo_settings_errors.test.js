@@ -2,6 +2,7 @@
 // refuse to save defaults over the real settings.
 
 import { flushPromises, mount } from "@vue/test-utils";
+import { ref } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ElementPlusStubs, RouterLinkStub } from "../helpers/vue";
@@ -73,9 +74,10 @@ const LFS = {
   lfs_suffix_rules: ["a", " "],
 };
 
-const mountPage = async () => {
+const mountPage = async (access = null) => {
   const wrapper = mount(SettingsPage, {
     global: {
+      provide: { repositoryAccess: ref(access) },
       stubs: {
         ...ElementPlusStubs,
         ElTable: true,
@@ -104,6 +106,26 @@ beforeEach(() => {
 });
 
 describe("repo settings load failures", () => {
+  it("preserves invitation privacy and explicitly maps each visibility change", async () => {
+    const wrapper = await mountPage({ visibility: "invite", can_manage: true });
+    const select = wrapper.get('select[aria-label="Repository visibility"]');
+    expect(select.element.value).toBe("invite");
+    for (const [visibility, payload] of [
+      ["invite", { private: true, invite_mode: true }],
+      ["private", { private: true, invite_mode: false }],
+      ["public", { private: false, invite_mode: false }],
+    ]) {
+      await select.setValue(visibility);
+      await wrapper.vm.saveGeneralSettings();
+      expect(mocks.settingsAPI.updateRepoSettings).toHaveBeenLastCalledWith(
+        "model",
+        "acme",
+        "demo",
+        payload,
+      );
+    }
+    wrapper.unmount();
+  });
   it("shows why the repository did not load, saves nothing, and recovers on retry", async () => {
     mocks.repoAPI.getInfo.mockRejectedValueOnce(down(503));
     const wrapper = await mountPage();
@@ -125,6 +147,7 @@ describe("repo settings load failures", () => {
       "demo",
       {
         private: true,
+        invite_mode: false,
       },
     );
   });

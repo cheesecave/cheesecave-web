@@ -1,7 +1,12 @@
-<!-- The marker every list puts on a private repository: a lock and "Private" -->
+<!-- Invitation mode is optional on custom lists; legacy private-only payloads stay compatible. -->
+<script setup>
+defineProps({ invite: { type: Boolean, default: false } });
+</script>
 <template>
   <span class="repo-private"
-    ><span class="i-carbon-locked" aria-hidden="true" />Private</span
+    ><span class="i-carbon-locked" aria-hidden="true" />{{
+      invite ? "Invite" : "Private"
+    }}</span
   >
 </template>
 

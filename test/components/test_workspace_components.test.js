@@ -338,6 +338,29 @@ describe("workspace sections", () => {
     expect(wrapper.emitted("update:filter")[0]).toEqual(["model"]);
     expect(wrapper.get('[aria-label="Private"]').exists()).toBe(true);
   });
+  it("labels invitation repositories in the sidebar without preflighting each result", () => {
+    const w = render(WorkspaceSidebar, {
+      username: "alice",
+      repositories: [
+        {
+          id: "alice/invited",
+          type: "model",
+          private: true,
+          invite_mode: true,
+        },
+      ],
+    });
+    expect(w.get('[aria-label="Invite"]').attributes("title")).toBe("Invite");
+    expect(w.find('[aria-label="Private"]').exists()).toBe(false);
+    w.unmount();
+  });
+  it("preserves the optional invitation flag in activity repository cards", () => {
+    const item = activity();
+    item.repository.invite_mode = true;
+    const w = render(WorkspaceFeed, { items: [item] });
+    expect(w.get(".repo-private").text()).toBe("Invite");
+    w.unmount();
+  });
 
   it("has a place for collections, with a way to make one and a way to see them all", () => {
     const wrapper = render(WorkspaceSidebar, { username: "alice" });

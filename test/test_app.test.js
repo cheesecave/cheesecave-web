@@ -1,6 +1,6 @@
-import { enableAutoUnmount, mount } from "@vue/test-utils";
+import { enableAutoUnmount, mount, flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
-import { defineComponent, h, nextTick, ref } from "vue";
+import { defineComponent, h, ref } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 enableAutoUnmount(afterEach);
@@ -8,6 +8,11 @@ enableAutoUnmount(afterEach);
 const mountCounts = {
   repoViewer: 0,
 };
+vi.mock("@/utils/api", () => ({
+  repositoryAccessAPI: {
+    getAccess: vi.fn().mockResolvedValue({ data: { access: "full" } }),
+  },
+}));
 
 const routeState = ref({
   path: "/models/mai_lin/lineart-caption-base",
@@ -81,9 +86,15 @@ const RouterViewStub = defineComponent({
 
 import App from "@/App.vue";
 import { useAuthStore } from "@/stores/auth";
+import { repositoryAccessAPI } from "@/utils/api";
 
 describe("App shell", () => {
-  beforeEach(() => setActivePinia(createPinia()));
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    repositoryAccessAPI.getAccess.mockResolvedValue({
+      data: { access: "full" },
+    });
+  });
   it("scrolls one site header with model and dataset views, leaving Spaces and other pages in the existing shell", async () => {
     const prefix = "/[type]s/[namespace]/[name]";
     const cases = [
@@ -142,7 +153,7 @@ describe("App shell", () => {
     });
     for (const [path, name, type, composite] of cases) {
       routeState.value = { path, name, params: { type } };
-      await nextTick();
+      await flushPromises();
       const headers = wrapper.findAll('[data-header="true"]');
       expect(headers, path).toHaveLength(1);
       const header = headers[0];
@@ -173,7 +184,7 @@ describe("App shell", () => {
         "/edit/main/README.md",
       ]) {
         routeState.value = { path: `/${type}s/team/demo${suffix}` };
-        await nextTick();
+        await flushPromises();
         expect(
           wrapper.find('[data-footer="true"]').exists(),
           routeState.value.path,
@@ -191,7 +202,7 @@ describe("App shell", () => {
       "/organizations/team",
     ]) {
       routeState.value = { path };
-      await nextTick();
+      await flushPromises();
       expect(wrapper.find('[data-footer="true"]').exists(), path).toBe(true);
     }
     wrapper.unmount();
@@ -213,18 +224,19 @@ describe("App shell", () => {
 
     expect(wrapper.find('[data-header="true"]').exists()).toBe(true);
     expect(wrapper.find('[data-footer="true"]').exists()).toBe(false);
+    await flushPromises();
     expect(mountCounts.repoViewer).toBe(1);
 
     routeState.value = {
       path: "/models/mai_lin/lineart-caption-base/tree/main",
     };
-    await nextTick();
+    await flushPromises();
     expect(mountCounts.repoViewer).toBe(1);
 
     routeState.value = {
       path: "/models/mai_lin/another-repo",
     };
-    await nextTick();
+    await flushPromises();
     expect(mountCounts.repoViewer).toBe(2);
 
     wrapper.unmount();
@@ -244,12 +256,13 @@ describe("App shell", () => {
       },
     });
 
+    await flushPromises();
     expect(mountCounts.repoViewer).toBe(1);
 
     routeState.value = {
       path: "/register",
     };
-    await nextTick();
+    await flushPromises();
 
     expect(mountCounts.repoViewer).toBe(2);
 
@@ -262,12 +275,13 @@ describe("App shell", () => {
     const wrapper = mount(App, {
       global: { components: { RouterView: RouterViewStub } },
     });
+    await flushPromises();
     expect(mountCounts.repoViewer).toBe(1);
     routeState.value = { path: "/models/a/b-c" };
-    await nextTick();
+    await flushPromises();
     expect(mountCounts.repoViewer).toBe(2);
     routeState.value = { path: "/models/a-b/c/tree/main" };
-    await nextTick();
+    await flushPromises();
     expect(mountCounts.repoViewer).toBe(2);
     wrapper.unmount();
   });
@@ -293,7 +307,7 @@ describe("App shell", () => {
       ["/models/mai_lin/lineart-caption-base/tree/main", false],
     ]) {
       routeState.value = { path };
-      await nextTick();
+      await flushPromises();
       expect(
         wrapper.get('[data-header="true"]').attributes("data-expanded"),
       ).toBe("true");
@@ -301,23 +315,23 @@ describe("App shell", () => {
     }
 
     auth.user = null;
-    await nextTick();
+    await flushPromises();
     expect(
       wrapper.get('[data-header="true"]').attributes("data-expanded"),
     ).toBe("false");
     expect(wrapper.find('[data-footer="true"]').exists()).toBe(false);
 
     auth.user = { username: "mai_lin" };
-    await nextTick();
+    await flushPromises();
     expect(
       wrapper.get('[data-header="true"]').attributes("data-expanded"),
     ).toBe("true");
 
     routeState.value = { path: "/" };
-    await nextTick();
+    await flushPromises();
     expect(wrapper.find('[data-footer="true"]').exists()).toBe(false);
     auth.user = null;
-    await nextTick();
+    await flushPromises();
     expect(
       wrapper.get('[data-header="true"]').attributes("data-expanded"),
     ).toBe("false");

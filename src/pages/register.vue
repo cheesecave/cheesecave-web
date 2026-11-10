@@ -63,6 +63,20 @@
           />
         </el-form-item>
 
+        <el-form-item label="Repository invitation code (optional)">
+          <el-input
+            v-model="repoInvitationToken"
+            type="password"
+            show-password
+            autocomplete="off"
+            placeholder="Optional repository invitation code"
+          />
+          <p class="mt-1 text-xs text-gray-500">
+            Grants read access to one repository. A repository code does not
+            replace a required site registration invitation.
+          </p>
+        </el-form-item>
+
         <el-form-item label="Password" prop="password">
           <el-input
             v-model="form.password"
@@ -111,7 +125,14 @@ const authStore = useAuthStore();
 const formRef = ref(null);
 const loading = ref(false);
 const siteConfig = ref(null);
-const invitationToken = ref(route.query.invitation || null);
+const suppliedInvitation =
+  typeof route.query.invitation === "string" ? route.query.invitation : "";
+const invitationToken = ref(
+  suppliedInvitation.startsWith("repo_") ? null : suppliedInvitation || null,
+);
+const repoInvitationToken = ref(
+  suppliedInvitation.startsWith("repo_") ? suppliedInvitation : "",
+);
 
 const form = reactive({
   username: "",
@@ -172,6 +193,8 @@ async function handleSubmit() {
         registerData.invitation_token = invitationToken.value;
       }
 
+      if (repoInvitationToken.value.trim())
+        registerData.repo_invitation_token = repoInvitationToken.value.trim();
       const result = await authStore.register(registerData);
       ElMessage.success(result.message || "Registration successful");
 
