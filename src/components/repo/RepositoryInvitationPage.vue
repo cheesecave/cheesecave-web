@@ -1,74 +1,76 @@
 <template>
-  <section class="container-main py-8 max-w-3xl space-y-6">
-    <h1 class="text-2xl font-semibold">
-      {{ repository.namespace }}/{{ repository.name }}
-    </h1>
-    <p class="text-sm text-gray-500">
-      Invite repository · Access requires approval or a repository invitation.
-    </p>
-    <div class="card prose dark:prose-invert" v-html="markdown" />
-    <div class="card space-y-3">
-      <h2 class="text-lg font-semibold">Request access</h2>
-      <p v-if="requestState" role="status">
-        Application status: {{ requestState.status }}
-      </p>
-      <el-button
-        v-if="requestState?.status === 'approved' && auth.isAuthenticated"
-        @click="$emit('changed')"
-        >Check approved access</el-button
-      >
-      <p v-if="auth.isAuthenticated">
-        Applying as {{ auth.username }}. Approval grants this account read
-        access to this repository.
-      </p>
-      <el-input
-        v-else
-        v-model="email"
-        type="email"
-        placeholder="Email required for anonymous requests"
-        aria-label="Application email"
-      />
-      <el-input
-        v-model="message"
-        type="textarea"
-        placeholder="Tell the manager why you need access"
-        aria-label="Application message"
-        maxlength="4000"
-      />
-      <el-button :loading="busy" @click="apply">Submit application</el-button>
-      <el-button :disabled="busy" @click="loadRequest"
-        >Refresh application status</el-button
-      >
-    </div>
-    <div class="card space-y-3">
-      <h2 class="text-lg font-semibold">Have a repository invitation code?</h2>
-      <p v-if="bindingNotice" role="status">{{ bindingNotice }}</p>
-      <el-input
-        v-model="token"
-        type="password"
-        show-password
-        autocomplete="off"
-        placeholder="Repository invitation code"
-        aria-label="Repository invitation code"
-      />
-      <el-button
-        v-if="auth.isAuthenticated"
-        :loading="busy"
-        @click="redeem(false)"
-        >Bind to my account</el-button
-      >
-      <RouterLink v-else :to="{ path: '/register' }" class="text-blue-500"
-        >Create an account, then enter your repository code</RouterLink
-      >
-      <el-button :loading="busy" @click="redeem(true)"
-        >Open temporary web preview</el-button
-      >
-      <p class="text-sm text-gray-500">
-        Temporary previews do not allow original files or bulk downloads.
-        Displayed content may still be copied or saved.
-      </p>
-    </div>
-  </section>
+  <RepositoryAccessLayout :repository="repository" :access="access">
+    <article
+      class="card mdx"
+      aria-label="Public invitation instructions"
+      v-html="markdown"
+    />
+    <template #aside>
+      <div class="card invitation-panel space-y-3">
+        <h2 class="text-lg font-semibold">Request access</h2>
+        <p v-if="requestState" role="status">
+          Application status: {{ requestState.status }}
+        </p>
+        <el-button
+          v-if="requestState?.status === 'approved' && auth.isAuthenticated"
+          @click="$emit('changed')"
+          >Check approved access</el-button
+        >
+        <p v-if="auth.isAuthenticated">
+          Applying as {{ auth.username }}. Approval grants this account read
+          access to this repository.
+        </p>
+        <el-input
+          v-else
+          v-model="email"
+          type="email"
+          placeholder="Email required for anonymous requests"
+          aria-label="Application email"
+        />
+        <el-input
+          v-model="message"
+          type="textarea"
+          placeholder="Tell the manager why you need access"
+          aria-label="Application message"
+          maxlength="4000"
+        />
+        <el-button type="primary" :loading="busy" @click="apply"
+          >Submit application</el-button
+        >
+        <el-button :disabled="busy" @click="loadRequest"
+          >Refresh application status</el-button
+        >
+      </div>
+      <div class="card invitation-panel space-y-3">
+        <h2 class="text-lg font-semibold">Repository invitation</h2>
+        <p v-if="bindingNotice" role="status">{{ bindingNotice }}</p>
+        <el-input
+          v-model="token"
+          type="password"
+          show-password
+          autocomplete="off"
+          placeholder="Repository invitation code"
+          aria-label="Repository invitation code"
+        />
+        <el-button
+          v-if="auth.isAuthenticated"
+          :loading="busy"
+          @click="redeem(false)"
+          >Bind to my account</el-button
+        >
+        <RouterLink v-else :to="{ path: '/register' }" class="text-blue-500"
+          >Create an account, then enter your repository code</RouterLink
+        >
+        <el-button :loading="busy" @click="redeem(true)"
+          >Open temporary web preview</el-button
+        >
+        <p class="text-sm text-gray-500">
+          Temporary previews do not allow original files or bulk downloads.
+          Displayed content may still be copied or saved.
+        </p>
+      </div>
+    </template>
+  </RepositoryAccessLayout>
 </template>
 <script setup>
 import { computed, ref, watch, onBeforeUnmount } from "vue";
@@ -81,6 +83,8 @@ import {
 } from "@/utils/repository-access";
 import { notifyError } from "@/errors";
 import { ElMessage } from "element-plus";
+import RepositoryAccessLayout from "./RepositoryAccessLayout.vue";
+import "@/markdown-styles/base.css";
 const props = defineProps({
   repository: { type: Object, required: true },
   access: { type: Object, required: true },
@@ -194,3 +198,17 @@ onBeforeUnmount(() => {
   generation++;
 });
 </script>
+
+<style scoped>
+.invitation-panel {
+  padding: 24px;
+}
+.invitation-panel :deep(.el-button) {
+  width: 100%;
+  margin-left: 0;
+}
+.invitation-panel > a {
+  display: block;
+  font-size: 14px;
+}
+</style>

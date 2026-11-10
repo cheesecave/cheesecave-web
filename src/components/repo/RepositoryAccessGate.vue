@@ -21,6 +21,7 @@
   <RestrictedRepositoryViewer
     v-else-if="access?.access === 'guest'"
     :repository="repository"
+    :access="access"
     @changed="reload"
   />
 </template>

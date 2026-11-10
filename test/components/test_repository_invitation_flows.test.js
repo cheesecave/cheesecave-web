@@ -132,7 +132,13 @@ describe("invitation and controlled visitor flows", () => {
     expect(mocks.api.guestPreview).toHaveBeenCalledWith(repo, "notes.txt");
     expect(w.text()).toContain("Bounded excerpt");
     expect(w.text()).toContain("This preview is limited");
-    expect(w.findAll("a[href],video,audio,iframe")).toHaveLength(0);
+    expect(w.findAll("video,audio,iframe,a[download]")).toHaveLength(0);
+    // Repository identity/navigation links are safe; original-file, object
+    // storage and external links must never appear in the guest viewer.
+    const safeLinks = ["/models", "/owner", "/models/owner/demo"];
+    for (const link of w.findAll("a[href]")) {
+      expect(safeLinks).toContain(link.attributes("href"));
+    }
     expect(w.html()).not.toContain("/resolve/");
     await button(w, "End temporary access").trigger("click");
     await flushPromises();
