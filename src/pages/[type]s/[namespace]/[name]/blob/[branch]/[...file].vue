@@ -360,7 +360,27 @@
               :index-url="indexedTarSidecarUrl"
               :filename="fileName"
               :tar-tree-entry="indexedTarTreeEntry"
+              :prefetched-index="prefetchedTarIndex"
             />
+          </div>
+          <!-- Prototype (?tarentry=new): checking for the index is not "this file type cannot be previewed" -->
+          <div
+            v-else-if="tarDetect === 'detecting'"
+            class="text-center py-16"
+            data-testid="tar-detecting"
+          >
+            <el-icon class="is-loading" :size="32"><div class="i-carbon-circle-dash" /></el-icon>
+            <p class="mt-3 text-sm text-gray-500">Looking for the tar index…</p>
+          </div>
+          <div
+            v-else-if="tarDetect === 'error'"
+            class="text-center py-16"
+            data-testid="tar-detect-error"
+          >
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+              Could not check whether this tar has an index.
+            </p>
+            <el-button class="mt-3" type="primary" @click="loadFileInfo">Retry</el-button>
           </div>
           <!-- Zip inline browser: same panel in zip mode. The central
              directory is the index, so no sibling lookup is needed. -->
@@ -563,7 +583,14 @@ import TarBrowserPanel from "@/components/repo/preview/TarBrowserPanel.vue";
 import FileMetadataPanel from "@/components/repo/preview/FileMetadataPanel.vue";
 import PsdPreview from "@/components/repo/preview/PsdPreview.vue";
 import { createHttpRangeSource, isPsdPath } from "@/utils/psd-preview";
-import { hasIndexSibling, tarSidecarPath } from "@/utils/indexed-tar";
+import {
+  hasIndexSibling,
+  tarSidecarPath,
+  parseTarIndex,
+  IndexedTarFetchError,
+  IndexedTarFormatError,
+} from "@/utils/indexed-tar";
+import { tarEntryMode, withRetry, takePrefetchedSidecar } from "@/utils/tar-entry";
 import {
   buildResolveUrl,
   getPreviewKind,
@@ -643,6 +670,9 @@ const deleting = ref(false);
 // sidecar.
 const indexedTarTreeEntry = ref(null);
 const isIndexedTar = ref(false);
+// Prototype (?tarentry=new): "idle" | "detecting" | "indexed" | "none" | "error", and the index the detection already downloaded
+const tarDetect = ref("idle");
+const prefetchedTarIndex = ref(null);
 const isZipArchive = computed(() => isZipArchivePath(filePath.value));
 const isParquet = computed(() => getPreviewKind(filePath.value) === "parquet");
 const isSafetensors = computed(
@@ -909,6 +939,9 @@ async function fetchFileSize() {
     const entry = data.find(
       (e) => e.type === "file" && e.path === filePath.value,
     );
+    if (entry && tarEntryMode() === "new" && fileName.value.toLowerCase().endsWith(".tar")) {
+      indexedTarTreeEntry.value = entry; // one request answers both the size and the hash banner
+    }
     return entry ? entry.size : null;
   } catch {
     return null;
@@ -938,6 +971,8 @@ async function loadFileInfo() {
   imageFailed.value = false;
   isIndexedTar.value = false;
   indexedTarTreeEntry.value = null;
+  tarDetect.value = "idle";
+  prefetchedTarIndex.value = null;
 
   // Indexed-tar detection runs in parallel with the file body load —
   // if the current file is a `.tar` and the parent folder also
@@ -946,9 +981,13 @@ async function loadFileInfo() {
   // effort: a failure here should not break the standard preview
   // path, so all errors are swallowed silently.
   if (fileName.value.toLowerCase().endsWith(".tar")) {
-    detectIndexedTar().catch((err) => {
-      console.warn("indexed-tar sibling detection failed", err);
-    });
+    if (tarEntryMode() === "new") {
+      detectIndexedTarDirect();
+    } else {
+      detectIndexedTar().catch((err) => {
+        console.warn("indexed-tar sibling detection failed", err);
+      });
+    }
   }
 
   try {
@@ -1001,6 +1040,41 @@ async function loadFileInfo() {
     console.error("Failed to load file:", err);
   } finally {
     loading.value = false;
+  }
+}
+
+// Prototype (?tarentry=new). No directory listing and no HEAD: ask for the sidecar itself, in parallel with everything else.
+// A 404 means "no index"; the body of a 200 is the index the panel needs anyway, so it is handed over instead of fetched twice.
+// Anything else (5xx, timeout, network) is retried with a short back-off, then shown as a failure with a Retry, never as "no index".
+let tarDetectRun = 0;
+async function detectIndexedTarDirect() {
+  const run = ++tarDetectRun;
+  tarDetect.value = "detecting";
+  const sidecarPath = tarSidecarPath(filePath.value);
+  if (!sidecarPath) {
+    tarDetect.value = "none";
+    return;
+  }
+  const sidecarUrl = `/${repoType.value}s/${namespace.value}/${name.value}/resolve/${branch.value}/${sidecarPath}`;
+  try {
+    const early = takePrefetchedSidecar(sidecarUrl); // started by the router when the link was followed
+    const payload = await withRetry((attempt) => (attempt === 0 && early ? early : parseTarIndex(sidecarUrl)), {
+      isTransient: (err) => !(err instanceof IndexedTarFetchError && err.status === 404) && !(err instanceof IndexedTarFormatError),
+    });
+    if (run !== tarDetectRun) return; // the page moved on
+    prefetchedTarIndex.value = payload;
+    isIndexedTar.value = true;
+    tarDetect.value = "indexed";
+  } catch (err) {
+    if (run !== tarDetectRun) return;
+    if (err instanceof IndexedTarFetchError && err.status === 404) {
+      tarDetect.value = "none";
+    } else if (err instanceof IndexedTarFormatError) {
+      isIndexedTar.value = true; // a json that is not an index: the panel says so, as it does today
+      tarDetect.value = "indexed";
+    } else {
+      tarDetect.value = "error";
+    }
   }
 }
 

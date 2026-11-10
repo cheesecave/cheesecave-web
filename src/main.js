@@ -9,6 +9,7 @@ import { initializeBrowserTimezone } from "./utils/datetime";
 import { createPageScrollBehavior } from "./utils/page-scroll";
 import { createRepoViewRoutes } from "./utils/repo-view-routes";
 import { installPageTitle } from "./utils/page-title";
+import { prefetchTarSidecarForRoute } from "./utils/tar-entry";
 import { useSiteBrandingStore } from "./stores/siteBranding";
 import { useSiteAppearanceStore } from "./stores/siteAppearance";
 
@@ -40,6 +41,9 @@ const router = createRouter({
   scrollBehavior: pageScroll.scrollBehavior,
 });
 pageScroll.install(router);
+router.beforeEach((to) => {
+  prefetchTarSidecarForRoute(to); // prototype (?tarentry=new): start the tar sidecar request when the link is followed
+});
 const disposePageTitle = installPageTitle(router);
 app.onUnmount(disposePageTitle);
 if (import.meta.hot) import.meta.hot.dispose(disposePageTitle);

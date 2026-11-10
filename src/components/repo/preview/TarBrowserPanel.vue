@@ -57,7 +57,10 @@ const props = defineProps({
   // hash against the hashes inside the sidecar index — drives the
   // top-of-panel warning / notice banner.
   tarTreeEntry: { type: Object, default: null },
+  // Prototype (?tarentry=new): the parsed index when the page already fetched it to find out that the tar has one
+  prefetchedIndex: { type: Object, default: null },
 });
+let prefetchedUsed = false;
 
 const state = ref("idle");
 const phase = ref("");
@@ -180,10 +183,16 @@ async function startLoad() {
       else if (p === "parsing") phase.value = "Parsing index JSON…";
       else if (p === "done") phase.value = "Building directory tree…";
     };
-    const payload = await parseTarIndex(props.indexUrl, {
-      signal: controller.signal,
-      onProgress,
-    });
+    let payload;
+    if (props.prefetchedIndex && !prefetchedUsed) {
+      prefetchedUsed = true; // a Retry fetches again
+      payload = props.prefetchedIndex;
+    } else {
+      payload = await parseTarIndex(props.indexUrl, {
+        signal: controller.signal,
+        onProgress,
+      });
+    }
     if (requestId !== currentRequestId) return;
     indexPayload.value = payload;
     const { tarUrl } = props;

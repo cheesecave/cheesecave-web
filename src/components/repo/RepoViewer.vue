@@ -1107,6 +1107,7 @@ import {
   isLaterZipVolume,
   zipEntryVolume,
 } from "@/utils/file-preview";
+import { tarEntryMode, runLimited, sidecarKnownAbsent, lastKeyOf } from "@/utils/tar-entry";
 import { tarSidecarPath } from "@/utils/indexed-tar";
 
 // Fixed batch size for the file-list Load More button. The earlier
@@ -1224,6 +1225,8 @@ const fileListHasMore = computed(() => fileListNextCursor.value !== null);
 const confirmedIndexedTars = ref(new Set());
 const rejectedIndexedTars = ref(new Set());
 let pendingIndexedTarProbeId = 0;
+// Prototype (?tarentry=new): the key of the last entry loaded so far, in the server's order (see utils/tar-entry.js)
+let fileListLastKey = "";
 
 // Client-side metadata preview (issue #27 v4): a small icon appears next
 // to .safetensors / .parquet rows; clicking opens a modal that reads the
@@ -1857,6 +1860,7 @@ async function fetchFileTree({ resetPagination = true } = {}, context) {
 
     if (requestId !== fileTreeRequestId.value) return;
 
+    fileListLastKey = lastKeyOf(page.entries);
     sortedEntries = sortFileEntries(page.entries || []);
     fileTree.value = sortedEntries;
     fileTreeContext = context;
@@ -1927,6 +1931,7 @@ async function loadMoreFileTree() {
     // Sort across the union so the appended rows respect the same
     // directories-first / alphabetical ordering as the initial load.
     appendedEntries = page.entries || [];
+    fileListLastKey = lastKeyOf(page.entries) || fileListLastKey;
     fileTree.value = sortFileEntries([...fileTree.value, ...appendedEntries]);
     fileListNextCursor.value = page.nextCursor || null;
   } catch (err) {
@@ -1955,7 +1960,52 @@ function resetIndexedTarProbeMemo() {
   rejectedIndexedTars.value = new Set();
 }
 
+// Prototype (?tarentry=new). A sidecar that sorts before the last loaded key and is not loaded does not exist (or the listing is
+// complete): no probe. The rest is probed four at a time; a 404 is "absent", any other failure is retried once and, if it persists,
+// left unknown (not remembered as absent), so a flaky answer never makes the icon disappear for good.
+async function probeMissingIndexedTarSiblingsNew(entries, requestId) {
+  const probeId = pendingIndexedTarProbeId;
+  const loaded = new Set(fileTree.value.filter((e) => e && e.type !== "directory").map((e) => e.path));
+  const hasMore = fileListNextCursor.value !== null;
+  const pending = [];
+  for (const entry of entries) {
+    if (!entry || entry.type === "directory") continue;
+    const sidecar = tarSidecarPath(entry.path);
+    if (!sidecar) continue;
+    if (loaded.has(sidecar)) continue;
+    if (confirmedIndexedTars.value.has(entry.path) || rejectedIndexedTars.value.has(entry.path)) continue;
+    if (sidecarKnownAbsent(sidecar, loaded, fileListLastKey, hasMore)) {
+      const next = new Set(rejectedIndexedTars.value);
+      next.add(entry.path);
+      rejectedIndexedTars.value = next;
+      continue;
+    }
+    pending.push({ tarPath: entry.path, sidecar });
+  }
+  await runLimited(
+    pending.map(({ tarPath, sidecar }) => async () => {
+      let result = await repoAPI.probeFile(props.repoType, props.namespace, props.name, currentBranch.value, sidecar);
+      if (result.state === "error") {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        result = await repoAPI.probeFile(props.repoType, props.namespace, props.name, currentBranch.value, sidecar);
+      }
+      if (probeId !== pendingIndexedTarProbeId || requestId !== fileTreeRequestId.value) return;
+      if (result.state === "yes") {
+        const next = new Set(confirmedIndexedTars.value);
+        next.add(tarPath);
+        confirmedIndexedTars.value = next;
+      } else if (result.state === "no") {
+        const next = new Set(rejectedIndexedTars.value);
+        next.add(tarPath);
+        rejectedIndexedTars.value = next;
+      }
+    }),
+    4,
+  );
+}
+
 async function probeMissingIndexedTarSiblings(entries, requestId) {
+  if (tarEntryMode() === "new") return probeMissingIndexedTarSiblingsNew(entries, requestId);
   // Probe just the supplied entries; the memoized confirmed/rejected
   // sets are kept across Load More batches so previously-resolved
   // siblings stay sticky. (They are reset by `loadFileTree` on a

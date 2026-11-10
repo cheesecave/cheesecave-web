@@ -471,6 +471,23 @@ export const repoAPI = {
   },
 
   /**
+   * Like fileExists, but a failure is not "absent": `no` is a 404 (the file is not there), `error` is anything else
+   * (5xx, timeout, network), which says nothing about the file. Prototype (proto/indexed-tar-entry).
+   * @returns {Promise<{state: "yes"|"no"|"error", status: number|null}>}
+   */
+  probeFile: async (type, namespace, name, revision, path) => {
+    const encodedPath = path.split("/").map((seg) => encodeURIComponent(seg)).join("/");
+    const url = `/api/${type}s/${namespace}/${name}/resolve/${encodeURIComponent(revision)}/${encodedPath}`;
+    try {
+      const response = await api.head(url);
+      return { state: response.status >= 200 && response.status < 300 ? "yes" : "error", status: response.status };
+    } catch (err) {
+      const status = err?.response?.status ?? null;
+      return { state: status === 404 ? "no" : "error", status };
+    }
+  },
+
+  /**
    * Get repository metadata for specific paths
    * @param {string} type - Repository type
    * @param {string} namespace - Owner namespace
