@@ -208,7 +208,7 @@ describe("TarBrowserPanel · lifecycle", () => {
 
   it("surfaces a classified error when the sidecar fetch fails", async () => {
     server.use(
-      http.get(INDEX_URL, () => new HttpResponse("nope", { status: 500 })),
+      http.get(INDEX_URL, () => new HttpResponse("nope", { status: 403 })),
     );
     const wrapper = mountPanel();
     await flushPromises();
@@ -234,7 +234,7 @@ describe("TarBrowserPanel · lifecycle", () => {
       http.get(INDEX_URL, () => {
         attempt += 1;
         if (attempt === 1) {
-          return new HttpResponse("nope", { status: 500 });
+          return new HttpResponse("nope", { status: 403 });
         }
         return HttpResponse.json({
           filesize: archive.totalSize,
@@ -258,6 +258,39 @@ describe("TarBrowserPanel · lifecycle", () => {
     expect(wrapper.text()).toContain("x.txt");
   });
 
+  it("retries a storage hiccup on the sidecar before showing an error", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    try {
+      let attempt = 0;
+      const archive = buildArchive([["x.txt", text("x")]]);
+      server.use(
+        http.get(INDEX_URL, () => {
+          attempt += 1;
+          if (attempt < 3) return new HttpResponse("busy", { status: 503 });
+          return HttpResponse.json({
+            filesize: archive.totalSize,
+            hash: "",
+            hash_lfs: "",
+            files: archive.files,
+          });
+        }),
+        http.get(TAR_URL, rangeResponder(archive.buffer)),
+      );
+      const wrapper = mountPanel();
+      await vi.advanceTimersByTimeAsync(0);
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "ErrorState" }).exists()).toBe(false);
+      await vi.advanceTimersByTimeAsync(300);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(900);
+      await flushPromises();
+      expect(attempt).toBe(3);
+      expect(wrapper.text()).toContain("x.txt");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("propagates an openMember failure to the member-view error state", async () => {
     // Sidecar parses successfully but the .tar Range read throws
     // (server returns 500). The openMember catch arm sets
@@ -273,7 +306,7 @@ describe("TarBrowserPanel · lifecycle", () => {
           files: archive.files,
         }),
       ),
-      http.get(TAR_URL, () => new HttpResponse("nope", { status: 500 })),
+      http.get(TAR_URL, () => new HttpResponse("nope", { status: 403 })),
     );
     const wrapper = mountPanel();
     await flushPromises();
@@ -353,6 +386,56 @@ describe("TarBrowserPanel · lifecycle", () => {
       }),
     ));
     const wrapper = mountPanel();
+    await flushPromises();
+    expect(wrapper.text()).toContain("a.txt");
+    await wrapper.setProps({ indexUrl: ALT });
+    await flushPromises();
+    expect(wrapper.text()).toContain("b.txt");
+    expect(wrapper.text()).not.toContain("a.txt");
+  });
+});
+
+describe("TarBrowserPanel · index handed over by the page", () => {
+  it("uses the index the page already downloaded and does not fetch the sidecar again", async () => {
+    const archive = buildArchive([["a.txt", text("alpha")]]);
+    let sidecarRequests = 0;
+    server.use(
+      http.get(INDEX_URL, () => {
+        sidecarRequests += 1;
+        return HttpResponse.json({});
+      }),
+      http.get(TAR_URL, rangeResponder(archive.buffer)),
+    );
+    const wrapper = mountPanel({
+      prefetchedIndex: {
+        filesize: archive.totalSize,
+        hash: "",
+        hash_lfs: "",
+        files: archive.files,
+      },
+    });
+    await flushPromises();
+    expect(wrapper.text()).toContain("a.txt");
+    expect(sidecarRequests).toBe(0);
+  });
+
+  it("fetches again when it has to reload (a handed-over index is used once)", async () => {
+    const a = buildArchive([["a.txt", text("alpha")]]);
+    const b = buildArchive([["b.txt", text("beta")]]);
+    const ALT = "https://s3.test.local/bucket/other.json";
+    server.use(
+      http.get(ALT, () =>
+        HttpResponse.json({
+          filesize: b.totalSize,
+          hash: "",
+          hash_lfs: "",
+          files: b.files,
+        }),
+      ),
+    );
+    const wrapper = mountPanel({
+      prefetchedIndex: { filesize: a.totalSize, hash: "", hash_lfs: "", files: a.files },
+    });
     await flushPromises();
     expect(wrapper.text()).toContain("a.txt");
     await wrapper.setProps({ indexUrl: ALT });
@@ -817,7 +900,7 @@ describe("TarBrowserPanel · download path", () => {
     // been settled, so the next Range read fails. The catch arm of
     // downloadMember turns the throw into an ElMessage.error toast.
     server.use(
-      http.get(TAR_URL, () => new HttpResponse("nope", { status: 500 })),
+      http.get(TAR_URL, () => new HttpResponse("nope", { status: 403 })),
     );
     const elementPlus = await import("element-plus");
     const errorSpy = vi.spyOn(elementPlus.ElMessage, "error");

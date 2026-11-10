@@ -157,9 +157,14 @@ describe("describeError", () => {
     );
     expect(describeError(err(KIND.NETWORK)).actions).toEqual(["retry"]);
     const storage = describeError(err(KIND.NETWORK), { storage: true });
-    expect(storage.title).toBe("Browser blocked the request");
-    expect(storage.description).toContain("CORS failure");
+    expect(storage.title).toBe("Could not reach the storage server");
+    // It does not claim CORS: a dropped connection or a storage error answer
+    // without CORS headers looks the same to the page.
+    expect(storage.description).not.toContain("looks like a CORS failure");
+    expect(storage.description).toContain("network problem");
+    expect(storage.description).toContain("Network tab");
     expect(storage.description).toContain("MinIO CORS");
+    expect(storage.actions).toEqual(["retry"]);
     expect(
       describeError(err(KIND.NETWORK, { offline: true }), { storage: true })
         .title,
