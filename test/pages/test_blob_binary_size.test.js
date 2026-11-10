@@ -29,7 +29,7 @@ vi.mock("vue-router/auto", () => ({
 vi.mock("@/utils/api", () => ({
   repoAPI: {
     listTree: vi.fn().mockResolvedValue({ data: [] }),
-    fileExists: vi.fn().mockResolvedValue(true),
+    probeFile: vi.fn().mockResolvedValue({ state: "yes", status: 200 }),
     getPathsInfo: (...args) => mocks.getPathsInfoImpl(...args),
     commitFiles: vi.fn(),
   },

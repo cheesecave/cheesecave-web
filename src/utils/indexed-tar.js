@@ -624,6 +624,10 @@ export function hasIndexSibling(tarPath, siblings) {
   if (dot < 0) return false;
   const base = tarPath.slice(0, dot);
   const wanted = `${base}.json`;
+  // A Set of the loaded file paths (built once per page load) answers in
+  // O(1). Scanning the entries instead is O(n) per call, which is O(n^2)
+  // when it runs for every row of a long list on every render.
+  if (siblings instanceof Set) return siblings.has(wanted);
   if (!siblings || typeof siblings[Symbol.iterator] !== "function")
     return false;
   for (const entry of siblings) {
@@ -633,6 +637,48 @@ export function hasIndexSibling(tarPath, siblings) {
   }
   return false;
 }
+
+/**
+ * The greatest key of a page of tree entries, or null for an empty page.
+ * The server returns a folder's entries in key order and in contiguous
+ * pages, so every key up to this one has been loaded.
+ *
+ * @param {Array<{path: string}>|null|undefined} entries
+ * @returns {string|null}
+ */
+export function lastKeyOf(entries) {
+  if (!entries || entries.length === 0) return null;
+  let last = entries[0].path;
+  for (const entry of entries) if (entry.path > last) last = entry.path;
+  return last;
+}
+
+/**
+ * Can a missing sidecar be called absent without asking the server?
+ * Pages are contiguous in key order, so a sidecar that is not among the
+ * loaded rows does not exist when (a) the whole folder is loaded, or (b)
+ * its key sorts at or before the last loaded key: the page has already
+ * passed that position. (`x.json` sorts before `x.tar`, so for ordinary
+ * names the answer is always yes.) A sidecar that sorts after the last
+ * loaded key (`X.json` after `X.TAR`) may sit on a later page, and so may
+ * anything we cannot compare safely: the server orders by UTF-8 bytes,
+ * which only matches a plain string comparison for ASCII names.
+ *
+ * @param {string} sidecarPath
+ * @param {string|null} lastLoadedKey
+ * @param {boolean} hasMore - another page follows
+ * @returns {boolean}
+ */
+export function sidecarKnownAbsent(sidecarPath, lastLoadedKey, hasMore) {
+  if (!hasMore) return true;
+  if (lastLoadedKey === null) return false;
+  if (!ASCII_ONLY.test(sidecarPath) || !ASCII_ONLY.test(lastLoadedKey)) {
+    return false;
+  }
+  return sidecarPath <= lastLoadedKey;
+}
+
+const ASCII_ONLY = /^[\x00-\x7f]*$/;
 
 /**
  * Compute the expected `.json` sidecar path for a given `.tar` path.

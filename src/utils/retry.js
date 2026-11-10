@@ -47,3 +47,27 @@ export async function withRetry(
   // The last attempt: whatever it throws is the answer.
   return fn(waits.length);
 }
+
+/**
+ * Run async tasks with at most `limit` of them in flight, results in task order.
+ * Used where one page would otherwise fire dozens of requests at once.
+ *
+ * @template T
+ * @param {Array<() => Promise<T>>} tasks
+ * @param {number} limit
+ * @returns {Promise<T[]>}
+ */
+export async function runLimited(tasks, limit) {
+  const results = new Array(tasks.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < tasks.length) {
+      const index = next++;
+      results[index] = await tasks[index]();
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(limit, tasks.length) }, worker),
+  );
+  return results;
+}
