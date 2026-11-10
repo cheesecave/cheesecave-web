@@ -97,6 +97,7 @@ describe("invitation and controlled visitor flows", () => {
     await button(w, "Submit application").trigger("click");
     await flushPromises();
     expect(mocks.api.request).toHaveBeenCalledWith(repo, { message: "" });
+    await button(w, "Repository invitation").trigger("click");
     await w
       .get('input[aria-label="Repository invitation code"]')
       .setValue("repo_secret");
@@ -111,6 +112,7 @@ describe("invitation and controlled visitor flows", () => {
     localStorage.setItem("hf_token", "existing-personal-token");
     const w = mountView(Invitation, { repository: repo, access: {} });
     await flushPromises();
+    await button(w, "Repository invitation").trigger("click");
     await w
       .get('input[aria-label="Repository invitation code"]')
       .setValue("repo_secret");
@@ -119,6 +121,10 @@ describe("invitation and controlled visitor flows", () => {
     expect(mocks.api.guest).toHaveBeenCalledWith(repo, "repo_secret");
     expect(mocks.api.bind).not.toHaveBeenCalled();
     expect(localStorage.getItem("hf_token")).toBe("existing-personal-token");
+    expect(
+      w.find('input[aria-label="Repository invitation code"]').exists(),
+    ).toBe(false);
+    await button(w, "Repository invitation").trigger("click");
     expect(
       w.get('input[aria-label="Repository invitation code"]').element.value,
     ).toBe("");
@@ -181,7 +187,9 @@ describe("invitation and controlled visitor flows", () => {
     expect(w.text()).toContain("first 100 entries");
     await button(w, "rows.csv").trigger("click");
     await flushPromises();
-    expect(w.get("td").text()).toBe("<img src=secret>");
+    expect(w.get('[aria-label="Controlled file preview"] td').text()).toBe(
+      "<img src=secret>",
+    );
     expect(w.find("img").exists()).toBe(false);
     w.unmount();
   });
@@ -243,6 +251,7 @@ describe("invitation and controlled visitor flows", () => {
     mocks.api.bind.mockResolvedValue({ data: { grant } });
     const invitation = mountView(Invitation, { repository: repo, access: {} });
     await flushPromises();
+    await button(invitation, "Repository invitation").trigger("click");
     await invitation
       .get('input[aria-label="Repository invitation code"]')
       .setValue("repo_old");

@@ -56,16 +56,6 @@ async function copyRepoId() {
       <template v-if="$slots.actions" #actions
         ><slot name="actions"
       /></template>
-      <template #metadata>
-        <p class="repository-access-summary">
-          <span class="i-carbon-locked" aria-hidden="true" />
-          {{
-            preview
-              ? "Temporary web preview · Original files and bulk downloads are unavailable"
-              : "Access requires approval or a repository invitation"
-          }}
-        </p>
-      </template>
     </RepositoryHeader>
     <div
       class="repository-access-content"
@@ -94,15 +84,6 @@ aside {
   grid-template-columns: minmax(0, 1fr) 300px;
   gap: 24px;
   align-items: start;
-}
-.repository-access-summary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  color: var(--site-muted);
-  font-size: 13px;
-  line-height: 24px;
 }
 aside {
   display: grid;

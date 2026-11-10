@@ -152,6 +152,13 @@ describe("restricted repository pages share the normal repository header", () =>
         query(wrapper).getByRole("button", { name: "Submit application" }),
       ).toBeDefined();
       expect(
+        query(wrapper).queryByRole("button", { name: "Bind to my account" }),
+      ).toBeNull();
+      await wrapper
+        .findAll("button")
+        .find((button) => button.text() === "Repository invitation")
+        .trigger("click");
+      expect(
         query(wrapper).getByRole("button", { name: "Bind to my account" }),
       ).toBeDefined();
       expect(mocks.getAccess).toHaveBeenCalledWith(target);
