@@ -150,6 +150,93 @@ describe("parseTarIndex", () => {
   // Playwright verification documented on the PR.
 });
 
+describe("parseTarIndex · transient storage failures", () => {
+  const FAST = { retryWaits: [0, 0] };
+
+  it("retries a network-level failure and returns the index", async () => {
+    let calls = 0;
+    server.use(
+      http.get(INDEX_URL, () => {
+        calls += 1;
+        return calls < 3 ? HttpResponse.error() : HttpResponse.json(SAMPLE_INDEX);
+      }),
+    );
+    const payload = await parseTarIndex(INDEX_URL, FAST);
+    expect(payload.filesize).toBe(4096);
+    expect(calls).toBe(3);
+  });
+
+  it("retries a 503 and a 429", async () => {
+    const answers = [503, 429];
+    server.use(
+      http.get(INDEX_URL, () => {
+        const status = answers.shift();
+        return status
+          ? new HttpResponse("busy", { status })
+          : HttpResponse.json(SAMPLE_INDEX);
+      }),
+    );
+    await expect(parseTarIndex(INDEX_URL, FAST)).resolves.toMatchObject({
+      filesize: 4096,
+    });
+  });
+
+  it("gives up after three attempts and surfaces the failure", async () => {
+    let calls = 0;
+    server.use(
+      http.get(INDEX_URL, () => {
+        calls += 1;
+        return HttpResponse.error();
+      }),
+    );
+    await expect(parseTarIndex(INDEX_URL, FAST)).rejects.toBeInstanceOf(
+      TypeError,
+    );
+    expect(calls).toBe(3);
+  });
+
+  it("does not retry a 404 (the sidecar is not there)", async () => {
+    let calls = 0;
+    server.use(
+      http.get(INDEX_URL, () => {
+        calls += 1;
+        return new HttpResponse("nope", { status: 404 });
+      }),
+    );
+    await expect(parseTarIndex(INDEX_URL, FAST)).rejects.toMatchObject({
+      status: 404,
+    });
+    expect(calls).toBe(1);
+  });
+
+  it("does not retry a body that is not an index (the file will not change)", async () => {
+    let calls = 0;
+    server.use(
+      http.get(INDEX_URL, () => {
+        calls += 1;
+        return new HttpResponse("{not json", { status: 200 });
+      }),
+    );
+    await expect(parseTarIndex(INDEX_URL, FAST)).rejects.toBeInstanceOf(
+      IndexedTarFormatError,
+    );
+    expect(calls).toBe(1);
+  });
+
+  it("reports the fetch phase again on each attempt", async () => {
+    let calls = 0;
+    server.use(
+      http.get(INDEX_URL, () => {
+        calls += 1;
+        return calls < 2 ? HttpResponse.error() : HttpResponse.json(SAMPLE_INDEX);
+      }),
+    );
+    const phases = [];
+    await parseTarIndex(INDEX_URL, { ...FAST, onProgress: (p) => phases.push(p) });
+    expect(phases).toEqual(["fetch", "fetch", "parsing", "done"]);
+  });
+});
+
 describe("buildTreeFromIndex + listDirectory", () => {
   it("groups files by directory prefix and aggregates size + count", () => {
     const tree = buildTreeFromIndex(SAMPLE_INDEX.files);
@@ -398,6 +485,85 @@ describe("buildMemberRangeHeader + extractMemberBytes", () => {
     await expect(
       extractMemberBytes(TAR_URL, { offset: 0, size: 8 }),
     ).rejects.toThrow(/expected 8/);
+  });
+});
+
+describe("extractMemberBytes · transient storage failures", () => {
+  const FAST = { retryWaits: [0, 0] };
+  const body = new Uint8Array([1, 2, 3, 4]);
+  const ok = () =>
+    new HttpResponse(body, {
+      status: 206,
+      headers: { "Content-Range": "bytes 0-3/4", "Content-Length": "4" },
+    });
+
+  it("retries a network-level failure of the range read", async () => {
+    let calls = 0;
+    server.use(
+      http.get(TAR_URL, () => {
+        calls += 1;
+        return calls < 3 ? HttpResponse.error() : ok();
+      }),
+    );
+    const bytes = await extractMemberBytes(TAR_URL, { offset: 0, size: 4 }, FAST);
+    expect(Array.from(bytes)).toEqual([1, 2, 3, 4]);
+    expect(calls).toBe(3);
+  });
+
+  it("retries a 500 and a 429", async () => {
+    const answers = [500, 429];
+    server.use(
+      http.get(TAR_URL, () => {
+        const status = answers.shift();
+        return status ? new HttpResponse("busy", { status }) : ok();
+      }),
+    );
+    await expect(
+      extractMemberBytes(TAR_URL, { offset: 0, size: 4 }, FAST),
+    ).resolves.toHaveLength(4);
+  });
+
+  it("gives up after three attempts", async () => {
+    let calls = 0;
+    server.use(
+      http.get(TAR_URL, () => {
+        calls += 1;
+        return HttpResponse.error();
+      }),
+    );
+    await expect(
+      extractMemberBytes(TAR_URL, { offset: 0, size: 4 }, FAST),
+    ).rejects.toBeInstanceOf(TypeError);
+    expect(calls).toBe(3);
+  });
+
+  it("does not retry a 403 or a short body", async () => {
+    let calls = 0;
+    server.use(
+      http.get(TAR_URL, () => {
+        calls += 1;
+        return new HttpResponse("denied", { status: 403 });
+      }),
+    );
+    await expect(
+      extractMemberBytes(TAR_URL, { offset: 0, size: 4 }, FAST),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(calls).toBe(1);
+
+    calls = 0;
+    server.use(
+      http.get(TAR_URL, () => {
+        calls += 1;
+        return new HttpResponse(new Uint8Array([1]), {
+          status: 206,
+          headers: { "Content-Range": "bytes 0-0/1", "Content-Length": "1" },
+        });
+      }),
+    );
+    await expect(
+      extractMemberBytes(TAR_URL, { offset: 0, size: 4 }, FAST),
+    ).rejects.toThrow(/expected 4/);
+    expect(calls).toBe(1);
   });
 });
 
