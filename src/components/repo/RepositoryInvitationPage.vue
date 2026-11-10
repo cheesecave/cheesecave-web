@@ -39,13 +39,13 @@
         <el-button v-if="requestState" :disabled="busy" @click="loadRequest"
           >Refresh application status</el-button
         >
-        <el-button
-          text
-          type="primary"
+        <button
+          type="button"
           class="invitation-code-trigger"
           @click="codeDialogOpen = true"
-          >Have an Invitation?</el-button
         >
+          Have an Invitation?
+        </button>
       </div>
     </template>
   </RepositoryAccessLayout>
@@ -236,8 +236,25 @@ onBeforeUnmount(() => {
   margin-left: 0;
 }
 .invitation-code-trigger {
-  width: 100%;
-  margin: 0;
+  display: block;
+  width: fit-content;
+  margin-inline: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--site-link);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  cursor: pointer;
+  text-underline-offset: 3px;
+}
+.invitation-code-trigger:hover {
+  text-decoration: underline;
+}
+.invitation-code-trigger:focus-visible {
+  outline: 2px solid var(--site-primary);
+  outline-offset: 3px;
 }
 .invitation-actions {
   display: flex;
