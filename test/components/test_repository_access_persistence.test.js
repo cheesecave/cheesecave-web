@@ -53,7 +53,7 @@ vi.mock("@/components/repo/RepositoryInvitationPage.vue", () => ({
 }));
 vi.mock("@/components/repo/RestrictedRepositoryViewer.vue", () => ({
   default: defineComponent({
-    props: ["repository", "embedded", "view"],
+    props: ["repository", "embedded", "view", "branch"],
     emits: ["changed", "overview", "navigate"],
     setup(props, { emit }) {
       mocks.guests++;
@@ -75,6 +75,7 @@ vi.mock("@/components/repo/metadata/MetadataHeader.vue", () => ({
   default: { template: "<span />" },
 }));
 import Gate from "@/components/repo/RepositoryAccessGate.vue";
+import RestrictedViewer from "@/components/repo/RestrictedRepositoryViewer.vue";
 
 const FullRepository = defineComponent({
   name: "RepoViewer",
@@ -136,6 +137,26 @@ describe("repository access transitions preserve the header and replace only pro
     for (const wrapper of wrappers.splice(0)) wrapper.unmount();
   });
 
+  it.each([
+    ["release", "release"],
+    ["refs%2Fpr%2F1", "refs/pr/1"],
+    ["%FF", "%FF"],
+  ])(
+    "forwards the requested restricted revision %s without silently using main",
+    async (encoded, expected) => {
+      mocks.getAccess.mockResolvedValue(reply("guest"));
+      const wrapper = mountGate(
+        reactive({
+          path: `/models/owner/demo/blob/${encoded}/notes.txt`,
+          query: {},
+        }),
+      );
+      await flushPromises();
+      expect(wrapper.findComponent(RestrictedViewer).props("branch")).toBe(
+        expected,
+      );
+    },
+  );
   it("keeps the same header through invitation, pending recheck, guest and full access", async () => {
     const check = deferred();
     mocks.getAccess

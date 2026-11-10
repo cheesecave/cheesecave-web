@@ -14,11 +14,23 @@ const props = defineProps({
   name: { type: String, required: true },
   branch: { type: String, required: true },
   path: { type: String, required: true },
+  previewSource: { type: Object, default: null },
 });
 const errorContext = useErrorContext();
 const resource = useAsyncResource(
   async () => {
     const path = props.path;
+    if (props.previewSource) {
+      if (props.branch !== "main") return null;
+      try {
+        const info = await props.previewSource.fileInfo(path);
+        const value = info?.last_commit;
+        return value?.id ? { ...value, date: value.timestamp } : null;
+      } catch (error) {
+        props.previewSource.onAccessDenied?.(error);
+        throw error;
+      }
+    }
     const { data } = await repoAPI.getPathsInfo(
       props.repoType,
       props.namespace,
@@ -43,6 +55,7 @@ const resource = useAsyncResource(
       () => props.name,
       () => props.branch,
       () => props.path,
+      () => props.previewSource,
     ],
   },
 );
@@ -51,7 +64,12 @@ const commit = computed(() => resource.data.value);
 // so a slow detail request never hides the title, SHA, or date already loaded.
 const authorResource = useAsyncResource(
   async ({ signal }) => {
-    if (!resource.ready.value || !commit.value || commit.value.author)
+    if (
+      props.previewSource ||
+      !resource.ready.value ||
+      !commit.value ||
+      commit.value.author
+    )
       return null;
     const id = commit.value.id;
     const { data } = await repoAPI.getCommitDetail(
@@ -71,6 +89,7 @@ const authorResource = useAsyncResource(
       () => props.name,
       () => props.branch,
       () => props.path,
+      () => props.previewSource,
       () => resource.status.value,
       () => commit.value?.id,
     ],

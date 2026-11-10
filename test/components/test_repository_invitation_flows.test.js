@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
     guestFileInfo: vi.fn(),
   },
 }));
+vi.mock("@/stores/theme", () => ({ useThemeStore: () => ({ isDark: false }) }));
 vi.mock("@/stores/markdownStyle", () => ({
   useMarkdownStyleStore: () => ({ resolved: "github" }),
 }));
@@ -27,6 +28,7 @@ vi.mock("@/stores/auth", () => ({ useAuthStore: () => mocks.auth }));
 vi.mock("@/errors/notify", () => ({ notifyError: mocks.notify }));
 import Invitation from "@/components/repo/RepositoryInvitationPage.vue";
 import Visitor from "@/components/repo/RestrictedRepositoryViewer.vue";
+import CodeViewer from "@/components/common/CodeViewer.vue";
 import BindPage from "@/pages/repo-access.vue";
 const repo = { type: "model", namespace: "owner", name: "demo" };
 const fileLink = (w, text) =>
@@ -171,6 +173,7 @@ describe("invitation and controlled visitor flows", () => {
       "/models/owner/demo/tree/main",
       "/models/owner/demo/commits/main",
       "/models/owner/demo?tab=metadata",
+      "/models/owner/demo/blob/main/notes.txt",
     ];
     for (const link of w.findAll("a[href]")) {
       expect(safeLinks).toContain(link.attributes("href"));
@@ -193,7 +196,7 @@ describe("invitation and controlled visitor flows", () => {
     await flushPromises();
     await fileLink(w, "notes.txt").trigger("click");
     await flushPromises();
-    expect(w.find("img").exists()).toBe(false);
+    expect(w.find(".file-detail-content img").exists()).toBe(false);
     w.unmount();
   });
   it("renders bounded rows as text and can load the next file page", async () => {
@@ -234,10 +237,10 @@ describe("invitation and controlled visitor flows", () => {
     expect(fileLink(w, "other.txt")).toBeDefined();
     await fileLink(w, "rows.csv").trigger("click");
     await flushPromises();
-    expect(w.get('[aria-label="Controlled file preview"] td').text()).toBe(
-      "<img src=secret>",
+    expect(w.getComponent(CodeViewer).props("code")).toBe(
+      "name\n<img src=secret>\n",
     );
-    expect(w.find("img").exists()).toBe(false);
+    expect(w.find(".file-detail-content img").exists()).toBe(false);
     w.unmount();
   });
   it("renders raster thumbnail data without an original file URL", async () => {

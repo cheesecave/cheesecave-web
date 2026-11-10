@@ -1,5 +1,6 @@
 // src/kohaku-hub-ui/src/utils/api.js
 import axios from "axios";
+import { mediaKind } from "./media-types";
 import { formatAuthHeader, getExternalTokens } from "./externalTokens";
 import { KIND, decodeError, decodeResponse, emitAuthRequired } from "@/errors";
 
@@ -144,9 +145,20 @@ export const repositoryAccessAPI = {
     api.get(`${repositoryAccessBase(repo)}/guest/file-info`, {
       params: { path },
     }),
+  guestMediaPlaylistURL: (repo, path, snapshot) =>
+    `${repositoryAccessBase(repo)}/guest/media/hls/playlist?path=${encodeURIComponent(path)}&snapshot=${encodeURIComponent(snapshot)}`,
+  guestPdfPage: (repo, path, page, snapshot) =>
+    api.get(`${repositoryAccessBase(repo)}/guest/media/pdf/page`, {
+      params: { path, page, snapshot },
+      responseType: "blob",
+      timeout: 180000,
+    }),
   guestPreview: (repo, path) =>
     api.get(`${repositoryAccessBase(repo)}/guest/preview`, {
       params: { path },
+      ...(/\.pdf$/i.test(path) || ["video", "audio"].includes(mediaKind(path))
+        ? { timeout: 180000 }
+        : {}),
     }),
 };
 

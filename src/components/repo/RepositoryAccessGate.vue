@@ -49,6 +49,7 @@
     :view="guestView"
     :path="guestLocation.path"
     :file-path="guestLocation.filePath"
+    :branch="guestLocation.branch"
     @overview="guestOverview = $event"
     @navigate="navigateGuest"
     @open-file="openGuestFile"
@@ -130,12 +131,22 @@ const guestView = computed(() => {
   if (["tree", "blob"].includes(section)) return "files";
   return "card";
 });
+function decodeRouteSegment(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
 const guestLocation = computed(() => {
   const parts = (props.route.path || "").split("/").slice(4);
-  const path = parts.slice(2).map(decodeURIComponent).join("/");
+  const path = parts.slice(2).map(decodeRouteSegment).join("/");
+  const branch = ["blob", "tree", "commits"].includes(parts[0])
+    ? decodeRouteSegment(parts[1] || "main")
+    : "main";
   return parts[0] === "blob"
-    ? { path: path.split("/").slice(0, -1).join("/"), filePath: path }
-    : { path: parts[0] === "tree" ? path : "", filePath: "" };
+    ? { path: path.split("/").slice(0, -1).join("/"), filePath: path, branch }
+    : { path: parts[0] === "tree" ? path : "", filePath: "", branch };
 });
 const headerMetadata = computed(() => {
   const metadata = fullHeader.value?.hasMetadataHeader

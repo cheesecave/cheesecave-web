@@ -23,6 +23,40 @@ describe("repository access API contract", () => {
       [`${base}/guest/commits`, { params: { cursor: "signed-history" } }],
     ]);
   });
+  it.each(["manual.pdf", "media/movie.mp4", "sound.wav"])(
+    "allows bounded server conversion time for %s without changing raw endpoints",
+    async (path) => {
+      const get = vi.spyOn(api, "get").mockResolvedValue({});
+      get.mockClear();
+      await access.guestPreview(repo, path);
+      expect(get).toHaveBeenCalledExactlyOnceWith(`${base}/guest/preview`, {
+        params: { path },
+        timeout: 180000,
+      });
+    },
+  );
+  it("constructs a scoped derivative playlist URL instead of trusting a source URL", () => {
+    expect(
+      access.guestMediaPlaylistURL(repo, "media/a video.mp4", "a".repeat(64)),
+    ).toBe(
+      `${base}/guest/media/hls/playlist?path=media%2Fa%20video.mp4&snapshot=${"a".repeat(64)}`,
+    );
+  });
+  it("requests only a snapshot-bound rendered PDF page with the separate guest session", async () => {
+    const get = vi
+      .spyOn(api, "get")
+      .mockResolvedValue({ data: new Blob(["page"]) });
+    get.mockClear();
+    await access.guestPdfPage(repo, "folder/manual.pdf", 2, "snapshot-id");
+    expect(get).toHaveBeenCalledExactlyOnceWith(
+      `${base}/guest/media/pdf/page`,
+      {
+        params: { path: "folder/manual.pdf", page: 2, snapshot: "snapshot-id" },
+        responseType: "blob",
+        timeout: 180000,
+      },
+    );
+  });
   it("keeps site invitations in query and repository codes in the registration body", async () => {
     const post = vi.spyOn(api, "post").mockResolvedValue({ data: {} });
     await authAPI.register({

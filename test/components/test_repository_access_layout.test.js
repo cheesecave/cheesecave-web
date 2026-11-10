@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
 }));
+vi.mock("@/stores/theme", () => ({ useThemeStore: () => ({ isDark: false }) }));
 vi.mock("@/stores/markdownStyle", () => ({
   useMarkdownStyleStore: () => ({ resolved: "github" }),
 }));

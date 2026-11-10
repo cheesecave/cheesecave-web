@@ -2,6 +2,12 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ElementPlusStubs, RouterLinkStub } from "../helpers/vue";
 
+const ordinary = vi.hoisted(() => ({
+  listTreePage: vi.fn(),
+  listRefs: vi.fn(),
+  getPathsInfo: vi.fn(),
+  getCommitDetail: vi.fn(),
+}));
 const api = vi.hoisted(() => ({
   guestOverview: vi.fn(),
   guestTree: vi.fn(),
@@ -10,10 +16,14 @@ const api = vi.hoisted(() => ({
   guestFileInfo: vi.fn(),
   leaveGuest: vi.fn(),
 }));
+vi.mock("@/stores/theme", () => ({ useThemeStore: () => ({ isDark: false }) }));
 vi.mock("@/stores/markdownStyle", () => ({
   useMarkdownStyleStore: () => ({ resolved: "github" }),
 }));
-vi.mock("@/utils/api", () => ({ repositoryAccessAPI: api }));
+vi.mock("@/stores/auth", () => ({
+  useAuthStore: () => ({ isAuthenticated: false, username: null, user: null }),
+}));
+vi.mock("@/utils/api", () => ({ repositoryAccessAPI: api, repoAPI: ordinary }));
 import Viewer from "@/components/repo/RestrictedRepositoryViewer.vue";
 import CodeViewer from "@/components/common/CodeViewer.vue";
 
@@ -165,21 +175,34 @@ describe("normal repository browsing over controlled guest APIs", () => {
     await button(wrapper, "script.py").trigger("click");
     await flushPromises();
     expect(api.guestPreview).toHaveBeenCalledWith(repo, "script.py");
-    expect(wrapper.get('[aria-label="File header"]').text()).toContain(
+    expect(wrapper.get(".repository-file-workbench").text()).toContain(
       "script.py",
     );
     expect(wrapper.findComponent(CodeViewer).props("code")).toBe(
       "print('bounded')\n",
     );
-    expect(wrapper.find('[aria-label="Repository files"]').exists()).toBe(
+    expect(
+      wrapper
+        .find('.file-detail-sidebar [aria-label="Repository files"]')
+        .exists() ||
+        wrapper.find('aside[aria-label="Repository files"]').exists(),
+    ).toBe(true);
+    expect(wrapper.find('[aria-label="Repository information"]').exists()).toBe(
       false,
     );
     expect(wrapper.text()).toContain("This preview is limited");
     expect(wrapper.html()).not.toMatch(
       /\/resolve\/|download=|<iframe|<video|<audio/,
     );
-    await button(wrapper, "Back to Files").trigger("click");
-    expect(wrapper.find('[aria-label="Repository files"]').exists()).toBe(true);
+    expect(wrapper.get(".file-detail-breadcrumb a").attributes("href")).toBe(
+      "/models/owner/demo/tree/main",
+    );
+    await wrapper.setProps({ filePath: "script.py" });
+    await wrapper.setProps({ filePath: "" });
+    await flushPromises();
+    expect(wrapper.find('table[aria-label="Repository files"]').exists()).toBe(
+      true,
+    );
   });
 
   it("renders Markdown file previews with the same safe card presentation", async () => {
@@ -203,10 +226,8 @@ describe("normal repository browsing over controlled guest APIs", () => {
     await flushPromises();
     await button(wrapper, "guide.md").trigger("click");
     await flushPromises();
-    expect(
-      wrapper.get('[aria-label="Controlled file preview"]').text(),
-    ).toContain("File readme");
-    expect(wrapper.find("img").exists()).toBe(false);
+    expect(wrapper.get(".file-detail-content").text()).toContain("File readme");
+    expect(wrapper.find(".file-detail-content img").exists()).toBe(false);
     expect(wrapper.html()).not.toContain("/resolve/");
     expect(wrapper.get('[aria-label="File metadata"]').text()).toContain(
       "license",
@@ -303,8 +324,10 @@ describe("normal repository browsing over controlled guest APIs", () => {
       repo,
       "folder/script.py",
     );
-    expect(api.guestTree).not.toHaveBeenCalled();
-    expect(wrapper.get('[aria-label="File header"]').text()).toContain(
+    expect(api.guestTree).toHaveBeenCalled();
+    for (const call of Object.values(ordinary))
+      expect(call).not.toHaveBeenCalled();
+    expect(wrapper.get(".repository-file-workbench").text()).toContain(
       "script.py",
     );
     await wrapper.setProps({ filePath: "folder/other.py" });
@@ -374,9 +397,9 @@ describe("normal repository browsing over controlled guest APIs", () => {
     await button(wrapper, "README.md").trigger("click");
     await flushPromises();
     expect(api.guestPreview).toHaveBeenCalledWith(repo, "README.md");
-    expect(
-      wrapper.get('[aria-label="Controlled file preview"]').text(),
-    ).toContain("Model documentation");
+    expect(wrapper.get(".file-detail-content").text()).toContain(
+      "Model documentation",
+    );
     expect(wrapper.text()).not.toContain("Short generic excerpt");
   });
 
@@ -413,13 +436,13 @@ describe("normal repository browsing over controlled guest APIs", () => {
       repo,
       "docs/direct.txt",
     );
-    expect(wrapper.get('[aria-label="File header"]').text()).toContain(
+    expect(wrapper.get(".repository-file-workbench").text()).toContain(
       "1.2 KB",
     );
-    expect(wrapper.get('[aria-label="File last commit"]').text()).toContain(
+    expect(wrapper.get('[aria-label="Latest file commit"]').text()).toContain(
       "Update direct file",
     );
-    expect(wrapper.get('[aria-label="File last commit"]').text()).toContain(
+    expect(wrapper.get('[aria-label="Latest file commit"]').text()).toContain(
       "editor",
     );
     expect(wrapper.html()).not.toContain("/resolve/");
@@ -484,11 +507,17 @@ describe("normal repository browsing over controlled guest APIs", () => {
     api.guestTree.mockResolvedValueOnce({
       data: { path: "docs", entries: [], has_more: false },
     });
-    await button(wrapper, "Back to Files").trigger("click");
+    expect(wrapper.get(".file-detail-breadcrumb a").attributes("href")).toBe(
+      "/models/owner/demo/tree/main",
+    );
+    await wrapper.setProps({ filePath: "docs/guide.md", view: "files" });
+    await wrapper.setProps({ filePath: "", path: "docs" });
     await flushPromises();
-    expect(api.guestTree).toHaveBeenCalledExactlyOnceWith(repo, "docs", {
+    expect(api.guestTree).toHaveBeenLastCalledWith(repo, "docs", {
       search: "",
     });
+    for (const call of Object.values(ordinary))
+      expect(call).not.toHaveBeenCalled();
   });
   it("uses real encoded file and folder links and preserves modified browser navigation", async () => {
     api.guestTree.mockResolvedValueOnce({
