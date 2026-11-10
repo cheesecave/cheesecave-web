@@ -1,7 +1,7 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { within } from "@testing-library/vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ElementPlusStubs } from "../helpers/vue";
+import { ElementPlusStubs, RouterLinkStub } from "../helpers/vue";
 
 const mocks = vi.hoisted(() => ({
   guestTree: vi.fn(),
@@ -11,8 +11,12 @@ const mocks = vi.hoisted(() => ({
   guestCommits: vi.fn(),
   guestFileInfo: vi.fn(),
 }));
+vi.mock("@/stores/theme", () => ({ useThemeStore: () => ({ isDark: false }) }));
 vi.mock("@/stores/markdownStyle", () => ({
   useMarkdownStyleStore: () => ({ resolved: "github" }),
+}));
+vi.mock("@/stores/auth", () => ({
+  useAuthStore: () => ({ isAuthenticated: false, username: null, user: null }),
 }));
 vi.mock("@/utils/api", () => ({ repositoryAccessAPI: mocks }));
 import Visitor from "@/components/repo/RestrictedRepositoryViewer.vue";
@@ -25,6 +29,7 @@ function mountVisitor() {
     global: {
       stubs: {
         ...ElementPlusStubs,
+        RouterLink: RouterLinkStub,
         RepositoryAccessLayout: {
           template:
             '<section><slot name="actions"/><slot/><slot name="aside"/></section>',
@@ -108,7 +113,7 @@ describe("controlled guest file rows", () => {
       wrapper
         .findAll("a[href]")
         .every((link) =>
-          /^\/(?:owner$|models\/owner\/demo\/(?:tree|blob)\/main\/(?:notes\.txt|manual\.pdf|folder))$/.test(
+          /^\/(?:owner|models\/owner\/demo\/(?:tree|blob|commits)\/main(?:\/(?:notes\.txt|manual\.pdf|folder))?)$/.test(
             link.attributes("href"),
           ),
         ),
@@ -174,16 +179,20 @@ describe("controlled guest file rows", () => {
       repository,
       "notes.txt",
     );
-    const preview = queries(wrapper).getByRole("article", {
-      name: "Controlled file preview",
-    });
+    const preview = wrapper.get(".repository-file-workbench").element;
     expect(preview.textContent).toContain("Limited excerpt");
     expect(preview.textContent).toContain("This preview is limited");
     expect(
       queries(wrapper).getByRole("heading", { name: "notes.txt", exact: true }),
     ).toBeDefined();
+    expect(wrapper.get(".file-detail-breadcrumb a").attributes("href")).toBe(
+      "/models/owner/demo/tree/main",
+    );
+    expect(wrapper.find('[aria-label="Repository information"]').exists()).toBe(
+      false,
+    );
     expect(
-      queries(wrapper).getByRole("button", { name: "Back to Files" }),
+      queries(wrapper).getByRole("complementary", { name: "Repository files" }),
     ).toBeDefined();
     expect(
       queries(wrapper).queryByRole("table", { name: "Repository files" }),
@@ -193,7 +202,7 @@ describe("controlled guest file rows", () => {
       wrapper
         .findAll("a[href]")
         .every((link) =>
-          /^\/(?:owner$|models\/owner\/demo\/(?:tree|blob)\/main\/(?:notes\.txt|manual\.pdf|folder))$/.test(
+          /^\/(?:owner|models\/owner\/demo\/(?:tree|blob|commits)\/main(?:\/(?:notes\.txt|manual\.pdf|folder))?)$/.test(
             link.attributes("href"),
           ),
         ),

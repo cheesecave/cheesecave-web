@@ -2,12 +2,13 @@
 import { computed, defineComponent, ref, watch, onBeforeUnmount } from "vue";
 import { repositoryAccessAPI } from "@/utils/api";
 import { parseYAMLFrontmatter, normalizeMetadata } from "@/utils/yaml-parser";
+import { controlledPreviewText } from "@/utils/controlled-preview-text";
 import { formatRelativeTime } from "@/utils/datetime";
 import { decodeError, notifyError } from "@/errors";
 import ErrorState from "@/components/common/ErrorState.vue";
 import RepositoryAccessLayout from "./RepositoryAccessLayout.vue";
-import GuestFilePreview from "./GuestFilePreview.vue";
-import GuestMarkdownPreview from "./GuestMarkdownPreview.vue";
+import BlobFilePage from "@/pages/[type]s/[namespace]/[name]/blob/[branch]/[...file].vue";
+import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import GuestRepositorySidebar from "./GuestRepositorySidebar.vue";
 import DetailedMetadataPanel from "./metadata/DetailedMetadataPanel.vue";
 import "@/markdown-styles/base.css";
@@ -18,6 +19,7 @@ const props = defineProps({
   view: { type: String, default: "card" },
   path: { type: String, default: "" },
   filePath: { type: String, default: "" },
+  branch: { type: String, default: "main" },
 });
 const emit = defineEmits([
   "changed",
@@ -47,12 +49,7 @@ const entries = ref([]),
   treeLoaded = ref(false),
   treeError = ref(null),
   treeLoading = ref(false);
-const selectedPath = ref(""),
-  selectedSize = ref(null),
-  fileInfo = ref(null),
-  content = ref(null),
-  fileError = ref(null),
-  fileLoading = ref(false);
+const selectedPath = ref("");
 const commits = ref([]),
   commitsCursor = ref(null),
   commitsHasMore = ref(false),
@@ -63,8 +60,8 @@ const commits = ref([]),
 let generation = 0,
   overviewRequest = 0,
   treeRequest = 0,
-  fileRequest = 0,
   commitsRequest = 0;
+const fileMetadataCache = new Map();
 let treeContext = "",
   searchTimer;
 function recheckRevokedAccess(cause) {
@@ -82,17 +79,15 @@ function recheckRevokedAccess(cause) {
   if (accessInvalid.value) return true;
   accessInvalid.value = true;
   generation++;
+  fileMetadataCache.clear();
   clearTimeout(searchTimer);
   overview.value = null;
   entries.value = [];
-  content.value = null;
   commits.value = [];
   selectedPath.value = "";
   selectedCommit.value = null;
-  selectedSize.value = null;
   overviewLoading.value = false;
   treeLoading.value = false;
-  fileLoading.value = false;
   commitsLoading.value = false;
   treeHasMore.value = false;
   commitsHasMore.value = false;
@@ -174,7 +169,12 @@ function canonicalReadmePreview(data, path) {
     return { ...data, text: readme.text, truncated: Boolean(readme.truncated) };
   return data;
 }
-async function loadOverview() {
+let pendingOverview = Promise.resolve();
+function loadOverview() {
+  pendingOverview = fetchOverview();
+  return pendingOverview;
+}
+async function fetchOverview() {
   if (accessInvalid.value) return;
   const owner = generation,
     request = ++overviewRequest,
@@ -202,6 +202,16 @@ async function loadOverview() {
 }
 async function loadTree(path = "", append = false) {
   if (accessInvalid.value) return;
+  if (props.branch !== "main") {
+    entries.value = [];
+    treeError.value = decodeError(
+      Object.assign(
+        new Error("Only the default branch is available in guest preview"),
+        { status: 400 },
+      ),
+    );
+    return;
+  }
   const context = `${path}\0${query.value}`;
   if (append && context !== treeContext) append = false;
   const owner = generation,
@@ -256,53 +266,97 @@ function queueSearch() {
 }
 async function preview(path, size = null, updateRoute = true) {
   if (accessInvalid.value) return;
-  const owner = generation,
-    request = ++fileRequest,
-    target = { ...props.repository };
   selectedPath.value = path;
-  selectedSize.value = size;
-  fileInfo.value = null;
   currentPath.value = path.split("/").slice(0, -1).join("/");
   if (treeContext !== `${currentPath.value}\0${query.value}`)
     treeLoaded.value = false;
-  content.value = null;
-  fileLoading.value = true;
-  fileError.value = null;
   activeView.value = "files";
   if (updateRoute) emit("open-file", path);
-  loadFileInfo(target, path, owner, request);
-  try {
-    const { data } = await repositoryAccessAPI.guestPreview(target, path);
-    if (owner === generation && request === fileRequest) {
-      content.value = canonicalReadmePreview(data, path);
-      selectedSize.value = fileInfo.value?.size ?? size ?? data.size;
+}
+const filePreviewSource = {
+  restricted: true,
+  async loadFile(path) {
+    const target = { ...props.repository };
+    const infoPromise = filePreviewSource.fileInfo(path).catch((error) => {
+      if (recheckRevokedAccess(error)) throw error;
+      return null;
+    });
+    const [{ data }, info] = await Promise.all([
+      repositoryAccessAPI.guestPreview(target, path),
+      infoPromise,
+    ]);
+    if (/^readme\.md$/i.test(path)) await pendingOverview;
+    const content =
+      JSON.stringify(target) === JSON.stringify(props.repository)
+        ? canonicalReadmePreview(data, path)
+        : data;
+    if (["video", "audio"].includes(content?.kind)) {
+      if (!/^[a-f0-9]{64}$/.test(content.snapshot || ""))
+        throw new Error("Invalid media snapshot");
+      return {
+        content: {
+          ...content,
+          playlist_url: repositoryAccessAPI.guestMediaPlaylistURL(
+            target,
+            path,
+            content.snapshot,
+          ),
+        },
+        info,
+      };
     }
-  } catch (cause) {
-    if (
-      owner === generation &&
-      request === fileRequest &&
-      recheckRevokedAccess(cause)
-    )
-      return;
-    if (owner === generation && request === fileRequest)
-      fileError.value = decodeError(cause);
-  } finally {
-    if (owner === generation && request === fileRequest)
-      fileLoading.value = false;
-  }
-}
-async function loadFileInfo(target, path, owner, request) {
-  try {
-    const { data } = await repositoryAccessAPI.guestFileInfo(target, path);
-    if (owner !== generation || request !== fileRequest) return;
-    fileInfo.value = data;
-    selectedSize.value = data.size ?? selectedSize.value;
-  } catch (cause) {
-    if (owner !== generation || request !== fileRequest) return;
-    recheckRevokedAccess(cause);
-    // A metadata outage must not replace an otherwise valid bounded preview.
-  }
-}
+    return { content: controlledPreviewText(content, path), info };
+  },
+  async fileInfo(path) {
+    const target = { ...props.repository },
+      key = JSON.stringify([target, generation, path]);
+    if (!fileMetadataCache.has(key)) {
+      const pending = repositoryAccessAPI
+        .guestFileInfo(target, path)
+        .then((result) => result.data)
+        .catch((error) => {
+          fileMetadataCache.delete(key);
+          throw error;
+        });
+      fileMetadataCache.set(key, pending);
+    }
+    return fileMetadataCache.get(key);
+  },
+  async listTree(path, options = {}) {
+    const { data } = await repositoryAccessAPI.guestTree(
+      { ...props.repository },
+      path,
+      options,
+    );
+    return {
+      entries: data.entries,
+      nextCursor: data.next_cursor,
+      hasMore: data.has_more,
+    };
+  },
+  async loadThumbnail(path) {
+    return (
+      await repositoryAccessAPI.guestPreview({ ...props.repository }, path)
+    ).data;
+  },
+  async loadPdfPage(path, page, snapshot) {
+    return (
+      await repositoryAccessAPI.guestPdfPage(
+        { ...props.repository },
+        path,
+        page,
+        snapshot,
+      )
+    ).data;
+  },
+  onAccessDenied: recheckRevokedAccess,
+  openFile: preview,
+};
+const fileIdentity = computed(() => ({
+  ...props.repository,
+  branch: props.branch,
+  path: selectedPath.value,
+}));
 function entryURL(entry) {
   const repo = props.repository;
   const base = `/${repo.type}s/${encodeURIComponent(repo.namespace)}/${encodeURIComponent(repo.name)}`;
@@ -325,24 +379,28 @@ function followEntry(event, entry) {
 function openFolder(path) {
   clearTimeout(searchTimer);
   query.value = "";
-  fileRequest++;
   selectedPath.value = "";
-  content.value = null;
-  fileError.value = null;
   activeView.value = "files";
   emit("open-folder", path);
   loadTree(path);
 }
 function backToFiles() {
-  fileRequest++;
   selectedPath.value = "";
-  content.value = null;
-  fileError.value = null;
   emit("open-folder", currentPath.value);
   if (!treeLoaded.value) loadTree(currentPath.value);
 }
 async function loadCommits(append = false) {
   if (accessInvalid.value) return;
+  if (props.branch !== "main") {
+    commits.value = [];
+    commitsError.value = decodeError(
+      Object.assign(
+        new Error("Only the default branch is available in guest preview"),
+        { status: 400 },
+      ),
+    );
+    return;
+  }
   const owner = generation,
     request = ++commitsRequest,
     target = { ...props.repository },
@@ -393,9 +451,7 @@ function navigate(view) {
   activeView.value = view;
   selectedCommit.value = null;
   if (view !== "files") {
-    fileRequest++;
     selectedPath.value = "";
-    content.value = null;
   }
   emit("navigate", view);
   ensureView();
@@ -409,14 +465,14 @@ async function leave() {
   }
 }
 watch(
-  () => JSON.stringify(props.repository),
+  () => JSON.stringify([props.repository, props.branch]),
   () => {
     generation++;
+    fileMetadataCache.clear();
     accessInvalid.value = false;
     clearTimeout(searchTimer);
     overview.value = null;
     entries.value = [];
-    content.value = null;
     commits.value = [];
     treeLoaded.value = false;
     commitsLoaded.value = false;
@@ -428,7 +484,6 @@ watch(
     selectedPath.value = "";
     selectedCommit.value = null;
     activeView.value = props.view;
-    fileError.value = null;
     treeError.value = null;
     commitsError.value = null;
     loadOverview();
@@ -442,9 +497,7 @@ watch(
     if (activeView.value !== view) selectedCommit.value = null;
     activeView.value = view;
     if (view !== "files") {
-      fileRequest++;
       selectedPath.value = "";
-      content.value = null;
       ensureView();
       return;
     }
@@ -454,21 +507,14 @@ watch(
       }
     } else if (selectedPath.value || currentPath.value !== path) {
       selectedPath.value = "";
-      content.value = null;
-      fileRequest++;
       currentPath.value = path;
       loadTree(path);
     } else ensureView();
   },
 );
-watch(
-  () => overview.value?.readme,
-  () => {
-    if (content.value)
-      content.value = canonicalReadmePreview(content.value, selectedPath.value);
-  },
-);
+watch(selectedPath, () => fileMetadataCache.clear(), { flush: "sync" });
 onBeforeUnmount(() => {
+  fileMetadataCache.clear();
   generation++;
   clearTimeout(searchTimer);
 });
@@ -487,6 +533,12 @@ defineExpose({ leave, navigate });
       ><el-button @click="leave">End temporary access</el-button></template
     >
     <div v-if="accessInvalid" role="status">Checking repository access…</div>
+    <BlobFilePage
+      v-else-if="activeView === 'files' && selectedPath"
+      embedded
+      :file-identity="fileIdentity"
+      :preview-source="filePreviewSource"
+    />
     <div v-else class="guest-repository-body" :class="{ embedded }">
       <main class="min-w-0">
         <ErrorState
@@ -504,10 +556,16 @@ defineExpose({ leave, navigate });
             class="card"
             aria-label="Repository card"
           >
-            <GuestMarkdownPreview
-              :repository="repository"
-              :source="parsedCard.content"
-              :path="overview.readme.path"
+            <MarkdownViewer
+              :repo-type="repository.type"
+              :namespace="repository.namespace"
+              :name="repository.name"
+              branch="main"
+              :content="parsedCard.content"
+              :file-path="overview.readme.path"
+              :controlled-source="filePreviewSource"
+              :strip-frontmatter="false"
+              :heading-offset="1"
               @open-file="preview"
               @access-denied="recheckRevokedAccess"
             />
@@ -520,166 +578,143 @@ defineExpose({ leave, navigate });
           </div></template
         >
         <template v-else-if="activeView === 'files'">
-          <template v-if="selectedPath"
-            ><ErrorState
-              v-if="fileError"
-              :error="fileError"
-              mode="inline-panel"
-              :retry="() => preview(selectedPath, selectedSize, false)" />
-            <div v-if="fileLoading" role="status">Loading file…</div>
-            <GuestFilePreview
-              :repository="repository"
-              :path="selectedPath"
-              :file-info="fileInfo"
-              :content="content"
-              :size="formatSize(selectedSize)"
-              @back="backToFiles"
+          <div class="guest-files-toolbar">
+            <span class="guest-branch"
+              ><span class="i-carbon-branch" aria-hidden="true" />{{
+                branch
+              }}</span
+            ><el-input
+              v-model="query"
+              aria-label="Filter files by name prefix"
+              placeholder="Filter files by name prefix…"
+              clearable
+              @input="queueSearch"
+            /><button
+              type="button"
+              class="guest-text-action"
+              @click="navigate('commits')"
+            >
+              <span class="i-carbon-change-catalog" aria-hidden="true" />History
+            </button>
+          </div>
+          <div v-if="currentPath" class="guest-directory-toolbar">
+            <h2 class="font-semibold">{{ currentPath }}</h2>
+            <button
+              type="button"
+              class="guest-text-action"
+              @click="openFolder(currentPath.split('/').slice(0, -1).join('/'))"
+            >
+              <span class="i-carbon-arrow-up" aria-hidden="true" />Parent folder
+            </button>
+          </div>
+          <ErrorState
+            v-if="treeError"
+            :error="treeError"
+            mode="inline-panel"
+            :retry="() => loadTree(currentPath)"
+          />
+          <div v-if="treeLoading && !entries.length" role="status">
+            Loading files…
+          </div>
+          <p v-if="treeMessage" class="guest-note">{{ treeMessage }}</p>
+          <div class="guest-file-list">
+            <section class="guest-latest-commit" aria-label="Latest commit">
+              <template v-if="commits[0]">
+                <span class="i-carbon-user-avatar" aria-hidden="true" />
+                <span>{{ commits[0].author }}</span>
+                <button
+                  type="button"
+                  class="guest-text-action guest-latest-title"
+                  @click="showCommit(commits[0])"
+                >
+                  {{ commits[0].message.split("\n")[0] }}
+                </button>
+                <span class="font-mono">{{ commits[0].id.slice(0, 7) }}</span>
+                <span class="guest-latest-date">{{
+                  formatRelativeTime(commits[0].timestamp, "—")
+                }}</span>
+              </template>
+              <span v-else
+                >Latest commit<span
+                  v-if="overview?.head"
+                  class="font-mono ml-2"
+                  >{{ overview.head.slice(0, 7) }}</span
+                ></span
+              >
+            </section>
+            <table aria-label="Repository files" class="guest-file-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Last commit</th>
+                  <th>Updated</th>
+                  <th>Size</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="entry in sortedEntries" :key="entry.path">
+                  <td>
+                    <span
+                      :class="
+                        entry.type === 'directory'
+                          ? 'i-carbon-folder guest-folder-icon'
+                          : 'i-carbon-document'
+                      "
+                      class="guest-entry-icon"
+                      aria-hidden="true"
+                    /><a
+                      :href="entryURL(entry)"
+                      class="guest-entry-name"
+                      :aria-label="entry.path"
+                      @click="followEntry($event, entry)"
+                    >
+                      {{ entry.path.split("/").pop() }}
+                    </a>
+                  </td>
+                  <td class="guest-entry-metadata">
+                    {{ entry.last_commit?.title || "—" }}
+                  </td>
+                  <td class="guest-entry-updated">
+                    {{ formatRelativeTime(entry.last_commit?.timestamp, "—") }}
+                  </td>
+                  <td class="guest-entry-size">
+                    {{
+                      entry.type === "directory" ? "—" : formatSize(entry.size)
+                    }}
+                  </td>
+                </tr>
+                <tr v-if="!treeLoading && !entries.length">
+                  <td colspan="4" class="guest-empty">No files found</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-if="treeHasMore" class="text-center pt-4">
+            <el-button
+              :loading="treeLoading"
+              @click="loadTree(currentPath, true)"
+              >Load More Files</el-button
+            >
+          </div>
+          <article
+            v-if="!currentPath && !query && overview?.readme"
+            class="card mt-6"
+            aria-label="Directory README"
+          >
+            <MarkdownViewer
+              :repo-type="repository.type"
+              :namespace="repository.namespace"
+              :name="repository.name"
+              branch="main"
+              :content="parsedCard.content"
+              :file-path="overview.readme.path"
+              :controlled-source="filePreviewSource"
+              :strip-frontmatter="false"
+              :heading-offset="1"
               @open-file="preview"
               @access-denied="recheckRevokedAccess"
-          /></template>
-          <template v-else>
-            <div class="guest-files-toolbar">
-              <span class="guest-branch"
-                ><span class="i-carbon-branch" aria-hidden="true" />{{
-                  branch
-                }}</span
-              ><el-input
-                v-model="query"
-                aria-label="Filter files by name prefix"
-                placeholder="Filter files by name prefix…"
-                clearable
-                @input="queueSearch"
-              /><button
-                type="button"
-                class="guest-text-action"
-                @click="navigate('commits')"
-              >
-                <span
-                  class="i-carbon-change-catalog"
-                  aria-hidden="true"
-                />History
-              </button>
-            </div>
-            <div v-if="currentPath" class="guest-directory-toolbar">
-              <h2 class="font-semibold">{{ currentPath }}</h2>
-              <button
-                type="button"
-                class="guest-text-action"
-                @click="
-                  openFolder(currentPath.split('/').slice(0, -1).join('/'))
-                "
-              >
-                <span class="i-carbon-arrow-up" aria-hidden="true" />Parent
-                folder
-              </button>
-            </div>
-            <ErrorState
-              v-if="treeError"
-              :error="treeError"
-              mode="inline-panel"
-              :retry="() => loadTree(currentPath)"
             />
-            <div v-if="treeLoading && !entries.length" role="status">
-              Loading files…
-            </div>
-            <p v-if="treeMessage" class="guest-note">{{ treeMessage }}</p>
-            <div class="guest-file-list">
-              <section class="guest-latest-commit" aria-label="Latest commit">
-                <template v-if="commits[0]">
-                  <span class="i-carbon-user-avatar" aria-hidden="true" />
-                  <span>{{ commits[0].author }}</span>
-                  <button
-                    type="button"
-                    class="guest-text-action guest-latest-title"
-                    @click="showCommit(commits[0])"
-                  >
-                    {{ commits[0].message.split("\n")[0] }}
-                  </button>
-                  <span class="font-mono">{{ commits[0].id.slice(0, 7) }}</span>
-                  <span class="guest-latest-date">{{
-                    formatRelativeTime(commits[0].timestamp, "—")
-                  }}</span>
-                </template>
-                <span v-else
-                  >Latest commit<span
-                    v-if="overview?.head"
-                    class="font-mono ml-2"
-                    >{{ overview.head.slice(0, 7) }}</span
-                  ></span
-                >
-              </section>
-              <table aria-label="Repository files" class="guest-file-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Last commit</th>
-                    <th>Updated</th>
-                    <th>Size</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="entry in sortedEntries" :key="entry.path">
-                    <td>
-                      <span
-                        :class="
-                          entry.type === 'directory'
-                            ? 'i-carbon-folder guest-folder-icon'
-                            : 'i-carbon-document'
-                        "
-                        class="guest-entry-icon"
-                        aria-hidden="true"
-                      /><a
-                        :href="entryURL(entry)"
-                        class="guest-entry-name"
-                        :aria-label="entry.path"
-                        @click="followEntry($event, entry)"
-                      >
-                        {{ entry.path.split("/").pop() }}
-                      </a>
-                    </td>
-                    <td class="guest-entry-metadata">
-                      {{ entry.last_commit?.title || "—" }}
-                    </td>
-                    <td class="guest-entry-updated">
-                      {{
-                        formatRelativeTime(entry.last_commit?.timestamp, "—")
-                      }}
-                    </td>
-                    <td class="guest-entry-size">
-                      {{
-                        entry.type === "directory"
-                          ? "—"
-                          : formatSize(entry.size)
-                      }}
-                    </td>
-                  </tr>
-                  <tr v-if="!treeLoading && !entries.length">
-                    <td colspan="4" class="guest-empty">No files found</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div v-if="treeHasMore" class="text-center pt-4">
-              <el-button
-                :loading="treeLoading"
-                @click="loadTree(currentPath, true)"
-                >Load More Files</el-button
-              >
-            </div>
-            <article
-              v-if="!currentPath && !query && overview?.readme"
-              class="card mt-6"
-              aria-label="Directory README"
-            >
-              <GuestMarkdownPreview
-                :repository="repository"
-                :source="parsedCard.content"
-                :path="overview.readme.path"
-                @open-file="preview"
-                @access-denied="recheckRevokedAccess"
-              />
-            </article>
-          </template>
+          </article>
         </template>
         <section
           v-else-if="activeView === 'commits'"

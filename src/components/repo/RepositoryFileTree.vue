@@ -16,6 +16,7 @@ const props = defineProps({
   name: { type: String, required: true },
   branch: { type: String, required: true },
   currentPath: { type: String, default: "" },
+  previewSource: { type: Object, default: null },
 });
 defineEmits(["collapse"]);
 const router = useRouter();
@@ -89,16 +90,24 @@ async function loadFolder(path, append = false) {
   state.failedAppend = append;
   const pending = (async () => {
     try {
-      const page = await repoAPI.listTreePage(
-        ...identity,
-        path ? `/${encodePath(path)}` : "",
-        {
-          limit: 50,
-          recursive: false,
-          expand: false,
-          ...(append && state.nextCursor ? { cursor: state.nextCursor } : {}),
-        },
-      );
+      if (props.previewSource && props.branch !== "main")
+        throw new Error("Only the default branch is available");
+      const page = props.previewSource
+        ? await props.previewSource.listTree(path, {
+            ...(append && state.nextCursor ? { cursor: state.nextCursor } : {}),
+          })
+        : await repoAPI.listTreePage(
+            ...identity,
+            path ? `/${encodePath(path)}` : "",
+            {
+              limit: 50,
+              recursive: false,
+              expand: false,
+              ...(append && state.nextCursor
+                ? { cursor: state.nextCursor }
+                : {}),
+            },
+          );
       if (context !== generation) return;
       if (!append) state.entries = [];
       mergeEntries(state, page.entries || [], path);
@@ -107,6 +116,7 @@ async function loadFolder(path, append = false) {
       state.loaded = true;
     } catch (error) {
       if (context !== generation) return;
+      props.previewSource?.onAccessDenied?.(error);
       const decoded = decodeError(error);
       if (decoded.kind !== KIND.CANCELLED) state.error = decoded;
     } finally {
@@ -117,6 +127,10 @@ async function loadFolder(path, append = false) {
   return pending;
 }
 async function loadRefs() {
+  if (props.previewSource) {
+    branches.value = props.branch === "main" ? ["main"] : [];
+    return;
+  }
   const context = generation;
   const request = ++refsRequest;
   refsLoading.value = true;
@@ -156,6 +170,30 @@ async function revealCurrentPath() {
     return !stateFor(parent).entries.some((item) => item.path === entry);
   });
   if (!needed.length) return;
+  if (props.previewSource) {
+    if (props.branch !== "main") return;
+    try {
+      const info = await props.previewSource.fileInfo(path);
+      if (context !== generation || path !== currentPath.value) return;
+      for (const item of needed) {
+        const parent = item.split("/").slice(0, -1).join("/");
+        mergeEntries(
+          stateFor(parent),
+          [
+            {
+              path: item,
+              type: item === path ? "file" : "directory",
+              ...(item === path ? { size: info.size } : {}),
+            },
+          ],
+          parent,
+        );
+      }
+    } catch (error) {
+      props.previewSource.onAccessDenied?.(error);
+    }
+    return;
+  }
   try {
     const { data } = await repoAPI.getPathsInfo(
       props.repoType,
@@ -224,7 +262,13 @@ const rows = computed(() => {
 const hasRows = computed(() => rows.value.some((row) => row.kind === "entry"));
 
 watch(
-  () => [props.repoType, props.namespace, props.name, props.branch],
+  () => [
+    props.repoType,
+    props.namespace,
+    props.name,
+    props.branch,
+    props.previewSource,
+  ],
   () => {
     generation += 1;
     folders.clear();
