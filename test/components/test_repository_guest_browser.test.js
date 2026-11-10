@@ -106,6 +106,97 @@ describe("normal repository browsing over controlled guest APIs", () => {
   });
   afterEach(() => wrappers.splice(0).forEach((wrapper) => wrapper.unmount()));
 
+  it("uses the ordinary directory component, toolbar and grid without a guest table", async () => {
+    const wrapper = mountViewer({ view: "files" });
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "RepositoryFiles" }).exists()).toBe(
+      true,
+    );
+    expect(wrapper.get(".repository-branch-select").exists()).toBe(true);
+    expect(wrapper.get('[data-testid="repository-size"]').text()).toBe(
+      "1.2 KB",
+    );
+    expect(wrapper.get(".repository-history-link").text()).toBe(
+      "History: 1 commit",
+    );
+    expect(wrapper.findComponent({ name: "RepoLatestCommit" }).exists()).toBe(
+      true,
+    );
+    expect(
+      wrapper
+        .get(".repository-file-list")
+        .findAll('[data-testid="filelist-row-link"]'),
+    ).toHaveLength(2);
+    expect(
+      wrapper
+        .find("table, thead, .guest-files-toolbar, .guest-latest-commit")
+        .exists(),
+    ).toBe(false);
+    expect(wrapper.find('[title="Open metadata preview"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.html()).not.toContain("/resolve/");
+    for (const call of Object.values(ordinary))
+      expect(call).not.toHaveBeenCalled();
+  });
+
+  it("selects linked commit metadata only from the authorized history response", async () => {
+    const id = "a".repeat(40);
+    const wrapper = mountViewer({ view: "commits", commitId: id });
+    await flushPromises();
+    expect(wrapper.text()).toContain("Back to commit history");
+    expect(wrapper.get(".font-mono.break-all").text()).toBe(id);
+    await wrapper.setProps({ commitId: "b".repeat(40) });
+    expect(wrapper.text()).not.toContain("Back to commit history");
+    await wrapper.setProps({ commitId: [id] });
+    expect(wrapper.text()).not.toContain("Back to commit history");
+    for (const call of Object.values(ordinary))
+      expect(call).not.toHaveBeenCalled();
+    expect(api.guestCommits).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not mistake a partial controlled history page for a total", async () => {
+    api.guestCommits.mockResolvedValueOnce({
+      data: {
+        commits: [
+          {
+            id: "a".repeat(40),
+            message: "Latest",
+            timestamp: 1794268800,
+            author: "owner",
+          },
+        ],
+        has_more: true,
+        next_cursor: "next",
+      },
+    });
+    const wrapper = mountViewer({ view: "files" });
+    await flushPromises();
+    expect(wrapper.get(".repository-history-link").text()).toBe("History");
+    expect(wrapper.get(".latest-commit-title").text()).toBe("Latest");
+  });
+
+  it("retries a failed directory commit summary using only controlled history", async () => {
+    api.guestCommits.mockRejectedValueOnce({ response: { status: 500 } });
+    const wrapper = mountViewer({ view: "files" });
+    await flushPromises();
+    expect(wrapper.get(".repository-latest-commit").text()).not.toContain(
+      "No commits yet",
+    );
+    expect(wrapper.find(".repository-history-retry").exists()).toBe(true);
+    await wrapper.get(".repository-history-retry").trigger("click");
+    await flushPromises();
+    expect(api.guestCommits).toHaveBeenCalledTimes(2);
+    expect(wrapper.get(".repository-history-link").text()).toBe(
+      "History: 1 commit",
+    );
+    expect(wrapper.get(".latest-commit-title").text()).toBe(
+      "Add model documentation",
+    );
+    for (const call of Object.values(ordinary))
+      expect(call).not.toHaveBeenCalled();
+  });
+
   it("shows README as the card and ordinary repository sidebar without a Preview only card", async () => {
     const wrapper = mountViewer();
     await flushPromises();
@@ -200,9 +291,11 @@ describe("normal repository browsing over controlled guest APIs", () => {
     await wrapper.setProps({ filePath: "script.py" });
     await wrapper.setProps({ filePath: "" });
     await flushPromises();
-    expect(wrapper.find('table[aria-label="Repository files"]').exists()).toBe(
-      true,
-    );
+    expect(
+      wrapper
+        .find('.repository-file-list[aria-label="Repository files"]')
+        .exists(),
+    ).toBe(true);
   });
 
   it("renders Markdown file previews with the same safe card presentation", async () => {
@@ -410,9 +503,12 @@ describe("normal repository browsing over controlled guest APIs", () => {
       "Add model documentation",
     );
     expect(api.guestCommits).toHaveBeenCalledExactlyOnceWith(repo, {});
-    await button(wrapper, "Add model documentation").trigger("click");
+    expect(wrapper.get(".latest-commit-title").attributes("href")).toBe(
+      `/models/owner/demo/commits/main?commit=${"a".repeat(40)}`,
+    );
+    await wrapper.setProps({ view: "commits" });
     await flushPromises();
-    expect(wrapper.emitted("navigate").at(-1)).toEqual(["commits"]);
+    await button(wrapper, "Add model documentation").trigger("click");
     expect(wrapper.text()).toContain("Back to commit history");
     expect(api.guestCommits).toHaveBeenCalledTimes(1);
   });
@@ -472,8 +568,11 @@ describe("normal repository browsing over controlled guest APIs", () => {
     await flushPromises();
     const table = wrapper.get('[aria-label="Repository files"]');
     expect(table.text()).toContain("Configure model");
-    expect(table.get("thead").text()).toContain("Last commit");
-    expect(table.get("thead").text()).toContain("Updated");
+    expect(table.find("thead").exists()).toBe(false);
+    expect(table.findAll(".relative.py-3")).toHaveLength(1);
+    expect(
+      table.get('a[title="Configure model"]').attributes("href"),
+    ).toContain("/commits/main?commit=");
   });
   it("keeps a valid bounded preview when the file metadata service fails", async () => {
     api.guestFileInfo.mockRejectedValueOnce({ response: { status: 500 } });
@@ -532,8 +631,8 @@ describe("normal repository browsing over controlled guest APIs", () => {
     });
     const wrapper = mountViewer({ view: "files" });
     await flushPromises();
-    const file = wrapper.get('a[aria-label="model card.md"]');
-    const folder = wrapper.get('a[aria-label="docs & examples"]');
+    const file = wrapper.get('a[aria-label="Open model card.md"]');
+    const folder = wrapper.get('a[aria-label="Open docs & examples"]');
     expect(file.attributes("href")).toBe(
       "/models/owner/demo/blob/main/model%20card.md",
     );

@@ -13,13 +13,24 @@ const props = defineProps({
   name: { type: String, required: true },
   branch: { type: String, required: true },
   external: { type: Boolean, default: false },
+  source: { type: Object, default: null },
 });
 const errorContext = useErrorContext();
 // This small request never controls the file list or loads history's permissions.
 // useAsyncResource ignores superseded responses and stops on component disposal.
 const resource = useAsyncResource(
-  async () => {
+  async ({ signal }) => {
     if (props.external) return null;
+    const source = props.source;
+    if (source) {
+      try {
+        return (await source.latestCommit?.({ signal })) || null;
+      } catch (cause) {
+        if (!signal.aborted && source === props.source)
+          source.onAccessDenied?.(cause);
+        throw cause;
+      }
+    }
     const { data } = await repoAPI.listCommits(
       props.repoType,
       props.namespace,
@@ -37,6 +48,7 @@ const resource = useAsyncResource(
       () => props.name,
       () => props.branch,
       () => props.external,
+      () => props.source,
     ],
   },
 );
@@ -44,10 +56,14 @@ const commit = computed(() => resource.data.value);
 const repoPath = computed(
   () => `/${props.repoType}s/${props.namespace}/${props.name}`,
 );
-const commitPath = computed(
-  () =>
-    `${repoPath.value}/commit/${commit.value?.id}${props.branch === "main" ? "" : `?branch=${encodeURIComponent(props.branch)}`}`,
+const commitPath = computed(() =>
+  props.source
+    ? `/${props.repoType}s/${encodeURIComponent(props.namespace)}/${encodeURIComponent(props.name)}/commits/${encodeURIComponent(props.branch)}?commit=${encodeURIComponent(commit.value?.id || "")}`
+    : `${repoPath.value}/commit/${commit.value?.id}${props.branch === "main" ? "" : `?branch=${encodeURIComponent(props.branch)}`}`,
 );
+function retryLoad() {
+  return props.source?.reload ? props.source.reload() : resource.reload();
+}
 </script>
 
 <template>
@@ -105,7 +121,7 @@ const commitPath = computed(
       v-if="!external && resource.failed.value"
       :error="resource.error.value"
       :context="errorContext('latest commit')"
-      :retry="resource.reload"
+      :retry="retryLoad"
       :retrying="resource.retrying.value"
       mode="inline-panel"
     />

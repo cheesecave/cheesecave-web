@@ -222,7 +222,7 @@ describe("restricted repository pages share the normal repository header", () =>
       });
       await wrapper
         .getComponent(Visitor)
-        .findAll("a.guest-entry-name")
+        .findAll('a[data-testid="filelist-row-link"]')
         .find((link) => link.text() === "notes.txt")
         .trigger("click");
       await flushPromises();
@@ -234,6 +234,23 @@ describe("restricted repository pages share the normal repository header", () =>
       expect(wrapper.findComponent(Invitation).exists()).toBe(false);
     },
   );
+
+  it("forwards only a string commit query to the controlled history selection", async () => {
+    mocks.getAccess.mockResolvedValue({
+      data: { access: "guest", visibility: "invite" },
+    });
+    const id = "a".repeat(40);
+    const route = reactive({
+      path: "/models/owner/invited/commits/main",
+      query: { commit: id },
+    });
+    const wrapper = mountView(Gate, { route });
+    await flushPromises();
+    expect(wrapper.getComponent(Visitor).props("commitId")).toBe(id);
+    route.query.commit = [id];
+    await flushPromises();
+    expect(wrapper.getComponent(Visitor).props("commitId")).toBe("");
+  });
 
   it("shows the ordinary model tag chips from controlled card metadata", async () => {
     mocks.getAccess.mockResolvedValue({

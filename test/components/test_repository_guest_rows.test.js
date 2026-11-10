@@ -41,6 +41,9 @@ function mountVisitor() {
   return wrapper;
 }
 const queries = (wrapper) => within(wrapper.element);
+const rowFor = (listing, name) =>
+  within(listing).getByRole("link", { name: `Open ${name}`, exact: true })
+    .parentElement;
 describe("controlled guest file rows", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -94,26 +97,27 @@ describe("controlled guest file rows", () => {
   it("renders named file metadata as rows without download or original-file links", async () => {
     const wrapper = mountVisitor();
     await flushPromises();
-    const table = queries(wrapper).getByRole("table", {
-      name: "Repository files",
-    });
-    expect(
-      within(table)
-        .getAllByRole("columnheader")
-        .map((cell) => cell.textContent.trim()),
-    ).toEqual(["Name", "Last commit", "Updated", "Size"]);
-    const note = within(table).getByRole("row", { name: /notes.txt/ });
+    const table = wrapper.get(
+      '.repository-file-list[aria-label="Repository files"]',
+    ).element;
+    expect(within(table).queryByRole("table")).toBeNull();
+    expect(wrapper.findComponent({ name: "RepositoryFiles" }).exists()).toBe(
+      true,
+    );
+    const note = rowFor(table, "notes.txt");
     expect(note.textContent).toContain("Update notes");
     expect(note.textContent).toContain("1.5 KB");
-    const pdf = within(table).getByRole("row", { name: /manual.pdf/ });
-    expect(within(pdf).getAllByRole("cell")).toHaveLength(4);
+    const pdf = rowFor(table, "manual.pdf");
+    expect(pdf.className).toContain(
+      "md:grid-cols-[auto_minmax(0,1.4fr)_minmax(0,2fr)_120px_110px]",
+    );
     expect(pdf.textContent).toContain("512 B");
     expect(wrapper.findAll("a[download],video,audio,iframe")).toHaveLength(0);
     expect(
       wrapper
         .findAll("a[href]")
         .every((link) =>
-          /^\/(?:owner|models\/owner\/demo\/(?:tree|blob|commits)\/main(?:\/(?:notes\.txt|manual\.pdf|folder))?)$/.test(
+          /^\/(?:owner|models\/owner\/demo\/(?:tree|blob|commits)\/main(?:\/(?:notes\.txt|manual\.pdf|folder))?(?:\?commit=[a-z0-9]+)?)$/.test(
             link.attributes("href"),
           ),
         ),
@@ -141,25 +145,23 @@ describe("controlled guest file rows", () => {
       },
     });
     await queries(wrapper)
-      .getByRole("link", { name: "folder", exact: true })
+      .getByRole("link", { name: "Open folder", exact: true })
       .click();
     await flushPromises();
     expect(mocks.guestTree).toHaveBeenLastCalledWith(repository, "folder", {
       search: "",
     });
-    const table = queries(wrapper).getByRole("table", {
-      name: "Repository files",
-    });
+    const table = wrapper.get(
+      '.repository-file-list[aria-label="Repository files"]',
+    ).element;
     expect(
       within(table)
-        .getByRole("link", { name: "folder/nested.txt", exact: true })
+        .getByRole("link", { name: "Open nested.txt", exact: true })
         .textContent.trim(),
     ).toBe("nested.txt");
-    expect(
-      within(table).getByRole("row", { name: /nested.txt/ }).textContent,
-    ).toContain("0 B");
+    expect(rowFor(table, "nested.txt").textContent).toContain("-");
     await queries(wrapper)
-      .getByRole("button", { name: "Parent folder", exact: true })
+      .getByRole("link", { name: "root", exact: true })
       .click();
     await flushPromises();
     expect(mocks.guestTree).toHaveBeenLastCalledWith(repository, "", {
@@ -172,7 +174,7 @@ describe("controlled guest file rows", () => {
     const wrapper = mountVisitor();
     await flushPromises();
     await queries(wrapper)
-      .getByRole("link", { name: "notes.txt", exact: true })
+      .getByRole("link", { name: "Open notes.txt", exact: true })
       .click();
     await flushPromises();
     expect(mocks.guestPreview).toHaveBeenCalledExactlyOnceWith(
@@ -183,7 +185,10 @@ describe("controlled guest file rows", () => {
     expect(preview.textContent).toContain("Limited excerpt");
     expect(preview.textContent).toContain("This preview is limited");
     expect(
-      queries(wrapper).getByRole("heading", { name: "notes.txt", exact: true }),
+      queries(wrapper).getByRole("heading", {
+        name: "notes.txt",
+        exact: true,
+      }),
     ).toBeDefined();
     expect(wrapper.get(".file-detail-breadcrumb a").attributes("href")).toBe(
       "/models/owner/demo/tree/main",
@@ -202,7 +207,7 @@ describe("controlled guest file rows", () => {
       wrapper
         .findAll("a[href]")
         .every((link) =>
-          /^\/(?:owner|models\/owner\/demo\/(?:tree|blob|commits)\/main(?:\/(?:notes\.txt|manual\.pdf|folder))?)$/.test(
+          /^\/(?:owner|models\/owner\/demo\/(?:tree|blob|commits)\/main(?:\/(?:notes\.txt|manual\.pdf|folder))?(?:\?commit=[a-z0-9]+)?)$/.test(
             link.attributes("href"),
           ),
         ),
@@ -239,31 +244,23 @@ describe("controlled guest file rows", () => {
     });
     const wrapper = mountVisitor();
     await flushPromises();
-    const table = queries(wrapper).getByRole("table", {
-      name: "Repository files",
-    });
-    expect(
-      within(table).getByRole("row", { name: /rows.csv/ }).textContent,
-    ).toContain("2.5 MB");
-    expect(
-      within(table).getByRole("row", { name: /photo.png/ }).textContent,
-    ).toContain("1.5 KB");
-    expect(
-      within(table).getByRole("row", { name: /weights.bin/ }).textContent,
-    ).toContain("2.5 GB");
-    expect(
-      within(table).getByRole("row", { name: /unknown.bin/ }).textContent,
-    ).toContain("—");
+    const table = wrapper.get(
+      '.repository-file-list[aria-label="Repository files"]',
+    ).element;
+    expect(rowFor(table, "rows.csv").textContent).toContain("2.5 MB");
+    expect(rowFor(table, "photo.png").textContent).toContain("1.5 KB");
+    expect(rowFor(table, "weights.bin").textContent).toContain("2.5 GB");
+    expect(rowFor(table, "unknown.bin").textContent).toContain("-");
     expect(wrapper.html()).not.toContain("storage.invalid");
   });
 
-  it("shows an empty folder as an empty file table without offering ordinary file actions", async () => {
+  it("shows an empty folder in the ordinary file list without offering ordinary file actions", async () => {
     mocks.guestTree.mockResolvedValueOnce({ data: { path: "", entries: [] } });
     const wrapper = mountVisitor();
     await flushPromises();
-    const table = queries(wrapper).getByRole("table", {
-      name: "Repository files",
-    });
+    const table = wrapper.get(
+      '.repository-file-list[aria-label="Repository files"]',
+    ).element;
     expect(within(table).getByText("No files found")).toBeDefined();
     expect(within(table).queryByRole("button")).toBeNull();
     expect(mocks.guestPreview).not.toHaveBeenCalled();
