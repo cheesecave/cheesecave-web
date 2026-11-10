@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   guestTree: vi.fn(),
   guestPreview: vi.fn(),
   leaveGuest: vi.fn(),
+  guestOverview: vi.fn(),
+  guestCommits: vi.fn(),
+  guestFileInfo: vi.fn(),
   ordinaryRead: vi.fn(),
   copy: vi.fn(),
   success: vi.fn(),
@@ -23,6 +26,9 @@ vi.mock("@/utils/api", () => ({
     guestTree: mocks.guestTree,
     guestPreview: mocks.guestPreview,
     leaveGuest: mocks.leaveGuest,
+    guestOverview: mocks.guestOverview,
+    guestCommits: mocks.guestCommits,
+    guestFileInfo: mocks.guestFileInfo,
   },
   collectionsAPI: {},
 }));
@@ -73,6 +79,21 @@ describe("restricted repository pages share the normal repository header", () =>
     vi.clearAllMocks();
     mocks.auth = reactive({ isAuthenticated: true, username: "reader" });
     mocks.getRequest.mockResolvedValue({ data: { request: null } });
+    mocks.guestOverview.mockResolvedValue({
+      data: {
+        id: "owner/invited",
+        author: "owner",
+        default_branch: "main",
+        metadata: {},
+        readme: null,
+      },
+    });
+    mocks.guestFileInfo.mockImplementation((_repo, path) =>
+      Promise.resolve({ data: { path, size: null, last_modified: null } }),
+    );
+    mocks.guestCommits.mockResolvedValue({
+      data: { commits: [], has_more: false },
+    });
     mocks.guestTree.mockResolvedValue({
       data: {
         path: "",
@@ -177,7 +198,7 @@ describe("restricted repository pages share the normal repository header", () =>
         data: { access: "guest", visibility },
       });
       const wrapper = mountView(Gate, {
-        route: { path: "/models/owner/invited" },
+        route: { path: "/models/owner/invited/tree/main" },
       });
       await flushPromises();
       const header = expectRestrictedHeader(
@@ -192,11 +213,13 @@ describe("restricted repository pages share the normal repository header", () =>
           .getByRole("link", { name: "Files" })
           .getAttribute("aria-current"),
       ).toBe("page");
-      expect(mocks.guestTree).toHaveBeenCalledWith(repository, "");
+      expect(mocks.guestTree).toHaveBeenCalledWith(repository, "", {
+        search: "",
+      });
       await wrapper
         .getComponent(Visitor)
-        .findAll("button")
-        .find((button) => button.text() === "notes.txt")
+        .findAll("a.guest-entry-name")
+        .find((link) => link.text() === "notes.txt")
         .trigger("click");
       await flushPromises();
       expect(mocks.guestPreview).toHaveBeenCalledWith(repository, "notes.txt");

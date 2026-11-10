@@ -14,6 +14,9 @@ const mocks = vi.hoisted(() => ({
     leaveGuest: vi.fn(),
     guestTree: vi.fn(),
     guestPreview: vi.fn(),
+    guestOverview: vi.fn(),
+    guestCommits: vi.fn(),
+    guestFileInfo: vi.fn(),
   },
 }));
 vi.mock("@/utils/api", () => ({ repositoryAccessAPI: mocks.api }));
@@ -23,10 +26,12 @@ import Invitation from "@/components/repo/RepositoryInvitationPage.vue";
 import Visitor from "@/components/repo/RestrictedRepositoryViewer.vue";
 import BindPage from "@/pages/repo-access.vue";
 const repo = { type: "model", namespace: "owner", name: "demo" };
+const fileLink = (w, text) =>
+  w.findAll("a.guest-entry-name").find((link) => link.text() === text);
 const button = (w, text) => w.findAll("button").find((b) => b.text() === text);
 const mountView = (component, props = {}) =>
   mount(component, {
-    props,
+    props: { ...(component === Visitor ? { view: "files" } : {}), ...props },
     global: { stubs: { ...ElementPlusStubs, RouterLink: RouterLinkStub } },
   });
 describe("invitation and controlled visitor flows", () => {
@@ -46,6 +51,21 @@ describe("invitation and controlled visitor flows", () => {
     });
     mocks.api.guest.mockResolvedValue({ data: { access: "guest" } });
     mocks.api.leaveGuest.mockResolvedValue({});
+    mocks.api.guestOverview.mockResolvedValue({
+      data: {
+        id: "owner/demo",
+        author: "owner",
+        default_branch: "main",
+        metadata: {},
+        readme: null,
+      },
+    });
+    mocks.api.guestFileInfo.mockImplementation((_repo, path) =>
+      Promise.resolve({ data: { path, size: null, last_modified: null } }),
+    );
+    mocks.api.guestCommits.mockResolvedValue({
+      data: { commits: [], has_more: false },
+    });
     mocks.api.guestTree.mockResolvedValue({
       data: {
         path: "",
@@ -133,7 +153,7 @@ describe("invitation and controlled visitor flows", () => {
   it("shows only controlled excerpts and never emits original download URLs", async () => {
     const w = mountView(Visitor, { repository: repo });
     await flushPromises();
-    await button(w, "notes.txt").trigger("click");
+    await fileLink(w, "notes.txt").trigger("click");
     await flushPromises();
     expect(mocks.api.guestPreview).toHaveBeenCalledWith(repo, "notes.txt");
     expect(w.text()).toContain("Bounded excerpt");
@@ -141,7 +161,14 @@ describe("invitation and controlled visitor flows", () => {
     expect(w.findAll("video,audio,iframe,a[download]")).toHaveLength(0);
     // Repository identity/navigation links are safe; original-file, object
     // storage and external links must never appear in the guest viewer.
-    const safeLinks = ["/models", "/owner", "/models/owner/demo"];
+    const safeLinks = [
+      "/models",
+      "/owner",
+      "/models/owner/demo",
+      "/models/owner/demo/tree/main",
+      "/models/owner/demo/commits/main",
+      "/models/owner/demo?tab=metadata",
+    ];
     for (const link of w.findAll("a[href]")) {
       expect(safeLinks).toContain(link.attributes("href"));
     }
@@ -161,19 +188,28 @@ describe("invitation and controlled visitor flows", () => {
     });
     const w = mountView(Visitor, { repository: repo });
     await flushPromises();
-    await button(w, "notes.txt").trigger("click");
+    await fileLink(w, "notes.txt").trigger("click");
     await flushPromises();
     expect(w.find("img").exists()).toBe(false);
     w.unmount();
   });
-  it("renders bounded rows as text and displays a capped-tree notice", async () => {
-    mocks.api.guestTree.mockResolvedValue({
-      data: {
-        path: "",
-        entries: [{ path: "rows.csv", type: "file" }],
-        has_more: true,
-      },
-    });
+  it("renders bounded rows as text and can load the next file page", async () => {
+    mocks.api.guestTree
+      .mockResolvedValueOnce({
+        data: {
+          path: "",
+          entries: [{ path: "rows.csv", type: "file" }],
+          has_more: true,
+          next_cursor: "signed-next-page",
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          path: "",
+          entries: [{ path: "other.txt", type: "file" }],
+          has_more: false,
+        },
+      });
     mocks.api.guestPreview.mockResolvedValue({
       data: {
         kind: "rows",
@@ -184,8 +220,16 @@ describe("invitation and controlled visitor flows", () => {
     });
     const w = mountView(Visitor, { repository: repo });
     await flushPromises();
-    expect(w.text()).toContain("first 100 entries");
-    await button(w, "rows.csv").trigger("click");
+    expect(button(w, "Load More Files")).toBeDefined();
+    await button(w, "Load More Files").trigger("click");
+    await flushPromises();
+    expect(mocks.api.guestTree).toHaveBeenLastCalledWith(repo, "", {
+      search: "",
+      cursor: "signed-next-page",
+    });
+    expect(fileLink(w, "rows.csv")).toBeDefined();
+    expect(fileLink(w, "other.txt")).toBeDefined();
+    await fileLink(w, "rows.csv").trigger("click");
     await flushPromises();
     expect(w.get('[aria-label="Controlled file preview"] td').text()).toBe(
       "<img src=secret>",
@@ -199,7 +243,7 @@ describe("invitation and controlled visitor flows", () => {
     });
     const w = mountView(Visitor, { repository: repo });
     await flushPromises();
-    await button(w, "notes.txt").trigger("click");
+    await fileLink(w, "notes.txt").trigger("click");
     await flushPromises();
     expect(w.get("img").attributes("src")).toBe("data:image/png;base64,AA==");
     expect(w.html()).not.toContain("/resolve/");

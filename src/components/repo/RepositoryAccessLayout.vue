@@ -3,11 +3,14 @@ import { computed } from "vue";
 import { ElMessage } from "element-plus";
 import RepositoryHeader from "./RepositoryHeader.vue";
 import { copyToClipboard } from "@/utils/clipboard";
+import { guestRepositoryTabs } from "@/utils/repository-access";
 
 const props = defineProps({
   repository: { type: Object, required: true },
   access: { type: Object, default: () => ({}) },
   preview: { type: Boolean, default: false },
+  embedded: { type: Boolean, default: false },
+  view: { type: String, default: "card" },
 });
 // Only route identity and the access preflight are public here. In particular,
 // rendering the shared header must never request normal repository metadata.
@@ -18,14 +21,7 @@ const tabs = computed(() => {
   const path = `/${props.repository.type}s/${props.repository.namespace}/${props.repository.name}`;
   const locked = "Repository access is required";
   return props.preview
-    ? [
-        { key: "files", label: "Files", to: path },
-        {
-          key: "metadata",
-          label: "Metadata",
-          disabledReason: "Unavailable in temporary preview",
-        },
-      ]
+    ? guestRepositoryTabs(props.repository)
     : [
         { key: "card", label: "Invitation", to: path },
         { key: "files", label: "Files", disabledReason: locked },
@@ -44,13 +40,14 @@ async function copyRepoId() {
 <template>
   <section class="repository-access-page">
     <RepositoryHeader
+      v-if="!embedded"
       :repo-type="repository.type"
       :namespace="repository.namespace"
       :name="repository.name"
       :namespace-link="`/${repository.namespace}`"
       :visibility="visibility"
       :tabs="tabs"
-      :active-tab="preview ? 'files' : 'card'"
+      :active-tab="preview ? view : 'card'"
       @copy="copyRepoId"
     >
       <template v-if="$slots.actions" #actions

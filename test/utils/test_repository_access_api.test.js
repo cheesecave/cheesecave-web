@@ -3,6 +3,26 @@ import api, { repositoryAccessAPI as access, authAPI } from "@/utils/api";
 const repo = { type: "dataset", namespace: "an owner", name: "data.v1" };
 const base = "/api/datasets/an%20owner/data.v1/access";
 describe("repository access API contract", () => {
+  it("uses controlled overview, complete file pages and history without raw endpoints", async () => {
+    const get = vi.spyOn(api, "get").mockResolvedValue({});
+    get.mockClear();
+    await access.guestOverview(repo);
+    await access.guestFileInfo(repo, "folder/README.md");
+    await access.guestTree(repo, "folder", {
+      cursor: "signed-page",
+      search: "read",
+    });
+    await access.guestCommits(repo, { cursor: "signed-history" });
+    expect(get.mock.calls).toEqual([
+      [`${base}/guest/overview`],
+      [`${base}/guest/file-info`, { params: { path: "folder/README.md" } }],
+      [
+        `${base}/guest/tree`,
+        { params: { path: "folder", cursor: "signed-page", search: "read" } },
+      ],
+      [`${base}/guest/commits`, { params: { cursor: "signed-history" } }],
+    ]);
+  });
   it("keeps site invitations in query and repository codes in the registration body", async () => {
     const post = vi.spyOn(api, "post").mockResolvedValue({ data: {} });
     await authAPI.register({

@@ -128,8 +128,22 @@ export const repositoryAccessAPI = {
   guest: (repo, token) =>
     api.post(`${repositoryAccessBase(repo)}/guest`, { token }),
   leaveGuest: (repo) => api.delete(`${repositoryAccessBase(repo)}/guest`),
-  guestTree: (repo, path = "") =>
-    api.get(`${repositoryAccessBase(repo)}/guest/tree`, { params: { path } }),
+  guestOverview: (repo) =>
+    api.get(`${repositoryAccessBase(repo)}/guest/overview`),
+  guestTree: (repo, path = "", options = {}) =>
+    api.get(`${repositoryAccessBase(repo)}/guest/tree`, {
+      params: {
+        path,
+        ...(options.cursor ? { cursor: options.cursor } : {}),
+        ...(options.search ? { search: options.search } : {}),
+      },
+    }),
+  guestCommits: (repo, params = {}) =>
+    api.get(`${repositoryAccessBase(repo)}/guest/commits`, { params }),
+  guestFileInfo: (repo, path) =>
+    api.get(`${repositoryAccessBase(repo)}/guest/file-info`, {
+      params: { path },
+    }),
   guestPreview: (repo, path) =>
     api.get(`${repositoryAccessBase(repo)}/guest/preview`, {
       params: { path },
