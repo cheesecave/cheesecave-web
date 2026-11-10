@@ -105,7 +105,14 @@ const defaultFence = md.renderer.rules.fence;
 md.renderer.rules.fence = (tokens, idx, options, env, self) => {
   const token = tokens[idx];
   const lang = (token.info || "").trim().split(/\s+/)[0];
-  if (lang === "mermaid") return defaultFence(tokens, idx, options, env, self);
+  if (lang === "mermaid") {
+    const html = defaultFence(tokens, idx, options, env, self);
+    // Changing from a normal diagram to controlled content must also replace
+    // any previously inserted Mermaid SVG, even when the source is identical.
+    return env.controlledResources
+      ? html.replace("<pre>", '<pre data-controlled-diagram="true">')
+      : html;
+  }
   const escape = md.utils.escapeHtml;
   const body =
     options.highlight(token.content, lang, "") || escape(token.content);
@@ -125,6 +132,108 @@ md.core.ruler.push("heading_offset", (state) => {
       token.tag = `h${Math.min(6, Number(token.tag[1]) + offset)}`;
   }
 });
+
+// Controlled previews use this same parser and plugin pipeline. Resource URLs
+// are replaced at token-render time, before DOMParser or v-html can load them.
+export function controlledRelativePath(value, filePath = "README.md") {
+  if (typeof value !== "string" || value.length > 2048) return null;
+  try {
+    value = decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+  if (
+    !value ||
+    /^[\\/]|^[a-z][a-z0-9+.-]*:|[\\\u0000-\u001f\u007f]/i.test(value)
+  )
+    return null;
+  value = value.split(/[?#]/)[0];
+  if (!value) return null;
+  const parts = filePath.split("/").slice(0, -1);
+  for (const part of value.split("/")) {
+    if (!part || part === ".") continue;
+    if (part === "..") {
+      if (!parts.length) return null;
+      parts.pop();
+    } else parts.push(part);
+  }
+  return parts.length ? parts.join("/") : null;
+}
+const ordinaryImage = md.renderer.rules.image;
+const ordinaryLink = md.renderer.rules.link_open;
+const ordinaryInlineHTML = md.renderer.rules.html_inline;
+const ordinaryBlockHTML = md.renderer.rules.html_block;
+md.renderer.rules.html_inline = (tokens, index, options, env, self) =>
+  env.controlledResources &&
+  !tokens[index].meta?.taskList &&
+  tokens[index].content !== LINK_ICON
+    ? ""
+    : ordinaryInlineHTML(tokens, index, options, env, self);
+md.renderer.rules.html_block = (tokens, index, options, env, self) =>
+  env.controlledResources
+    ? ""
+    : ordinaryBlockHTML(tokens, index, options, env, self);
+md.renderer.rules.image = (tokens, index, options, env, self) => {
+  if (!env.controlledResources)
+    return ordinaryImage(tokens, index, options, env, self);
+  const token = tokens[index];
+  const alt = md.utils.escapeHtml(token.content);
+  const path = controlledRelativePath(
+    token.attrGet("src"),
+    env.controlledResources.filePath,
+  );
+  return path
+    ? `<span data-guest-image="${md.utils.escapeHtml(path)}" data-image-alt="${alt}">${alt}</span>`
+    : alt;
+};
+md.renderer.rules.link_open = (tokens, index, options, env, self) => {
+  if (!env.controlledResources)
+    return ordinaryLink
+      ? ordinaryLink(tokens, index, options, env, self)
+      : self.renderToken(tokens, index, options);
+  const token = tokens[index],
+    href = token.attrGet("href") || "";
+  const path = controlledRelativePath(href, env.controlledResources.filePath);
+  const repo = env.repoContext;
+  const presentation = (token.attrs || []).filter(([key]) =>
+    ["class", "aria-label", "tabindex"].includes(key),
+  );
+  if (path && repo) {
+    const url = `/${repo.repoType}s/${encodeURIComponent(repo.namespace)}/${encodeURIComponent(repo.name)}/blob/main/${path.split("/").map(encodeURIComponent).join("/")}`;
+    token.attrs = [...presentation, ["href", url], ["data-guest-path", path]];
+  } else {
+    let allowed = /^#[^\s]*$/.test(href);
+    if (/^https?:\/\//i.test(href)) {
+      try {
+        const url = new URL(href);
+        allowed =
+          url.origin !== window.location.origin &&
+          !/\/(?:resolve|api)\//i.test(url.pathname);
+      } catch {
+        /* Invalid links remain text. */
+      }
+    }
+    if (allowed)
+      token.attrs = [
+        ...presentation,
+        ["href", href],
+        ["rel", "noopener noreferrer"],
+      ];
+    else {
+      token.tag = "span";
+      token.attrs = [];
+      let depth = 1;
+      for (let offset = index + 1; offset < tokens.length; offset++) {
+        depth += tokens[offset].nesting;
+        if (!depth) {
+          tokens[offset].tag = "span";
+          break;
+        }
+      }
+    }
+  }
+  return self.renderToken(tokens, index, options);
+};
 
 /**
  * Add support for GitHub-style task lists
@@ -148,6 +257,7 @@ md.core.ruler.after("inline", "task-lists", function (state) {
       // Create checkbox element
       const isChecked = match[1].toLowerCase() === "x";
       const checkbox = new state.Token("html_inline", "", 0);
+      checkbox.meta = { taskList: true };
       checkbox.content = `<input type="checkbox" disabled ${isChecked ? "checked" : ""} class="task-list-checkbox"> `;
 
       // Create remaining text
@@ -292,16 +402,21 @@ export function renderMarkdown(markdown, options = {}) {
     stripFrontmatter = false,
     repoContext = null,
     headingOffset = 0,
+    controlledResources = null,
   } = options;
 
   try {
     // Strip YAML frontmatter if requested
     let content = stripFrontmatter ? stripYAMLFrontmatter(markdown) : markdown;
 
-    let rawHTML = md.render(content, { headingOffset });
+    let rawHTML = md.render(content, {
+      headingOffset,
+      controlledResources,
+      repoContext,
+    });
 
     // Resolve relative image paths if repo context provided
-    if (repoContext) {
+    if (repoContext && !controlledResources) {
       rawHTML = resolveImagePaths(rawHTML, repoContext);
     }
 

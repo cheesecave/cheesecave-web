@@ -5,7 +5,10 @@ const mocks = vi.hoisted(() => ({
   guestPreview: vi.fn(),
   loadStyle: vi.fn(),
   style: null,
+  openFile: vi.fn(),
+  denied: vi.fn(),
 }));
+vi.mock("@/stores/theme", () => ({ useThemeStore: () => ({ isDark: false }) }));
 vi.mock("@/stores/markdownStyle", () => ({
   useMarkdownStyleStore: () => mocks.style,
 }));
@@ -14,16 +17,33 @@ vi.mock("@/markdown-styles/registry", async (importOriginal) => ({
   loadMarkdownStyle: mocks.loadStyle,
 }));
 vi.mock("@/utils/api", () => ({ repositoryAccessAPI: mocks }));
-import Markdown from "@/components/repo/GuestMarkdownPreview.vue";
+import Markdown from "@/components/common/MarkdownViewer.vue";
 const repo = { type: "model", namespace: "owner", name: "demo" };
 const wrappers = [];
+const sourceFor = (repository = repo) => ({
+  loadThumbnail: (path) => mocks.guestPreview(repository, path),
+  openFile: mocks.openFile,
+  onAccessDenied: mocks.denied,
+});
 const mountMarkdown = (props = {}) => {
+  const repository = props.repository || repo;
   const wrapper = mount(Markdown, {
-    props: { repository: repo, source: "# Card", ...props },
+    props: {
+      content: props.source ?? "# Card",
+      filePath: props.path ?? "README.md",
+      repoType: repository.type,
+      namespace: repository.namespace,
+      name: repository.name,
+      branch: "main",
+      headingOffset: 1,
+      stripFrontmatter: false,
+      controlledSource: sourceFor(repository),
+    },
   });
   wrappers.push(wrapper);
   return wrapper;
 };
+
 describe("controlled guest Markdown resources", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -70,7 +90,7 @@ describe("controlled guest Markdown resources", () => {
       "/models/owner/demo/blob/main/config.json",
     );
     await link.trigger("click");
-    expect(wrapper.emitted("open-file")).toEqual([["config.json"]]);
+    expect(mocks.openFile).toHaveBeenCalledExactlyOnceWith("config.json");
     expect(wrapper.html()).not.toContain("/resolve/");
   });
   it("caps unique thumbnails and concurrent image requests", async () => {
@@ -114,8 +134,9 @@ describe("controlled guest Markdown resources", () => {
     );
     const wrapper = mountMarkdown({ source: "![old](old.png)" });
     await wrapper.setProps({
-      repository: { ...repo, name: "other" },
-      source: "# Other",
+      name: "other",
+      controlledSource: sourceFor({ ...repo, name: "other" }),
+      content: "# Other",
     });
     complete({
       data: { kind: "image", data_url: "data:image/png;base64,AA==" },
@@ -125,7 +146,7 @@ describe("controlled guest Markdown resources", () => {
     mocks.guestPreview.mockResolvedValueOnce({
       data: { kind: "image", data_url: "https://storage.invalid/raw.png" },
     });
-    await wrapper.setProps({ source: "![new](new.png)" });
+    await wrapper.setProps({ content: "![new](new.png)" });
     await flushPromises();
     expect(wrapper.find("img").exists()).toBe(false);
   });
@@ -133,7 +154,7 @@ describe("controlled guest Markdown resources", () => {
     mocks.guestPreview.mockRejectedValueOnce({ response: { status: 403 } });
     const wrapper = mountMarkdown({ source: "![private](private.png)" });
     await flushPromises();
-    expect(wrapper.emitted("access-denied")).toHaveLength(1);
+    expect(mocks.denied).toHaveBeenCalledOnce();
     expect(wrapper.find("img").exists()).toBe(false);
   });
   it("applies the ordinary selected Markdown theme and waits for its stylesheet", async () => {
