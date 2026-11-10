@@ -1,3 +1,4 @@
+import { tarEntryMode, withRetry } from "@/utils/tar-entry";
 // src/kohaku-hub-ui/src/utils/indexed-tar.js
 //
 // Pure-client reader for the hfutils.index sidecar format. Mirrors the
@@ -356,22 +357,34 @@ export async function extractMemberBytes(tarUrl, info, options = {}) {
   // Same credentials story as parseTarIndex above: send the session
   // cookie on the same-origin /resolve/ hop, drop it on the cross-origin
   // redirect to the presigned tar URL.
-  const response = await fetch(tarUrl, {
-    headers: { Range: buildMemberRangeHeader(info) },
-    signal,
-    mode: "cors",
-    credentials: "same-origin",
+  const readOnce = async () => {
+    const response = await fetch(tarUrl, {
+      headers: { Range: buildMemberRangeHeader(info) },
+      signal,
+      mode: "cors",
+      credentials: "same-origin",
+    });
+    if (response.status !== 200 && response.status !== 206) {
+      throw await IndexedTarFetchError.fromResponse(response, "tar member");
+    }
+    const buf = new Uint8Array(await response.arrayBuffer());
+    if (buf.length !== info.size) {
+      throw new IndexedTarFetchError(
+        `Tar member range read returned ${buf.length} bytes, expected ${info.size}`,
+      );
+    }
+    return buf;
+  };
+  // Prototype (?tarentry=new): a failed fetch to the storage host (the browser reports a dropped connection,
+  // a reset, or a storage error answer without CORS headers all as the same TypeError) is retried twice.
+  if (tarEntryMode() !== "new") return readOnce();
+  return withRetry(readOnce, {
+    isTransient: (err) =>
+      !signal?.aborted &&
+      (err instanceof TypeError ||
+        (err instanceof IndexedTarFetchError &&
+          (err.status === 429 || err.status >= 500))),
   });
-  if (response.status !== 200 && response.status !== 206) {
-    throw await IndexedTarFetchError.fromResponse(response, "tar member");
-  }
-  const buf = new Uint8Array(await response.arrayBuffer());
-  if (buf.length !== info.size) {
-    throw new IndexedTarFetchError(
-      `Tar member range read returned ${buf.length} bytes, expected ${info.size}`,
-    );
-  }
-  return buf;
 }
 
 /**
