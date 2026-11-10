@@ -156,7 +156,7 @@ describe("restricted repository pages share the normal repository header", () =>
       ).toBeNull();
       await wrapper
         .findAll("button")
-        .find((button) => button.text() === "Repository invitation")
+        .find((button) => button.text() === "Have an Invitation?")
         .trigger("click");
       expect(
         query(wrapper).getByRole("button", { name: "Bind to my account" }),
