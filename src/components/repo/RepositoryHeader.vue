@@ -11,6 +11,7 @@ const props = defineProps({
   name: { type: String, required: true },
   namespaceLink: { type: String, required: true },
   repoInfo: { type: Object, default: null },
+  visibility: { type: String, default: null },
   signedIn: { type: Boolean, default: false },
   isOwner: { type: Boolean, default: false },
   liked: { type: Boolean, default: false },
@@ -21,7 +22,9 @@ const props = defineProps({
 });
 const access = inject("repositoryAccess", ref(null));
 const visibilityLabel = computed(() =>
-  access.value?.visibility === "invite" ? "Invite" : "Private",
+  (props.visibility || access.value?.visibility) === "invite"
+    ? "Invite"
+    : "Private",
 );
 defineEmits(["copy", "clone", "download", "like"]);
 const repoPath = computed(
@@ -35,9 +38,7 @@ const sourceUrl = computed(() =>
       )
     : null,
 );
-const typeLabel = computed(() =>
-  props.repoType === "model" ? "Model" : "Dataset",
-);
+const typeLabel = computed(() => getRepositoryType(props.repoType).label);
 const typeIcon = computed(() => getRepositoryType(props.repoType).icon);
 const tabIcons = {
   card: "i-carbon-document",
@@ -70,9 +71,9 @@ const tabIcons = {
                 name
               }}</RouterLink>
             </h1>
-            <template v-if="repoInfo">
+            <template v-if="repoInfo || visibility">
               <span
-                v-if="repoInfo.private"
+                v-if="repoInfo?.private || visibility"
                 class="repository-visibility"
                 :aria-label="`${visibilityLabel} repository`"
               >
@@ -124,20 +125,22 @@ const tabIcons = {
           </div>
         </div>
         <div
-          v-if="repoInfo"
+          v-if="repoInfo || $slots.actions"
           class="repository-actions"
           aria-label="Repository actions"
         >
-          <el-button @click="$emit('download')">
-            <span class="i-carbon-document-download" aria-hidden="true" />
-            Download
-          </el-button>
-          <LinkButton v-if="isOwner" :to="`${repoPath}/settings`">
-            <span class="i-carbon-settings" aria-hidden="true" /> Settings
-          </LinkButton>
-          <el-button type="primary" @click="$emit('clone')">
-            <span class="i-carbon-code" aria-hidden="true" /> Clone
-          </el-button>
+          <slot name="actions">
+            <el-button @click="$emit('download')">
+              <span class="i-carbon-document-download" aria-hidden="true" />
+              Download
+            </el-button>
+            <LinkButton v-if="isOwner" :to="`${repoPath}/settings`">
+              <span class="i-carbon-settings" aria-hidden="true" /> Settings
+            </LinkButton>
+            <el-button type="primary" @click="$emit('clone')">
+              <span class="i-carbon-code" aria-hidden="true" /> Clone
+            </el-button>
+          </slot>
         </div>
       </div>
       <div
