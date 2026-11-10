@@ -606,6 +606,10 @@ export function hasIndexSibling(tarPath, siblings) {
   if (dot < 0) return false;
   const base = tarPath.slice(0, dot);
   const wanted = `${base}.json`;
+  // A Set of file paths (built once per listing) answers in O(1); the
+  // entry-iterating path below is O(n) per call, which is O(n^2) when
+  // it runs for every row of a long list on every render.
+  if (siblings instanceof Set) return siblings.has(wanted);
   if (!siblings || typeof siblings[Symbol.iterator] !== "function")
     return false;
   for (const entry of siblings) {

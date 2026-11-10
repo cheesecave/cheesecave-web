@@ -1,11 +1,18 @@
 // Prototype (proto/indexed-tar-entry): how the pages decide that a .tar has an index sidecar, and how they probe for it.
 // `?tarentry=new` switches the whole prototype on; without it every page behaves exactly as `main` does.
 
+let modeSearch = null;
+let modeValue = "today";
 export function tarEntryMode() {
   try {
-    const q = new URLSearchParams(window.location.search).get("tarentry");
+    // Called per row of a long list: do the URL parse and the storage write once per query string.
+    const search = window.location.search;
+    if (search === modeSearch) return modeValue;
+    const q = new URLSearchParams(search).get("tarentry");
     if (q === "new" || q === "today") sessionStorage.setItem("tarentry", q);
-    return sessionStorage.getItem("tarentry") === "new" ? "new" : "today";
+    modeValue = sessionStorage.getItem("tarentry") === "new" ? "new" : "today";
+    modeSearch = search;
+    return modeValue;
   } catch {
     return "today";
   }

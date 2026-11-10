@@ -1166,6 +1166,16 @@ const repositorySize = computed(() => {
 });
 const currentBranch = ref(props.branch);
 const fileTree = ref([]);
+// Prototype (?tarentry=new): file paths of the loaded rows as a Set, so the
+// per-row sibling check is O(1) instead of a scan of every loaded row.
+const fileTreePathSet = computed(() => {
+  const set = new Set();
+  for (const e of fileTree.value) if (e && e.type !== "directory") set.add(e.path);
+  return set;
+});
+function siblingsForRows() {
+  return tarEntryMode() === "new" ? fileTreePathSet.value : fileTree.value;
+}
 const commits = ref([]);
 const commitsLoading = ref(false);
 const commitsHasMore = ref(false);
@@ -1257,7 +1267,7 @@ function previewIconClass(file) {
   if (isLaterZipVolume(file.path)) return "i-carbon-link opacity-60 scale-85";
   const kind = getPreviewKind(
     file.path,
-    fileTree.value,
+    siblingsForRows(),
     confirmedIndexedTars.value,
   );
   return PREVIEW_ICON_BY_KIND[kind] || "i-carbon-chart-line-data";
@@ -1266,7 +1276,7 @@ function previewIconClass(file) {
 function previewIconTitle(file) {
   const kind = getPreviewKind(
     file.path,
-    fileTree.value,
+    siblingsForRows(),
     confirmedIndexedTars.value,
   );
   if (kind === "indexed-tar") {
@@ -1283,7 +1293,7 @@ function previewIconTitle(file) {
 }
 
 function canPreviewFileRow(file) {
-  return canPreviewFile(file, fileTree.value, confirmedIndexedTars.value);
+  return canPreviewFile(file, siblingsForRows(), confirmedIndexedTars.value);
 }
 
 function buildResolveForPath(path) {
@@ -1300,7 +1310,7 @@ function buildResolveForPath(path) {
 function openFilePreview(file) {
   const kind = getPreviewKind(
     file.path,
-    fileTree.value,
+    siblingsForRows(),
     confirmedIndexedTars.value,
   );
   if (!kind) return;
@@ -1508,8 +1518,19 @@ function getEntryCommitTitle(file) {
   return file.lastCommit?.title || "-";
 }
 
+const relTimeMemo = new Map();
 function getEntryUpdatedAt(file) {
-  return formatRelativeTime(file.lastCommit?.date || file.lastModified, "-");
+  const value = file.lastCommit?.date || file.lastModified;
+  if (tarEntryMode() !== "new") return formatRelativeTime(value, "-");
+  // Prototype: the relative text of one timestamp is the same for every row
+  // and every render within a few seconds; compute it once.
+  const hit = relTimeMemo.get(value);
+  const now = Date.now();
+  if (hit && now - hit.at < 15000) return hit.text;
+  const text = formatRelativeTime(value, "-");
+  if (relTimeMemo.size > 2000) relTimeMemo.clear();
+  relTimeMemo.set(value, { at: now, text });
+  return text;
 }
 
 function getFileName(path) {
