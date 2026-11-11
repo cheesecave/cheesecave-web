@@ -1,3 +1,4 @@
+import { inZone } from "../helpers/zone";
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
@@ -656,5 +657,50 @@ describe("workspace sections", () => {
     expect(wrapper.emitted("update:type")[0]).toEqual(["space"]);
     await wrapper.get(".sidebar-state button").trigger("click");
     expect(wrapper.emitted("retry")).toHaveLength(1);
+  });
+});
+
+
+describe("WorkspaceActivityCard time", () => {
+  beforeEach(() => {
+    clearMissingEntityAvatars();
+    setActivePinia(createPinia());
+  });
+  const render = (component, props) =>
+    mount(component, {
+      props,
+      global: { stubs: { ...ElementPlusStubs, RouterLink: RouterLinkStub } },
+    });
+  it("reads created_at as UTC with or without a marker, in any browser zone", () => {
+    const item = {
+      id: "commit:2",
+      kind: "commit",
+      actor: { username: "alice", full_name: "Alice", is_org: false },
+      namespace: { username: "alice", is_org: false },
+      repository: { id: "alice/p", type: "model", private: false },
+      commit: { sha: "abcdef123456", message: "m" },
+    };
+    for (const zone of ["Asia/Shanghai", "America/Los_Angeles"]) {
+      for (const created_at of ["2026-10-04T03:04:05Z", "2026-10-04T03:04:05"]) {
+        inZone(zone, () => {
+          const time = render(WorkspaceActivityCard, { item: { ...item, created_at } }).get("time");
+          expect(time.attributes("datetime"), `${zone} ${created_at}`).toBe("2026-10-04T03:04:05.000Z");
+          expect(time.attributes("title")).toBe("2026-10-04 03:04:05 UTC");
+        });
+      }
+    }
+  });
+
+  it("shows an unreadable created_at as an unknown time", () => {
+    const item = {
+      id: "commit:3",
+      kind: "commit",
+      created_at: "not a time",
+      actor: { username: "alice", full_name: "Alice", is_org: false },
+      namespace: { username: "alice", is_org: false },
+      repository: { id: "alice/p", type: "model", private: false },
+      commit: { sha: "abcdef123456", message: "m" },
+    };
+    expect(render(WorkspaceActivityCard, { item }).get("time").text()).toBe("Unknown time");
   });
 });

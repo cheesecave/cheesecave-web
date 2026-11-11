@@ -387,7 +387,7 @@ import { useRoute, useRouter } from "vue-router";
 import { orgAPI, invitationAPI, settingsAPI } from "@/utils/api";
 import { copyToClipboard } from "@/utils/clipboard";
 import { ElMessage, ElMessageBox } from "element-plus";
-import dayjs from "dayjs";
+import { formatServerDate } from "@/utils/datetime";
 import AvatarUpload from "@/components/profile/AvatarUpload.vue";
 
 const route = useRoute();
@@ -435,7 +435,7 @@ const hasGeneralChanges = computed(() => {
 });
 
 function formatDate(date) {
-  return dayjs(date).format("MMM D, YYYY");
+  return formatServerDate(date, "MMM D, YYYY");
 }
 
 function getRoleType(role) {
