@@ -3,7 +3,7 @@ import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import EntityAvatar from "@/components/common/EntityAvatar.vue";
 import { buildEntityProfilePath } from "@/utils/entity-avatar";
-import { formatRelativeTime } from "@/utils/datetime";
+import { formatRelativeTime, parseServerTime } from "@/utils/datetime";
 import { getRepositoryType } from "@/utils/repository-types";
 
 const props = defineProps({ item: { type: Object, required: true } });
@@ -40,13 +40,13 @@ const repositoryType = computed(
   () => getRepositoryType(props.item.repository.type).label,
 );
 const time = computed(() => {
-  const date = new Date(props.item.created_at);
-  if (Number.isNaN(date.getTime())) return { label: "Unknown time" };
+  const date = parseServerTime(props.item.created_at);
+  if (!date.isValid()) return { label: "Unknown time" };
   const iso = date.toISOString();
   return {
     iso,
     label: `${iso.slice(0, 19).replace("T", " ")} UTC`,
-    relative: formatRelativeTime(date),
+    relative: formatRelativeTime(date.toDate()),
   };
 });
 </script>

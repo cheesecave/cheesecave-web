@@ -1,66 +1,52 @@
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
 
 dayjs.extend(relativeTime);
 dayjs.extend(utc);
-dayjs.extend(timezone);
 
-let browserTimeZone = "UTC";
+// A time string that names its own zone: ends in Z or in an offset after a clock time.
+// (A date such as "2026-01-01" ends in "-01" but has no clock time, so it does not match.)
+const NAMES_ITS_ZONE =
+  /[T ]\d\d:\d\d(?::\d\d(?:[.,]\d+)?)?\s*(?:Z|[+-]\d\d(?::?\d\d)?)$/i;
 
-export function initializeBrowserTimezone() {
-  if (typeof Intl !== "undefined") {
-    browserTimeZone =
-      Intl.DateTimeFormat().resolvedOptions().timeZone ||
-      dayjs.tz.guess() ||
-      "UTC";
-  }
-
-  return browserTimeZone;
-}
-
-function parseBrowserTime(value) {
-  const timeZone = initializeBrowserTimezone();
-
-  if (typeof value === "number") {
-    return dayjs.unix(value).tz(timeZone);
-  }
-
-  if (value instanceof Date) {
-    return dayjs(value).tz(timeZone);
-  }
-
+/**
+ * Read a time the server sent, in the one way the server means it.
+ *
+ * - a string with `Z` or an offset is that instant;
+ * - a string with neither is **UTC**: the backend's database values are naive UTC and are sent without a
+ *   marker (invitations, tokens, organizations, ...);
+ * - a number is unix seconds, a `Date` is itself.
+ *
+ * There is no second reading: a time is never re-read as local time, and a time that is ahead of the
+ * browser's clock (the client's clock is a little behind) stays ahead of it.
+ *
+ * @returns a dayjs value in the viewer's zone (call `.isValid()` before using it)
+ */
+export function parseServerTime(value) {
+  if (value === undefined || value === null) return dayjs(null); // dayjs(undefined) would be "now"
+  if (typeof value === "number") return dayjs.unix(value);
+  if (value instanceof Date) return dayjs(value);
   if (typeof value === "string") {
-    if (value.endsWith("Z")) {
-      const utcParsed = dayjs(value).tz(timeZone);
-      const localParsed = dayjs.tz(value.slice(0, -1), timeZone);
-
-      if (
-        utcParsed.isValid() &&
-        localParsed.isValid() &&
-        utcParsed.isAfter(dayjs()) &&
-        !localParsed.isAfter(dayjs())
-      ) {
-        return localParsed;
-      }
-
-      if (utcParsed.isValid()) {
-        return utcParsed;
-      }
-    }
-
-    return dayjs.tz(value, timeZone);
+    const text = value.trim();
+    return NAMES_ITS_ZONE.test(text) ? dayjs(text) : dayjs.utc(text).local();
   }
-
-  return dayjs(value).tz(timeZone);
+  return dayjs(value);
 }
 
 export function formatRelativeTime(value, fallback = "never") {
   if (!value) return fallback;
 
-  const parsed = parseBrowserTime(value);
+  const parsed = parseServerTime(value);
   return parsed.isValid() ? parsed.fromNow() : fallback;
+}
+
+/** A server time as a calendar date or clock time of the viewer's zone, e.g. `formatServerDate(v, "MMM D, YYYY")`. */
+export function formatServerDate(value, format, fallback = "") {
+  if (!value) return fallback;
+
+  const parsed = parseServerTime(value);
+  return parsed.isValid() ? parsed.format(format) : fallback;
 }
 
 // A list of a thousand rows renders the same few timestamps again and again
@@ -87,6 +73,6 @@ export function formatRelativeTimeCached(value, fallback = "never") {
 export function formatUnixRelativeTime(value, fallback = "Unknown") {
   if (!value) return fallback;
 
-  const parsed = parseBrowserTime(value);
+  const parsed = parseServerTime(value);
   return parsed.isValid() ? parsed.fromNow() : fallback;
 }

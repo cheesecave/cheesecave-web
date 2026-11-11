@@ -1,3 +1,4 @@
+import { inZone } from "../helpers/zone";
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -121,5 +122,23 @@ describe("how often an invitation can be used", () => {
 
     expect(w.text().replace(/\s+/g, " ")).toContain("2 / 5");
     expect(w.find('[role="img"]').exists()).toBe(false);
+  });
+});
+
+
+describe("the expiry the invite page shows", () => {
+  it("is the viewer's own time: the server's naive values are UTC", async () => {
+    mocks.get.mockResolvedValue({ data: invitation });
+    const w = mountPage();
+    await flushPromises();
+    for (const [zone, text] of [
+      ["Asia/Shanghai", "Jan 2, 2026 at 4:00 AM"],
+      ["America/Los_Angeles", "Jan 1, 2026 at 12:00 PM"],
+    ]) {
+      inZone(zone, () => {
+        expect(w.vm.formatDate("2026-01-01T20:00:00"), zone).toBe(text); // no marker: UTC
+        expect(w.vm.formatDate("2026-01-01T20:00:00Z"), zone).toBe(text);
+      });
+    }
   });
 });

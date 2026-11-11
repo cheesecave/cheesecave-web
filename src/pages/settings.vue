@@ -351,7 +351,7 @@ import {
   removeExternalToken,
 } from "@/utils/externalTokens";
 import { ElMessage, ElMessageBox } from "element-plus";
-import dayjs from "dayjs";
+import { formatServerDate } from "@/utils/datetime";
 import AvatarUpload from "@/components/profile/AvatarUpload.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import { KIND, decodeError } from "@/errors";
@@ -417,7 +417,7 @@ const hasProfileChanges = computed(() => {
 });
 
 function formatDate(date) {
-  return dayjs(date).format("MMM D, YYYY");
+  return formatServerDate(date, "MMM D, YYYY");
 }
 
 async function loadTokens() {
