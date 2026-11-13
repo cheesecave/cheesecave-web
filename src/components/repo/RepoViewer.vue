@@ -561,7 +561,7 @@
       </main>
 
       <!-- Sidebar (Compact) -->
-      <aside class="space-y-4 lg:sticky lg:top-4 lg:self-start">
+      <aside class="repository-info-sidebar space-y-4 lg:sticky lg:self-start">
         <!-- Relationships (Author + Base Model + Datasets from YAML) -->
         <SidebarRelationshipsCard
           :namespace="namespace"
@@ -2310,6 +2310,9 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.repository-info-sidebar {
+  top: calc(var(--repository-sticky-offset, 0px) + 16px);
+}
 .repository-page {
   min-width: 0;
 }

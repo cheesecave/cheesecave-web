@@ -63,6 +63,8 @@ export function createPageScrollBehavior() {
     let resizeObserver;
     let observedWrap;
     let finished = false;
+    let lastHashTop;
+    let stableHashFrames = 0;
     const cleanup = () => {
       finished = true;
       clearTimeout(timeout);
@@ -105,18 +107,28 @@ export function createPageScrollBehavior() {
         }
         const margin =
           parseFloat(getComputedStyle(anchor).scrollMarginTop) || 0;
+        const padding =
+          parseFloat(getComputedStyle(wrap).scrollPaddingTop) || 0;
         top = Math.max(
           0,
           anchor.getBoundingClientRect().top -
             wrap.getBoundingClientRect().top +
             wrap.scrollTop -
-            margin,
+            margin -
+            padding,
         );
+        stableHashFrames = lastHashTop === top ? stableHashFrames + 1 : 0;
+        lastHashTop = top;
       }
       wrap.scrollTop = top;
       wrap.scrollLeft = saved?.left ?? 0;
       // Loading placeholders may not yet provide enough height to restore.
-      if (wrap.scrollHeight - wrap.clientHeight >= top - 1) cleanup();
+      if (wrap.scrollHeight - wrap.clientHeight >= top - 1) {
+        // Scrolling to a hash can reveal the compact header on the next paint.
+        // Let its measured padding settle before releasing the anchor position.
+        if (!saved && to.hash && stableHashFrames < 2) schedule();
+        else cleanup();
+      }
     };
     const schedule = () => {
       if (!finished && frame === undefined)
