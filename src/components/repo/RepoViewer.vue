@@ -49,8 +49,17 @@
         :retry="loadRepoInfo"
         mode="inline-panel"
       />
+      <ErrorState
+        v-if="detailView === 'settings' && !canManageSettings && !error"
+        :error="settingsPermissionError"
+        :context="errorContext('repository settings')"
+        mode="inline-panel"
+      />
       <component
-        v-if="detailActive"
+        v-if="
+          detailActive &&
+          (detailView !== 'settings' || (canManageSettings && !error))
+        "
         :is="detailComponent"
         :key="detailKey"
         :embedded="isCompositeHeader"
@@ -247,16 +256,6 @@
               Download
             </el-button>
             <div class="w-0 h-0 p-0 m-0"></div>
-            <LinkButton
-              v-if="isOwner"
-              :to="`/${repoType}s/${namespace}/${name}/settings`"
-              size="small"
-              class="w-full sm:w-auto m-0 sm:m-1"
-              plain
-            >
-              <div class="i-carbon-settings inline-block mr-1" />
-              Settings
-            </LinkButton>
           </div>
         </div>
 
@@ -583,7 +582,7 @@
               <span class="text-gray-600 dark:text-gray-400">Type:</span>
               <span class="ml-2 font-medium">{{ repoTypeLabel }}</span>
             </div>
-            <div v-if="isCompositeHeader && repoInfo">
+            <div v-if="isCompositeHeader && repoType !== 'space' && repoInfo">
               <span class="text-gray-600 dark:text-gray-400">Downloads:</span>
               <span class="ml-2">{{ repoInfo.downloads || 0 }}</span>
             </div>
@@ -851,6 +850,9 @@ const detailComponents = {
         "../../pages/[type]s/[namespace]/[name]/blob/[branch]/[...file].vue"
       ),
   ),
+  settings: defineAsyncComponent(
+    () => import("../../pages/[type]s/[namespace]/[name]/settings.vue"),
+  ),
   commit: defineAsyncComponent(
     () =>
       import("../../pages/[type]s/[namespace]/[name]/commit/[commit_id].vue"),
@@ -1071,7 +1073,7 @@ const PATHS_INFO_BATCH_SIZE = 1000;
 // Computed
 const activeTab = computed(() => props.tab);
 const isCompositeHeader = computed(() =>
-  ["model", "dataset"].includes(props.repoType),
+  ["model", "dataset", "space"].includes(props.repoType),
 );
 
 const repoTypeLabel = computed(() => {
@@ -1081,6 +1083,23 @@ const repoTypeLabel = computed(() => {
 
 const isOwner = computed(() => {
   return authStore.canWriteToNamespace(props.namespace);
+});
+
+// Browser access state is authoritative for repository management. A single
+// read grant must never turn a namespace or repository into a settings owner.
+const canManageSettings = computed(
+  () =>
+    authStore.isAuthenticated &&
+    !isExternalRepo.value &&
+    (repositoryAccess.value
+      ? repositoryAccess.value.can_manage === true
+      : isOwner.value),
+);
+const settingsPermissionError = decodeError({
+  response: {
+    status: 403,
+    data: { detail: "Repository settings require management access" },
+  },
 });
 
 const isNamespaceOrg = ref(false);
@@ -1258,6 +1277,8 @@ function tabTarget(tab) {
       return `${page}/commits/${currentBranch.value}`;
     case "metadata":
       return `${page}?tab=metadata`;
+    case "settings":
+      return `${page}/settings`;
     default:
       return page;
   }
@@ -1283,6 +1304,7 @@ const repoTabs = computed(() => [
       : "",
   },
   { key: "metadata", label: "Metadata" },
+  ...(canManageSettings.value ? [{ key: "settings", label: "Settings" }] : []),
 ]);
 
 const headerTabs = computed(() =>
@@ -1405,7 +1427,10 @@ async function fetchRepoInfo({ signal }) {
 
   // Private model/dataset headers show visibility instead of a like control.
   let liked = null;
-  if (authStore.isAuthenticated && !(isCompositeHeader.value && data.private)) {
+  if (
+    authStore.isAuthenticated &&
+    !(isCompositeHeader.value && props.repoType !== "space" && data.private)
+  ) {
     try {
       const { data: likeData } = await likesAPI.checkLiked(
         props.repoType,
@@ -1424,7 +1449,8 @@ async function fetchRepoInfo({ signal }) {
 
   repoInfo.value = data;
   likesCount.value = data.likes || 0;
-  if (isCompositeHeader.value && data.private) isLiked.value = false;
+  if (isCompositeHeader.value && props.repoType !== "space" && data.private)
+    isLiked.value = false;
   else if (liked !== null) isLiked.value = liked;
 
   // Check if namespace is an org (for correct linking)
@@ -1445,6 +1471,22 @@ const error = computed(() =>
   repoInfoResource.failed.value ? repoInfoResource.error.value : null,
 );
 const loadRepoInfo = () => repoInfoResource.reload();
+
+// Settings reloads authoritative access after changing visibility. Refresh the
+// cached repository info too, so public controls and clone hints do not linger.
+watch(
+  () => repositoryAccess.value?.visibility,
+  (visibility, previous) => {
+    if (
+      visibility !== previous &&
+      ["public", "private", "invite"].includes(visibility) &&
+      repositoryAccess.value?.access === "full" &&
+      repoInfo.value
+    ) {
+      void loadRepoInfo();
+    }
+  },
+);
 
 // A cached (keep-alive) page that is hidden does not keep retrying in the
 // background; it checks again when it is shown, if it never got its answer.
@@ -1467,7 +1509,12 @@ onActivated(() => {
 });
 
 async function toggleLike() {
-  if (isCompositeHeader.value && repoInfo.value?.private) return;
+  if (
+    isCompositeHeader.value &&
+    props.repoType !== "space" &&
+    repoInfo.value?.private
+  )
+    return;
   if (!authStore.isAuthenticated) {
     ElMessage.warning("Please login to like repositories");
     return;

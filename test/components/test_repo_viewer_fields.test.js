@@ -142,8 +142,8 @@ describe("RepoViewer asks repo info for the fields of its kind", () => {
     );
     const w = mountViewer("space", "invite");
     await flushPromises();
-    expect(w.findAll("[data-el-tag]").map((tag) => tag.text())).toContain(
-      "Invite",
+    await vi.waitFor(() =>
+      expect(w.get(".repository-visibility").text()).toBe("Invite"),
     );
     w.unmount();
   });
