@@ -75,9 +75,9 @@
                   <el-button
                     v-if="!request.user_id && request.status === 'approved'"
                     :disabled="busy || loading"
-                    :aria-label="`Prepare invitation for ${applicant(request)}`"
+                    :aria-label="`Invite ${applicant(request)}`"
                     @click="issueForm.request_id = request.id"
-                    >Prepare invitation</el-button
+                    >Invite</el-button
                   >
                   <span
                     v-if="request.user_id && request.status !== 'pending'"

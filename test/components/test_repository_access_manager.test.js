@@ -125,7 +125,7 @@ describe("repository manager workflows", () => {
   });
   it("issues a code for an approved anonymous application only when requested", async () => {
     const w = await mountManager();
-    await button(w, "Prepare invitation").trigger("click");
+    await button(w, "Invite").trigger("click");
     await button(w, "Create repository code").trigger("click");
     await flushPromises();
     expect(api.issue).toHaveBeenCalledWith(

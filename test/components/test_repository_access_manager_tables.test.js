@@ -190,7 +190,7 @@ describe("repository access management tables", () => {
     await flushPromises();
     await button(
       rowWith(namedTable(w, "Applications"), "reviewer@example.com"),
-      "Prepare invitation",
+      "Invite",
     ).trigger("click");
     expect(w.text()).toContain("For anonymous application #12");
     await button(w, "Create repository code").trigger("click");
