@@ -27,6 +27,7 @@
       :aria-labelledby="`repository-settings-${activeTab}`"
     >
       <h2
+        v-if="activeTab !== 'access'"
         :id="`repository-settings-${activeTab}`"
         class="repository-settings-heading"
       >
@@ -558,7 +559,16 @@
             namespace: route.params.namespace,
             name: route.params.name,
           }"
-        />
+        >
+          <template #heading>
+            <h2
+              id="repository-settings-access"
+              class="repository-settings-heading is-inline"
+            >
+              Repository access
+            </h2>
+          </template>
+        </RepositoryAccessManager>
       </section>
     </div>
   </section>
@@ -1290,6 +1300,11 @@ onMounted(() => {
   font-size: 24px;
   font-weight: 600;
   line-height: 1.3;
+}
+.repository-settings-heading.is-inline {
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 .settings-form-sections {
   max-width: 900px;

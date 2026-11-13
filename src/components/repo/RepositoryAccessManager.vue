@@ -1,7 +1,12 @@
 <template>
   <section class="repository-access-settings" :aria-busy="loading || busy">
     <header class="access-page-heading" aria-label="Access record actions">
-      <el-button :loading="loading" :disabled="busy" @click="load"
+      <slot name="heading" />
+      <el-button
+        class="access-refresh"
+        :loading="loading"
+        :disabled="busy"
+        @click="load"
         >Refresh</el-button
       >
     </header>
@@ -633,7 +638,12 @@ onBeforeUnmount(() => {
 }
 
 .access-page-heading {
-  justify-content: flex-end;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--site-border);
+}
+.access-refresh {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 .access-panel {
   min-width: 0;
