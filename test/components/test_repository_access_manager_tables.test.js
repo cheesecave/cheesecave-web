@@ -10,6 +10,11 @@ const api = vi.hoisted(() => ({
   revokeGrant: vi.fn(),
   revokeGuest: vi.fn(),
 }));
+const confirm = vi.hoisted(() => vi.fn());
+vi.mock("element-plus", async (importOriginal) => ({
+  ...(await importOriginal()),
+  ElMessageBox: { confirm },
+}));
 vi.mock("@/utils/api", () => ({ repositoryAccessAPI: api }));
 import Manager from "@/components/repo/RepositoryAccessManager.vue";
 const repository = { type: "dataset", namespace: "owner", name: "data" };
@@ -79,9 +84,19 @@ const namedTable = (w, name) => w.get(`table[aria-label="${name}"]`);
 const rowWith = (table, text) =>
   table.findAll("tbody tr").find((row) => row.text().includes(text));
 const button = (w, text) => w.findAll("button").find((b) => b.text() === text);
+const respond =
+  (data) =>
+  (_target, { section }) =>
+    Promise.resolve({
+      data: {
+        [section]: data[section] || [],
+        totals: { [section]: data[section]?.length || 0 },
+      },
+    });
 beforeEach(() => {
   vi.clearAllMocks();
-  api.manage.mockResolvedValue({ data: records() });
+  confirm.mockResolvedValue("confirm");
+  api.manage.mockImplementation(respond(records()));
   for (const key of [
     "review",
     "grant",
@@ -93,14 +108,13 @@ beforeEach(() => {
   api.issue.mockResolvedValue({ data: { token: "repo_test_once" } });
 });
 describe("repository access management tables", () => {
-  it("separates all five collections into named semantic tables with scoped scrolling", async () => {
+  it("shows four named tables without visitor sessions or redundant grant controls", async () => {
     const w = mountManager();
     await flushPromises();
     for (const name of [
       "Applications",
       "Repository codes",
       "Account grants",
-      "Visitor sessions",
       "Audit log",
     ]) {
       const table = namedTable(w, name);
@@ -109,16 +123,19 @@ describe("repository access management tables", () => {
         table.element.parentElement.classList.contains("access-table-scroll"),
       ).toBe(true);
     }
-    expect(w.findAll("table")).toHaveLength(5);
+    expect(w.findAll("table")).toHaveLength(4);
+    expect(w.text()).not.toContain("Visitor sessions");
+    expect(w.text()).not.toContain("Read-only");
+    expect(w.text()).not.toContain("Grant read access");
+    expect(w.find('[aria-label="Grant account username"]').exists()).toBe(
+      false,
+    );
     expect(
       namedTable(w, "Repository codes")
         .findAll("th")
         .map((c) => c.text()),
     ).toEqual(["Code", "Status", "Redeem by", "Visitor lifetime", "Actions"]);
     expect(namedTable(w, "Audit log").text()).toContain("guest_session_issued");
-    expect(namedTable(w, "Visitor sessions").text()).not.toContain(
-      "guest_session_issued",
-    );
     w.unmount();
   });
   it("shows used legacy codes without separate usage quotas and retains grant states", async () => {
@@ -160,14 +177,13 @@ describe("repository access management tables", () => {
           ...state,
         },
       ];
-      api.manage.mockResolvedValueOnce({ data });
+      api.manage.mockImplementation(respond(data));
       const w = mountManager();
       await flushPromises();
       expect(
         namedTable(w, "Repository codes").get(".access-status").text(),
       ).toBe(status);
       expect(namedTable(w, "Account grants").text()).not.toContain("Used");
-      expect(namedTable(w, "Visitor sessions").text()).not.toContain("Used");
       w.unmount();
     },
   );
@@ -203,7 +219,7 @@ describe("repository access management tables", () => {
     await flushPromises();
     await button(
       rowWith(namedTable(w, "Applications"), "reader"),
-      "Approve",
+      "Invite",
     ).trigger("click");
     await flushPromises();
     expect(api.review).toHaveBeenLastCalledWith(repository, 11, {
@@ -222,12 +238,7 @@ describe("repository access management tables", () => {
     ).trigger("click");
     await flushPromises();
     expect(api.revokeGrant).toHaveBeenLastCalledWith(repository, 31);
-    await button(
-      rowWith(namedTable(w, "Visitor sessions"), "#41"),
-      "Revoke",
-    ).trigger("click");
-    await flushPromises();
-    expect(api.revokeGuest).toHaveBeenLastCalledWith(repository, 41);
+    expect(api.revokeGuest).not.toHaveBeenCalled();
     expect(
       rowWith(namedTable(w, "Repository codes"), "Second code")
         .find("button")
@@ -257,14 +268,13 @@ describe("repository access management tables", () => {
     w.unmount();
   });
   it("represents each empty collection with a table row rather than a loose paragraph", async () => {
-    api.manage.mockResolvedValueOnce({ data: {} });
+    api.manage.mockImplementation(respond({}));
     const w = mountManager();
     await flushPromises();
     for (const name of [
       "Applications",
       "Repository codes",
       "Account grants",
-      "Visitor sessions",
       "Audit log",
     ]) {
       const table = namedTable(w, name);
@@ -273,21 +283,21 @@ describe("repository access management tables", () => {
         String(table.findAll("th").length),
       );
     }
-    expect(w.text()).toContain("No visitor sessions.");
     expect(w.text()).toContain("No audit events.");
     w.unmount();
   });
   it("distinguishes initial loading from empty collections and clears stale loading", async () => {
     let finish;
-    api.manage.mockReturnValueOnce(
-      new Promise((resolve) => {
-        finish = resolve;
-      }),
-    );
+    api.manage.mockImplementation((target, { section }) => {
+      if (target.name === repository.name && section === "requests") {
+        return new Promise((resolve) => {
+          finish = resolve;
+        });
+      }
+      return respond(records())(target, { section });
+    });
     const w = mountManager();
-    expect(w.get('[role="status"]').text()).toContain(
-      "Loading repository access",
-    );
+    expect(namedTable(w, "Applications").text()).toContain("Loading…");
     expect(w.attributes("aria-busy")).toBe("true");
     expect(w.text()).not.toContain("No applications.");
     await w.setProps({ repository: { ...repository, name: "other" } });

@@ -1,20 +1,18 @@
 <template>
-  <section class="repository-access-settings" :aria-busy="loading || busy">
+  <section
+    class="repository-access-settings"
+    :aria-busy="loading || busy || confirming"
+  >
     <header class="access-page-heading" aria-label="Access record actions">
       <slot name="heading" />
       <el-button
         class="access-refresh"
         :loading="loading"
-        :disabled="busy"
+        :disabled="busy || confirming"
         @click="load"
         >Refresh</el-button
       >
     </header>
-    <p v-if="loading" class="access-loading" role="status">
-      Loading repository access…
-    </p>
-    <ErrorState v-if="error" :error="error" mode="inline-panel" :retry="load" />
-
     <section class="access-panel" aria-labelledby="access-applications-title">
       <div class="access-panel-heading">
         <h3 id="access-applications-title">Applications</h3>
@@ -38,10 +36,7 @@
           <tbody>
             <tr v-for="request in data.requests" :key="request.id">
               <td>
-                <span class="access-record-name">{{ applicant(request) }}</span
-                ><span class="access-secondary">{{
-                  request.user_id ? "Account" : "Email application"
-                }}</span>
+                <span class="access-record-name">{{ applicant(request) }}</span>
               </td>
               <td>
                 <span class="access-status" :data-status="request.status">{{
@@ -60,13 +55,22 @@
                 <div class="access-row-actions">
                   <template v-if="request.status === 'pending'">
                     <el-button
-                      :disabled="busy || loading"
+                      v-if="request.user_id"
+                      type="primary"
+                      :disabled="busy || loading || confirming"
+                      :aria-label="`Invite ${applicant(request)}`"
+                      @click="inviteAccount(request)"
+                      >Invite</el-button
+                    >
+                    <el-button
+                      v-else
+                      :disabled="busy || loading || confirming"
                       :aria-label="`Approve application from ${applicant(request)}`"
                       @click="review(request.id, true)"
                       >Approve</el-button
                     >
                     <el-button
-                      :disabled="busy || loading"
+                      :disabled="busy || loading || confirming"
                       :aria-label="`Reject application from ${applicant(request)}`"
                       @click="review(request.id, false)"
                       >Reject</el-button
@@ -75,7 +79,7 @@
                   <el-button
                     v-if="!request.user_id && request.status === 'approved'"
                     type="primary"
-                    :disabled="busy || loading"
+                    :disabled="busy || loading || confirming"
                     :aria-label="`Invite ${applicant(request)}`"
                     @click="openIssueDialog(request.id)"
                     >Invite</el-button
@@ -90,12 +94,31 @@
             </tr>
             <tr v-if="!data.requests.length">
               <td colspan="5" class="access-empty">
-                {{ loading ? "Loading…" : "No applications." }}
+                {{ pages.requests.loading ? "Loading…" : "No applications." }}
               </td>
             </tr>
           </tbody>
         </table>
       </div>
+      <footer class="access-pagination">
+        <ErrorState
+          v-if="pages.requests.error"
+          :error="pages.requests.error"
+          mode="inline-panel"
+          :retry="() => loadSection('requests', pages.requests.requestedPage)"
+        />
+        <el-pagination
+          aria-label="Applications pagination"
+          :current-page="pages.requests.page"
+          :page-size="pageSize"
+          :total="pages.requests.total"
+          :page-count="pageCount('requests')"
+          :pager-count="5"
+          :disabled="busy || confirming || pages.requests.loading"
+          layout="total, prev, pager, next, jumper"
+          @current-change="(page) => loadSection('requests', page)"
+        />
+      </footer>
     </section>
 
     <section class="access-panel" aria-labelledby="access-codes-title">
@@ -103,7 +126,7 @@
         <h3 id="access-codes-title">Repository codes</h3>
         <el-button
           type="primary"
-          :disabled="busy || loading"
+          :disabled="busy || loading || confirming"
           @click="openIssueDialog()"
         >
           Create code
@@ -131,7 +154,9 @@
                 <span class="access-record-name">{{
                   invitation.label || `Code #${invitation.id}`
                 }}</span
-                ><span class="access-secondary">#{{ invitation.id }}</span>
+                ><span v-if="invitation.label" class="access-secondary"
+                  >#{{ invitation.id }}</span
+                >
               </td>
               <td>
                 <span
@@ -152,7 +177,7 @@
                 <el-button
                   v-if="!invitation.revoked_at"
                   type="danger"
-                  :disabled="busy || loading"
+                  :disabled="busy || loading || confirming"
                   :aria-label="`Revoke code #${invitation.id}`"
                   @click="
                     perform((target) =>
@@ -168,18 +193,38 @@
             </tr>
             <tr v-if="!data.invitations.length">
               <td colspan="5" class="access-empty">
-                {{ loading ? "Loading…" : "No codes." }}
+                {{ pages.invitations.loading ? "Loading…" : "No codes." }}
               </td>
             </tr>
           </tbody>
         </table>
       </div>
+      <footer class="access-pagination">
+        <ErrorState
+          v-if="pages.invitations.error"
+          :error="pages.invitations.error"
+          mode="inline-panel"
+          :retry="
+            () => loadSection('invitations', pages.invitations.requestedPage)
+          "
+        />
+        <el-pagination
+          aria-label="Repository codes pagination"
+          :current-page="pages.invitations.page"
+          :page-size="pageSize"
+          :total="pages.invitations.total"
+          :page-count="pageCount('invitations')"
+          :pager-count="5"
+          :disabled="busy || confirming || pages.invitations.loading"
+          layout="total, prev, pager, next, jumper"
+          @current-change="(page) => loadSection('invitations', page)"
+        />
+      </footer>
     </section>
 
     <section class="access-panel" aria-labelledby="access-grants-title">
       <div class="access-panel-heading">
         <h3 id="access-grants-title">Account grants</h3>
-        <span class="access-muted">Read-only</span>
       </div>
       <div
         class="access-table-scroll"
@@ -232,7 +277,7 @@
                 <el-button
                   v-if="!item.revoked_at"
                   type="danger"
-                  :disabled="busy || loading"
+                  :disabled="busy || loading || confirming"
                   :aria-label="`Revoke account access for ${item.username || `account ${item.user_id}`}`"
                   @click="
                     perform((target) =>
@@ -245,105 +290,31 @@
             </tr>
             <tr v-if="!data.grants.length">
               <td colspan="5" class="access-empty">
-                {{ loading ? "Loading…" : "No account grants." }}
+                {{ pages.grants.loading ? "Loading…" : "No account grants." }}
               </td>
             </tr>
           </tbody>
         </table>
       </div>
-      <div class="access-form-panel">
-        <h4>Grant read access</h4>
-        <div class="access-form-grid">
-          <label
-            >Account<el-input
-              v-model="username"
-              placeholder="Account username"
-              aria-label="Grant account username"
-          /></label>
-          <label
-            >Grant expires (optional)<input
-              v-model="directExpiry"
-              type="datetime-local"
-              aria-label="Direct account grant expiry"
-          /></label>
-        </div>
-        <el-button
-          type="primary"
-          :loading="busy"
-          :disabled="loading"
-          @click="grant"
-          >Grant read access</el-button
-        >
-      </div>
-    </section>
-
-    <section class="access-panel" aria-labelledby="access-visitors-title">
-      <div class="access-panel-heading">
-        <h3 id="access-visitors-title">Visitor sessions</h3>
-      </div>
-      <div
-        class="access-table-scroll"
-        tabindex="0"
-        role="region"
-        aria-label="Visitor sessions table"
-      >
-        <table aria-label="Visitor sessions" class="access-table">
-          <thead>
-            <tr>
-              <th scope="col">Session</th>
-              <th scope="col">Status</th>
-              <th scope="col">Code</th>
-              <th scope="col">Created</th>
-              <th scope="col">Expires</th>
-              <th scope="col">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="guest in data.guests" :key="guest.id">
-              <td class="access-record-name">#{{ guest.id }}</td>
-              <td>
-                <span
-                  class="access-status"
-                  :data-status="lifecycleStatus(guest).toLowerCase()"
-                  >{{ lifecycleStatus(guest) }}</span
-                >
-              </td>
-              <td>
-                {{ guest.invite_id != null ? `#${guest.invite_id}` : "—" }}
-              </td>
-              <td>
-                <time :datetime="guest.created_at" :title="guest.created_at">{{
-                  dateLabel(guest.created_at)
-                }}</time>
-              </td>
-              <td>
-                <time :datetime="guest.expires_at" :title="guest.expires_at">{{
-                  dateLabel(guest.expires_at)
-                }}</time>
-              </td>
-              <td>
-                <el-button
-                  v-if="!guest.revoked_at"
-                  type="danger"
-                  :disabled="busy || loading"
-                  :aria-label="`Revoke visitor session #${guest.id}`"
-                  @click="
-                    perform((target) =>
-                      repositoryAccessAPI.revokeGuest(target, guest.id),
-                    )
-                  "
-                  >Revoke</el-button
-                ><span v-else class="access-muted">—</span>
-              </td>
-            </tr>
-            <tr v-if="!data.guests.length">
-              <td colspan="6" class="access-empty">
-                {{ loading ? "Loading…" : "No visitor sessions." }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <footer class="access-pagination">
+        <ErrorState
+          v-if="pages.grants.error"
+          :error="pages.grants.error"
+          mode="inline-panel"
+          :retry="() => loadSection('grants', pages.grants.requestedPage)"
+        />
+        <el-pagination
+          aria-label="Account grants pagination"
+          :current-page="pages.grants.page"
+          :page-size="pageSize"
+          :total="pages.grants.total"
+          :page-count="pageCount('grants')"
+          :pager-count="5"
+          :disabled="busy || confirming || pages.grants.loading"
+          layout="total, prev, pager, next, jumper"
+          @current-change="(page) => loadSection('grants', page)"
+        />
+      </footer>
     </section>
 
     <section class="access-panel" aria-labelledby="access-audit-title">
@@ -376,39 +347,32 @@
             </tr>
             <tr v-if="!data.events.length">
               <td colspan="3" class="access-empty">
-                {{ loading ? "Loading…" : "No audit events." }}
+                {{ pages.events.loading ? "Loading…" : "No audit events." }}
               </td>
             </tr>
           </tbody>
         </table>
       </div>
+      <footer class="access-pagination">
+        <ErrorState
+          v-if="pages.events.error"
+          :error="pages.events.error"
+          mode="inline-panel"
+          :retry="() => loadSection('events', pages.events.requestedPage)"
+        />
+        <el-pagination
+          aria-label="Audit log pagination"
+          :current-page="pages.events.page"
+          :page-size="pageSize"
+          :total="pages.events.total"
+          :page-count="pageCount('events')"
+          :pager-count="5"
+          :disabled="busy || confirming || pages.events.loading"
+          layout="total, prev, pager, next, jumper"
+          @current-change="(page) => loadSection('events', page)"
+        />
+      </footer>
     </section>
-    <footer class="access-pagination">
-      <p v-if="data.limit" class="access-muted">
-        Up to {{ data.limit }} records per table.
-      </p>
-      <div class="access-row-actions">
-        <el-button
-          v-if="offset > 0"
-          :disabled="busy || loading"
-          @click="
-            offset = Math.max(0, offset - 100);
-            load();
-          "
-          >Previous records</el-button
-        >
-        <el-button
-          v-if="Object.values(data.has_more || {}).some(Boolean)"
-          :disabled="busy || loading"
-          @click="
-            offset += 100;
-            load();
-          "
-          >More records</el-button
-        >
-      </div>
-    </footer>
-
     <el-dialog
       v-model="issueDialogOpen"
       title="Create repository code"
@@ -492,31 +456,46 @@
   </section>
 </template>
 <script setup>
-import { ref, watch, onBeforeUnmount } from "vue";
+import { computed, ref, watch, onBeforeUnmount } from "vue";
 import { formatRelativeTime } from "@/utils/datetime";
 import { repositoryAccessAPI } from "@/utils/api";
 import { copyToClipboard } from "@/utils/clipboard";
 import { decodeError, notifyError } from "@/errors";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import ErrorState from "@/components/common/ErrorState.vue";
 const props = defineProps({ repository: { type: Object, required: true } });
 const empty = () => ({
   requests: [],
   invitations: [],
   grants: [],
-  guests: [],
   events: [],
 });
+const sections = ["requests", "invitations", "grants", "events"];
+const pageSize = 20;
+const emptyPages = () =>
+  Object.fromEntries(
+    sections.map((key) => [
+      key,
+      {
+        page: 1,
+        requestedPage: 1,
+        total: 0,
+        loading: false,
+        error: null,
+        sequence: 0,
+      },
+    ]),
+  );
+const pages = ref(emptyPages());
 const data = ref(empty());
 const busy = ref(false);
-const loading = ref(false);
-const error = ref(null);
+const confirming = ref(false);
+const loading = computed(() =>
+  sections.some((key) => pages.value[key].loading),
+);
 const secret = ref("");
 const issueDialogOpen = ref(false);
-const username = ref("");
-const directExpiry = ref("");
 const grantExpiry = ref("");
-const offset = ref(0);
 const issueForm = ref({
   label: "",
   expires_days: 7,
@@ -555,26 +534,39 @@ function durationLabel(value) {
   return `${amount} ${unit}${amount === 1 ? "" : "s"}`;
 }
 let generation = 0;
-let loadSequence = 0;
-async function load() {
+const pageCount = (section) =>
+  Math.max(1, Math.ceil(pages.value[section].total / pageSize));
+async function loadSection(section, page = pages.value[section].page) {
+  const state = pages.value[section];
+  if (state.loading && state.requestedPage === page) return;
   const owner = generation;
-  const request = ++loadSequence;
+  const request = ++state.sequence;
   const target = { ...props.repository };
-  error.value = null;
-  loading.value = true;
+  state.requestedPage = page;
+  state.error = null;
+  state.loading = true;
   try {
     const response = await repositoryAccessAPI.manage(target, {
-      limit: 100,
-      offset: offset.value,
+      section,
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
     });
-    if (owner === generation && request === loadSequence)
-      data.value = { ...empty(), ...response.data };
+    if (owner !== generation || request !== state.sequence) return;
+    state.total = response.data.totals[section];
+    const lastPage = pageCount(section);
+    if (page > lastPage) return await loadSection(section, lastPage);
+    data.value[section] = response.data[section];
+    state.page = page;
   } catch (cause) {
-    if (owner === generation && request === loadSequence)
-      error.value = decodeError(cause);
+    if (owner === generation && request === state.sequence)
+      state.error = decodeError(cause);
   } finally {
-    if (owner === generation && request === loadSequence) loading.value = false;
+    if (owner === generation && request === state.sequence)
+      state.loading = false;
   }
+}
+async function load() {
+  await Promise.all(sections.map((section) => loadSection(section)));
 }
 async function perform(action) {
   if (busy.value) return;
@@ -593,8 +585,26 @@ async function perform(action) {
 }
 const review = (id, approve) =>
   perform((target) => repositoryAccessAPI.review(target, id, { approve }));
+async function inviteAccount(request) {
+  if (busy.value || loading.value || confirming.value) return;
+  const owner = generation;
+  confirming.value = true;
+  try {
+    await ElMessageBox.confirm(
+      `Grant ${applicant(request)} access to ${props.repository.namespace}/${props.repository.name}?`,
+      "Invite account",
+      { confirmButtonText: "Invite", cancelButtonText: "Cancel" },
+    );
+    if (owner === generation) await review(request.id, true);
+  } catch (cause) {
+    if (owner === generation && cause !== "cancel" && cause !== "close")
+      notifyError(cause, { fallback: "Repository access operation failed" });
+  } finally {
+    if (owner === generation) confirming.value = false;
+  }
+}
 function openIssueDialog(requestId = null) {
-  if (busy.value || loading.value) return;
+  if (busy.value || loading.value || confirming.value) return;
   secret.value = "";
   issueForm.value.request_id = requestId;
   issueDialogOpen.value = true;
@@ -618,29 +628,17 @@ async function issue() {
     if (owner === generation) secret.value = response.data.token;
   });
 }
-async function grant() {
-  if (!username.value.trim()) {
-    ElMessage.warning("Enter an account username");
-    return;
-  }
-  await perform((target) =>
-    repositoryAccessAPI.grant(target, {
-      username: username.value.trim(),
-      ...(directExpiry.value ? { expires_at: expiry(directExpiry.value) } : {}),
-    }),
-  );
-}
 watch(
   () => JSON.stringify(props.repository),
   () => {
     generation++;
     busy.value = false;
-    loading.value = false;
+    confirming.value = false;
+    pages.value = emptyPages();
     data.value = empty();
     issueDialogOpen.value = false;
     issueForm.value.request_id = null;
     secret.value = "";
-    offset.value = 0;
     load();
   },
   { immediate: true },
@@ -657,8 +655,7 @@ onBeforeUnmount(() => {
   gap: 24px;
 }
 .access-page-heading,
-.access-panel-heading,
-.access-pagination {
+.access-panel-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -778,14 +775,19 @@ onBeforeUnmount(() => {
 .access-event-action {
   font-family: ui-monospace, monospace;
 }
-.access-form-panel {
+.access-pagination {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  min-width: 0;
   border-top: 1px solid var(--site-border);
-  padding: 20px;
+  padding: 16px;
 }
-.access-form-panel h4 {
-  font-weight: 600;
-  margin: 0 0 16px;
-  font-size: 14px;
+.access-pagination :deep(.el-pagination) {
+  max-width: 100%;
+  flex-wrap: wrap;
+  row-gap: 8px;
 }
 .access-form-grid {
   display: grid;
@@ -848,23 +850,15 @@ onBeforeUnmount(() => {
   overflow-wrap: anywhere;
   user-select: all;
 }
-.access-muted,
-.access-loading {
+.access-muted {
   color: var(--site-muted);
   font-size: 13px;
-}
-.access-loading {
-  margin: 0;
-}
-.access-pagination p {
-  margin: 0;
 }
 @media (max-width: 640px) {
   .access-form-grid {
     grid-template-columns: minmax(0, 1fr);
   }
-  .access-panel-heading,
-  .access-form-panel {
+  .access-panel-heading {
     padding: 16px;
   }
   .access-pagination {
