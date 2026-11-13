@@ -9,11 +9,52 @@ const api = vi.hoisted(() => ({
   grant: vi.fn(),
   revokeGrant: vi.fn(),
 }));
+const confirm = vi.hoisted(() => vi.fn());
+vi.mock("element-plus", async (importOriginal) => ({
+  ...(await importOriginal()),
+  ElMessageBox: { confirm },
+}));
 vi.mock("@/utils/api", () => ({ repositoryAccessAPI: api }));
 import Manager from "@/components/repo/RepositoryAccessManager.vue";
 const repo = { type: "model", namespace: "owner", name: "demo" };
 const button = (w, text) => w.findAll("button").find((b) => b.text() === text);
+const respond =
+  (records) =>
+  (_target, { section }) =>
+    Promise.resolve({
+      data: {
+        [section]: records[section] || [],
+        totals: { [section]: records[section]?.length || 0 },
+      },
+    });
+const application = (w, text) =>
+  w
+    .get('table[aria-label="Applications"]')
+    .findAll("tbody tr")
+    .find((row) => row.text().includes(text));
 describe("repository manager workflows", () => {
+  it.each(["repository change", "unmount"])(
+    "does not grant after a pending confirmation and %s",
+    async (transition) => {
+      let finish;
+      confirm.mockReturnValueOnce(
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+      );
+      const w = await mountManager();
+      await button(application(w, "reader"), "Invite").trigger("click");
+      expect(api.review).not.toHaveBeenCalled();
+      if (transition === "repository change") {
+        await w.setProps({ repository: { ...repo, name: "other" } });
+        await flushPromises();
+      } else w.unmount();
+      finish();
+      await flushPromises();
+      expect(api.review).not.toHaveBeenCalled();
+      if (transition === "repository change") w.unmount();
+    },
+  );
   it("never shows a late issued secret under a different repository", async () => {
     let complete;
     api.issue.mockReturnValueOnce(
@@ -36,15 +77,17 @@ describe("repository manager workflows", () => {
   });
   it("ignores a late management response from the previous repository", async () => {
     let complete;
-    api.manage
-      .mockReturnValueOnce(
-        new Promise((resolve) => {
+    api.manage.mockImplementation((target, { section }) => {
+      if (target.name === repo.name && section === "invitations") {
+        return new Promise((resolve) => {
           complete = resolve;
-        }),
-      )
-      .mockResolvedValueOnce({
-        data: { invitations: [{ id: 20, label: "Next repository" }] },
-      });
+        });
+      }
+      return respond({ invitations: [{ id: 20, label: "Next repository" }] })(
+        target,
+        { section },
+      );
+    });
     const w = await mountManager();
     await w.setProps({ repository: { ...repo, name: "other" } });
     await flushPromises();
@@ -75,16 +118,16 @@ describe("repository manager workflows", () => {
     expect(instance.secret).toBe("");
   });
   it("labels expired codes and account grants as expired", async () => {
-    api.manage.mockResolvedValueOnce({
-      data: {
+    api.manage.mockImplementation(
+      respond({
         invitations: [
           { id: 8, label: "Old code", expires_at: "2020-01-01T00:00:00Z" },
         ],
         grants: [
           { id: 9, username: "Old reader", expires_at: "2020-01-01T00:00:00Z" },
         ],
-      },
-    });
+      }),
+    );
     const w = await mountManager();
     expect(w.text()).not.toContain("Read access");
     expect(w.text()).not.toContain("Active");
@@ -93,8 +136,9 @@ describe("repository manager workflows", () => {
   });
   beforeEach(() => {
     vi.clearAllMocks();
-    api.manage.mockResolvedValue({
-      data: {
+    confirm.mockResolvedValue("confirm");
+    api.manage.mockImplementation(
+      respond({
         requests: [
           { id: 1, username: "reader", status: "pending", user_id: 3 },
           { id: 2, email: "anon@example.com", status: "approved" },
@@ -103,8 +147,8 @@ describe("repository manager workflows", () => {
         grants: [{ id: 5, username: "reader", revoked_at: null }],
         guests: [],
         events: [],
-      },
-    });
+      }),
+    );
     api.review.mockResolvedValue({});
     api.issue.mockResolvedValue({
       data: { token: "repo_once", invitation: { id: 9 } },
@@ -123,15 +167,26 @@ describe("repository manager workflows", () => {
   };
   it("reviews an account request directly, and signs no invitation on approval", async () => {
     const w = await mountManager();
-    await button(w, "Approve").trigger("click");
+    await button(application(w, "reader"), "Invite").trigger("click");
     await flushPromises();
+    expect(confirm).toHaveBeenCalled();
     expect(api.review).toHaveBeenCalledWith(repo, 1, { approve: true });
+    expect(api.issue).not.toHaveBeenCalled();
+    w.unmount();
+  });
+  it("does not grant access when the Invite confirmation is cancelled", async () => {
+    confirm.mockRejectedValueOnce("cancel");
+    const w = await mountManager();
+    await button(application(w, "reader"), "Invite").trigger("click");
+    await flushPromises();
+    expect(confirm).toHaveBeenCalled();
+    expect(api.review).not.toHaveBeenCalled();
     expect(api.issue).not.toHaveBeenCalled();
     w.unmount();
   });
   it("issues a code for an approved anonymous application only when requested", async () => {
     const w = await mountManager();
-    await button(w, "Invite").trigger("click");
+    await button(application(w, "anon@example.com"), "Invite").trigger("click");
     if (!w.find("[data-el-dialog]").exists()) {
       await button(w, "Create code").trigger("click");
     }
