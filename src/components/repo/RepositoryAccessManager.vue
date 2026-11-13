@@ -74,6 +74,7 @@
                   </template>
                   <el-button
                     v-if="!request.user_id && request.status === 'approved'"
+                    type="primary"
                     :disabled="busy || loading"
                     :aria-label="`Invite ${applicant(request)}`"
                     @click="issueForm.request_id = request.id"
