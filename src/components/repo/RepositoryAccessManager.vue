@@ -428,7 +428,7 @@
       width="min(640px, calc(100vw - 32px))"
       append-to-body
       destroy-on-close
-      :close-on-click-modal="!busy"
+      :close-on-click-modal="false"
       :close-on-press-escape="!busy"
       :show-close="!busy"
       @close="secret = ''"
@@ -493,6 +493,7 @@
         <div class="access-secret-code">
           <code>{{ secret }}</code>
           <el-button
+            size="small"
             aria-label="Copy invitation code"
             title="Copy invitation code"
             @click="copySecret"
@@ -863,7 +864,7 @@ onBeforeUnmount(() => {
 }
 .access-secret-code {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   border: 1px solid var(--site-border);
   border-radius: 6px;
