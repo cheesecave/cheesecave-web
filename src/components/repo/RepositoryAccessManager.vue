@@ -157,6 +157,7 @@
               <td>
                 <el-button
                   v-if="!invitation.revoked_at"
+                  type="danger"
                   :disabled="busy || loading"
                   :aria-label="`Revoke code #${invitation.id}`"
                   @click="
@@ -167,7 +168,7 @@
                       ),
                     )
                   "
-                  >Revoke code</el-button
+                  >Revoke</el-button
                 ><span v-else class="access-muted">—</span>
               </td>
             </tr>
@@ -304,6 +305,7 @@
               <td>
                 <el-button
                   v-if="!item.revoked_at"
+                  type="danger"
                   :disabled="busy || loading"
                   :aria-label="`Revoke account access for ${item.username || `account ${item.user_id}`}`"
                   @click="
@@ -311,7 +313,7 @@
                       repositoryAccessAPI.revokeGrant(target, item.id),
                     )
                   "
-                  >Revoke account access</el-button
+                  >Revoke</el-button
                 ><span v-else class="access-muted">—</span>
               </td>
             </tr>
@@ -396,6 +398,7 @@
               <td>
                 <el-button
                   v-if="!guest.revoked_at"
+                  type="danger"
                   :disabled="busy || loading"
                   :aria-label="`Revoke visitor session #${guest.id}`"
                   @click="
@@ -403,7 +406,7 @@
                       repositoryAccessAPI.revokeGuest(target, guest.id),
                     )
                   "
-                  >Revoke visitor session</el-button
+                  >Revoke</el-button
                 ><span v-else class="access-muted">—</span>
               </td>
             </tr>

@@ -161,20 +161,20 @@ describe("repository access management tables", () => {
     });
     await button(
       rowWith(namedTable(w, "Repository codes"), "First code"),
-      "Revoke code",
+      "Revoke",
     ).trigger("click");
     await flushPromises();
     expect(api.revokeInvitation).toHaveBeenLastCalledWith(repository, 21);
     expect(api.revokeGrant).not.toHaveBeenCalled();
     await button(
       rowWith(namedTable(w, "Account grants"), "approved-reader"),
-      "Revoke account access",
+      "Revoke",
     ).trigger("click");
     await flushPromises();
     expect(api.revokeGrant).toHaveBeenLastCalledWith(repository, 31);
     await button(
       rowWith(namedTable(w, "Visitor sessions"), "#41"),
-      "Revoke visitor session",
+      "Revoke",
     ).trigger("click");
     await flushPromises();
     expect(api.revokeGuest).toHaveBeenLastCalledWith(repository, 41);
