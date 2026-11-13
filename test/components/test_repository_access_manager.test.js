@@ -22,6 +22,9 @@ describe("repository manager workflows", () => {
       }),
     );
     const w = await mountManager();
+    if (!w.find("[data-el-dialog]").exists()) {
+      await button(w, "Create code").trigger("click");
+    }
     await button(w, "Create repository code").trigger("click");
     await w.setProps({ repository: { ...repo, name: "other" } });
     await flushPromises();
@@ -61,6 +64,9 @@ describe("repository manager workflows", () => {
       }),
     );
     const w = await mountManager();
+    if (!w.find("[data-el-dialog]").exists()) {
+      await button(w, "Create code").trigger("click");
+    }
     await button(w, "Create repository code").trigger("click");
     const instance = w.vm;
     w.unmount();
@@ -126,6 +132,9 @@ describe("repository manager workflows", () => {
   it("issues a code for an approved anonymous application only when requested", async () => {
     const w = await mountManager();
     await button(w, "Invite").trigger("click");
+    if (!w.find("[data-el-dialog]").exists()) {
+      await button(w, "Create code").trigger("click");
+    }
     await button(w, "Create repository code").trigger("click");
     await flushPromises();
     expect(api.issue).toHaveBeenCalledWith(
@@ -145,11 +154,16 @@ describe("repository manager workflows", () => {
   });
   it("revokes an invitation separately from an account grant", async () => {
     const w = await mountManager();
-    await button(w.get('table[aria-label="Repository codes"]'), "Revoke").trigger("click");
+    await button(
+      w.get('table[aria-label="Repository codes"]'),
+      "Revoke",
+    ).trigger("click");
     await flushPromises();
     expect(api.revokeInvitation).toHaveBeenCalledWith(repo, 4);
     expect(api.revokeGrant).not.toHaveBeenCalled();
-    await button(w.get('table[aria-label="Account grants"]'), "Revoke").trigger("click");
+    await button(w.get('table[aria-label="Account grants"]'), "Revoke").trigger(
+      "click",
+    );
     await flushPromises();
     expect(api.revokeGrant).toHaveBeenCalledWith(repo, 5);
     w.unmount();

@@ -77,7 +77,7 @@
                     type="primary"
                     :disabled="busy || loading"
                     :aria-label="`Invite ${applicant(request)}`"
-                    @click="issueForm.request_id = request.id"
+                    @click="openIssueDialog(request.id)"
                     >Invite</el-button
                   >
                   <span
@@ -101,6 +101,13 @@
     <section class="access-panel" aria-labelledby="access-codes-title">
       <div class="access-panel-heading">
         <h3 id="access-codes-title">Repository codes</h3>
+        <el-button
+          type="primary"
+          :disabled="busy || loading"
+          @click="openIssueDialog()"
+        >
+          Create code
+        </el-button>
       </div>
       <div
         class="access-table-scroll"
@@ -179,74 +186,6 @@
             </tr>
           </tbody>
         </table>
-      </div>
-      <div class="access-form-panel">
-        <h4>Create repository invitation code</h4>
-        <p v-if="issueForm.request_id" class="access-application-association">
-          For anonymous application #{{ issueForm.request_id }}
-          <el-button @click="issueForm.request_id = null"
-            >Clear application</el-button
-          >
-        </p>
-        <div class="access-form-grid">
-          <label class="access-wide-field"
-            >Label<el-input
-              v-model="issueForm.label"
-              placeholder="Code label (optional)"
-              aria-label="Code label"
-          /></label>
-          <label
-            >Redeem within (days)<el-input-number
-              v-model="issueForm.expires_days"
-              aria-label="Code redemption lifetime in days"
-              :min="1"
-              :max="90"
-          /></label>
-          <label
-            >Account redemptions<el-input-number
-              v-model="issueForm.max_redemptions"
-              aria-label="Maximum account redemptions"
-              :min="1"
-              :max="10000"
-          /></label>
-          <label
-            >Visitor sessions<el-input-number
-              v-model="issueForm.max_guest_sessions"
-              aria-label="Maximum visitor sessions"
-              :min="0"
-              :max="10000"
-          /></label>
-          <label
-            >Visitor lifetime (seconds)<el-input-number
-              v-model="issueForm.guest_ttl_seconds"
-              aria-label="Visitor lifetime in seconds"
-              :min="60"
-              :max="604800"
-          /></label>
-          <label
-            >Account grant expires (optional)<input
-              v-model="grantExpiry"
-              type="datetime-local"
-              aria-label="Invitation account grant expiry"
-          /></label>
-        </div>
-        <el-button
-          type="primary"
-          :loading="busy"
-          :disabled="loading"
-          @click="issue"
-          >Create repository code</el-button
-        >
-        <div v-if="secret" class="access-secret" role="status">
-          <p>Copy this code now. It is shown only once.</p>
-          <code>{{ secret }}</code>
-          <div class="access-row-actions">
-            <el-button @click="secret = ''">Hide secret</el-button
-            ><RouterLink to="/repo-access"
-              >Open code redemption page</RouterLink
-            >
-          </div>
-        </div>
       </div>
     </section>
 
@@ -482,6 +421,91 @@
         >
       </div>
     </footer>
+
+    <el-dialog
+      v-model="issueDialogOpen"
+      title="Create repository code"
+      width="min(640px, calc(100vw - 32px))"
+      append-to-body
+      destroy-on-close
+      :close-on-click-modal="!busy"
+      :close-on-press-escape="!busy"
+      :show-close="!busy"
+      @close="secret = ''"
+    >
+      <div v-if="!secret" class="access-code-form">
+        <p v-if="issueForm.request_id" class="access-application-association">
+          For anonymous application #{{ issueForm.request_id }}
+          <el-button @click="issueForm.request_id = null"
+            >Clear application</el-button
+          >
+        </p>
+        <div class="access-form-grid">
+          <label class="access-wide-field"
+            >Label<el-input
+              v-model="issueForm.label"
+              placeholder="Code label (optional)"
+              aria-label="Code label"
+          /></label>
+          <label
+            >Redeem within (days)<el-input-number
+              v-model="issueForm.expires_days"
+              aria-label="Code redemption lifetime in days"
+              :min="1"
+              :max="90"
+          /></label>
+          <label
+            >Account redemptions<el-input-number
+              v-model="issueForm.max_redemptions"
+              aria-label="Maximum account redemptions"
+              :min="1"
+              :max="10000"
+          /></label>
+          <label
+            >Visitor sessions<el-input-number
+              v-model="issueForm.max_guest_sessions"
+              aria-label="Maximum visitor sessions"
+              :min="0"
+              :max="10000"
+          /></label>
+          <label
+            >Visitor lifetime (seconds)<el-input-number
+              v-model="issueForm.guest_ttl_seconds"
+              aria-label="Visitor lifetime in seconds"
+              :min="60"
+              :max="604800"
+          /></label>
+          <label
+            >Account grant expires (optional)<input
+              v-model="grantExpiry"
+              type="datetime-local"
+              aria-label="Invitation account grant expiry"
+          /></label>
+        </div>
+      </div>
+      <div v-if="secret" class="access-secret" role="status">
+        <p>Copy this code now. It is shown only once.</p>
+        <code>{{ secret }}</code>
+        <div class="access-row-actions">
+          <el-button @click="secret = ''">Hide secret</el-button
+          ><RouterLink to="/repo-access">Open code redemption page</RouterLink>
+        </div>
+      </div>
+      <template #footer>
+        <el-button :disabled="busy" @click="issueDialogOpen = false">
+          {{ secret ? "Done" : "Cancel" }}
+        </el-button>
+        <el-button
+          v-if="!secret"
+          type="primary"
+          :loading="busy"
+          :disabled="loading"
+          @click="issue"
+        >
+          Create repository code
+        </el-button>
+      </template>
+    </el-dialog>
   </section>
 </template>
 <script setup>
@@ -504,6 +528,7 @@ const busy = ref(false);
 const loading = ref(false);
 const error = ref(null);
 const secret = ref("");
+const issueDialogOpen = ref(false);
 const username = ref("");
 const directExpiry = ref("");
 const grantExpiry = ref("");
@@ -582,6 +607,12 @@ async function perform(action) {
 }
 const review = (id, approve) =>
   perform((target) => repositoryAccessAPI.review(target, id, { approve }));
+function openIssueDialog(requestId = null) {
+  if (busy.value || loading.value) return;
+  secret.value = "";
+  issueForm.value.request_id = requestId;
+  issueDialogOpen.value = true;
+}
 async function issue() {
   secret.value = "";
   await perform(async (target, owner) => {
@@ -615,6 +646,8 @@ watch(
     busy.value = false;
     loading.value = false;
     data.value = empty();
+    issueDialogOpen.value = false;
+    issueForm.value.request_id = null;
     secret.value = "";
     offset.value = 0;
     load();
