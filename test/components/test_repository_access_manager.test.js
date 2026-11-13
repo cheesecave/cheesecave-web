@@ -148,7 +148,9 @@ describe("repository manager workflows", () => {
       }),
     );
     expect(w.text()).toContain("repo_once");
-    await button(w, "Hide secret").trigger("click");
+    w.vm.issueDialogOpen = false;
+    w.getComponent({ name: "ElDialog" }).vm.$emit("close");
+    await flushPromises();
     expect(w.text()).not.toContain("repo_once");
     w.unmount();
   });

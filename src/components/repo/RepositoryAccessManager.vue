@@ -484,19 +484,28 @@
         </div>
       </div>
       <div v-if="secret" class="access-secret" role="status">
-        <p>Copy this code now. It is shown only once.</p>
-        <code>{{ secret }}</code>
-        <div class="access-row-actions">
-          <el-button @click="secret = ''">Hide secret</el-button
-          ><RouterLink to="/repo-access">Open code redemption page</RouterLink>
+        <el-alert
+          title="Copy this code now. It is shown only once."
+          type="error"
+          show-icon
+          :closable="false"
+        />
+        <div class="access-secret-code">
+          <code>{{ secret }}</code>
+          <el-button
+            aria-label="Copy invitation code"
+            title="Copy invitation code"
+            @click="copySecret"
+          >
+            <span class="i-carbon-copy" aria-hidden="true" />
+          </el-button>
         </div>
       </div>
-      <template #footer>
+      <template v-if="!secret" #footer>
         <el-button :disabled="busy" @click="issueDialogOpen = false">
-          {{ secret ? "Done" : "Cancel" }}
+          Cancel
         </el-button>
         <el-button
-          v-if="!secret"
           type="primary"
           :loading="busy"
           :disabled="loading"
@@ -512,6 +521,7 @@
 import { ref, watch, onBeforeUnmount } from "vue";
 import { formatRelativeTime } from "@/utils/datetime";
 import { repositoryAccessAPI } from "@/utils/api";
+import { copyToClipboard } from "@/utils/clipboard";
 import { decodeError, notifyError } from "@/errors";
 import { ElMessage } from "element-plus";
 import ErrorState from "@/components/common/ErrorState.vue";
@@ -612,6 +622,11 @@ function openIssueDialog(requestId = null) {
   secret.value = "";
   issueForm.value.request_id = requestId;
   issueDialogOpen.value = true;
+}
+async function copySecret() {
+  if (!secret.value) return;
+  if (await copyToClipboard(secret.value)) ElMessage.success("Copied");
+  else ElMessage.error("Failed to copy code");
 }
 async function issue() {
   secret.value = "";
@@ -845,16 +860,22 @@ onBeforeUnmount(() => {
 .access-secret {
   display: grid;
   gap: 12px;
-  margin-top: 20px;
+}
+.access-secret-code {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
   border: 1px solid var(--site-border);
   border-radius: 6px;
   padding: 16px;
   background: var(--site-hover);
 }
-.access-secret p {
-  margin: 0;
+.access-secret-code :deep(.el-button) {
+  flex-shrink: 0;
 }
 .access-secret code {
+  flex: 1;
+  min-width: 0;
   overflow-wrap: anywhere;
   user-select: all;
 }
