@@ -1,9 +1,9 @@
 <script setup>
 import { computed, inject, ref } from "vue";
-import LinkButton from "@/components/common/LinkButton.vue";
 import AddToCollectionMenu from "@/components/collections/AddToCollectionMenu.vue";
 import { externalRepoUrl } from "@/utils/external-repo";
 import { getRepositoryType } from "@/utils/repository-types";
+import { formatRelativeTime } from "@/utils/datetime";
 
 const props = defineProps({
   repoType: { type: String, required: true },
@@ -45,6 +45,7 @@ const tabIcons = {
   files: "i-carbon-folder",
   commits: "i-carbon-change-catalog",
   metadata: "i-carbon-information",
+  settings: "i-carbon-settings",
 };
 </script>
 
@@ -80,33 +81,40 @@ const tabIcons = {
                 <span class="i-carbon-locked" aria-hidden="true" />
                 {{ visibilityLabel }}
               </span>
-              <button
-                v-else-if="signedIn"
-                type="button"
-                class="repository-like"
-                :class="{ 'is-liked': liked }"
-                :aria-label="liked ? 'Unlike repository' : 'Like repository'"
-                :aria-pressed="liked"
-                :disabled="liking"
-                @click="$emit('like')"
+              <template
+                v-if="
+                  repoInfo &&
+                  (repoType === 'space' || !(repoInfo.private || visibility))
+                "
               >
+                <button
+                  v-if="signedIn"
+                  type="button"
+                  class="repository-like"
+                  :class="{ 'is-liked': liked }"
+                  :aria-label="liked ? 'Unlike repository' : 'Like repository'"
+                  :aria-pressed="liked"
+                  :disabled="liking"
+                  @click="$emit('like')"
+                >
+                  <span
+                    :class="
+                      liked ? 'i-carbon-favorite-filled' : 'i-carbon-favorite'
+                    "
+                    aria-hidden="true"
+                  />
+                  <span>Like</span
+                  ><span class="repository-like-count">{{ likesCount }}</span>
+                </button>
                 <span
-                  :class="
-                    liked ? 'i-carbon-favorite-filled' : 'i-carbon-favorite'
-                  "
-                  aria-hidden="true"
-                />
-                <span>Like</span
-                ><span class="repository-like-count">{{ likesCount }}</span>
-              </button>
-              <span
-                v-else
-                class="repository-like"
-                aria-label="Repository likes"
-              >
-                <span class="i-carbon-favorite" aria-hidden="true" />
-                <span>{{ likesCount }} likes</span>
-              </span>
+                  v-else
+                  class="repository-like"
+                  aria-label="Repository likes"
+                >
+                  <span class="i-carbon-favorite" aria-hidden="true" />
+                  <span>{{ likesCount }} likes</span>
+                </span>
+              </template>
             </template>
             <AddToCollectionMenu
               v-if="repoInfo && signedIn && !repoInfo.private"
@@ -134,14 +142,14 @@ const tabIcons = {
               <span class="i-carbon-document-download" aria-hidden="true" />
               Download
             </el-button>
-            <LinkButton v-if="isOwner" :to="`${repoPath}/settings`">
-              <span class="i-carbon-settings" aria-hidden="true" /> Settings
-            </LinkButton>
             <el-button type="primary" @click="$emit('clone')">
               <span class="i-carbon-code" aria-hidden="true" /> Clone
             </el-button>
           </slot>
         </div>
+      </div>
+      <div v-if="repoType === 'space' && repoInfo" class="repository-summary">
+        Updated {{ formatRelativeTime(repoInfo.lastModified, "Unknown") }}
       </div>
       <div
         v-if="repoInfo?._source && repoInfo._source !== 'local'"
