@@ -1237,7 +1237,7 @@ onMounted(() => {
   gap: 4px;
   min-width: 0;
   position: sticky;
-  top: 24px;
+  top: calc(var(--repository-sticky-offset, 0px) + 24px);
 }
 .repository-settings-nav-link {
   position: relative;

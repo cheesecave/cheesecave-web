@@ -1367,8 +1367,13 @@ onUnmounted(() => {
 }
 .file-detail-sidebar {
   position: sticky;
-  top: 0;
-  height: var(--file-sidebar-height, 100dvh);
+  top: var(--repository-sticky-offset, 0px);
+  height: max(
+    0px,
+    calc(
+      var(--file-sidebar-height, 100dvh) - var(--repository-sticky-offset, 0px)
+    )
+  );
   min-height: 0;
   border-right: 1px solid var(--site-border);
 }
@@ -1378,7 +1383,7 @@ onUnmounted(() => {
 }
 .file-detail-pathbar {
   position: sticky;
-  top: 0;
+  top: var(--repository-sticky-offset, 0px);
   z-index: 22;
   display: flex;
   align-items: center;
@@ -1418,7 +1423,7 @@ onUnmounted(() => {
 }
 .file-detail-toolbar {
   position: sticky;
-  top: 56px;
+  top: calc(var(--repository-sticky-offset, 0px) + 56px);
   z-index: 21;
   display: flex;
   align-items: center;
