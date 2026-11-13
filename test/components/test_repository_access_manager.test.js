@@ -145,11 +145,11 @@ describe("repository manager workflows", () => {
   });
   it("revokes an invitation separately from an account grant", async () => {
     const w = await mountManager();
-    await button(w, "Revoke code").trigger("click");
+    await button(w.get('table[aria-label="Repository codes"]'), "Revoke").trigger("click");
     await flushPromises();
     expect(api.revokeInvitation).toHaveBeenCalledWith(repo, 4);
     expect(api.revokeGrant).not.toHaveBeenCalled();
-    await button(w, "Revoke account access").trigger("click");
+    await button(w.get('table[aria-label="Account grants"]'), "Revoke").trigger("click");
     await flushPromises();
     expect(api.revokeGrant).toHaveBeenCalledWith(repo, 5);
     w.unmount();
