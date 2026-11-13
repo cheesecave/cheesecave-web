@@ -114,30 +114,22 @@ describe("repository access management tables", () => {
       namedTable(w, "Repository codes")
         .findAll("th")
         .map((c) => c.text()),
-    ).toEqual([
-      "Code",
-      "Status",
-      "Redeem by",
-      "Accounts",
-      "Visitors",
-      "Visitor lifetime",
-      "Actions",
-    ]);
+    ).toEqual(["Code", "Status", "Redeem by", "Visitor lifetime", "Actions"]);
     expect(namedTable(w, "Audit log").text()).toContain("guest_session_issued");
     expect(namedTable(w, "Visitor sessions").text()).not.toContain(
       "guest_session_issued",
     );
     w.unmount();
   });
-  it("displays separate usage counters, meaningful statuses and unknown values", async () => {
+  it("shows used legacy codes without separate usage quotas and retains grant states", async () => {
     const w = mountManager();
     await flushPromises();
     const codes = namedTable(w, "Repository codes");
     const first = rowWith(codes, "First code");
-    expect(first.text()).toContain("2 / 4");
-    expect(first.text()).toContain("3 / 8");
+    expect(first.text()).not.toContain("2 / 4");
+    expect(first.text()).not.toContain("3 / 8");
     expect(first.text()).toContain("1 hour");
-    expect(first.text()).toContain("Active");
+    expect(first.text()).toContain("Used");
     const second = rowWith(codes, "Second code");
     expect(second.text()).toContain("Revoked");
     expect(second.text()).toContain("—");
@@ -146,6 +138,64 @@ describe("repository access management tables", () => {
     expect(
       rowWith(namedTable(w, "Account grants"), "approved-reader").text(),
     ).toContain("No expiry");
+    w.unmount();
+  });
+  it.each([
+    [{ redemption_count: 0, guest_session_count: 0 }, "Active"],
+    [{ redemption_count: 1, guest_session_count: 0 }, "Used"],
+    [{ redemption_count: 0, guest_session_count: 1 }, "Active"],
+    [{ redemption_count: 0, guest_session_count: 100 }, "Active"],
+    [{ redemption_count: 2, guest_session_count: 3 }, "Used"],
+    [{ redemption_count: 1, revoked_at: "2026-01-01T00:00:00Z" }, "Revoked"],
+    [{ guest_session_count: 1, expires_at: "2020-01-01T00:00:00Z" }, "Expired"],
+  ])(
+    "marks a code used only after account redemption for %j",
+    async (state, status) => {
+      const data = records();
+      data.invitations = [
+        {
+          id: 23,
+          label: "Single use",
+          expires_at: "2099-01-01T00:00:00Z",
+          ...state,
+        },
+      ];
+      api.manage.mockResolvedValueOnce({ data });
+      const w = mountManager();
+      await flushPromises();
+      expect(
+        namedTable(w, "Repository codes").get(".access-status").text(),
+      ).toBe(status);
+      expect(namedTable(w, "Account grants").text()).not.toContain("Used");
+      expect(namedTable(w, "Visitor sessions").text()).not.toContain("Used");
+      w.unmount();
+    },
+  );
+  it("creates a code without presenting or sending separate exchange quotas", async () => {
+    const w = mountManager();
+    await flushPromises();
+    await button(w, "Create code").trigger("click");
+    expect(w.find('[aria-label="Maximum account redemptions"]').exists()).toBe(
+      false,
+    );
+    expect(w.find('[aria-label="Maximum visitor sessions"]').exists()).toBe(
+      false,
+    );
+    for (const label of [
+      "Code label",
+      "Code redemption lifetime in days",
+      "Visitor lifetime in seconds",
+      "Invitation account grant expiry",
+    ]) {
+      expect(w.find(`[aria-label="${label}"]`).exists()).toBe(true);
+    }
+    await button(w, "Create repository code").trigger("click");
+    await flushPromises();
+    expect(api.issue).toHaveBeenCalledWith(repository, {
+      label: "",
+      expires_days: 7,
+      guest_ttl_seconds: 86400,
+    });
     w.unmount();
   });
   it("binds each row action to its own record and keeps grant revocation separate", async () => {

@@ -115,17 +115,12 @@
         role="region"
         aria-label="Repository codes table"
       >
-        <table
-          aria-label="Repository codes"
-          class="access-table access-codes-table"
-        >
+        <table aria-label="Repository codes" class="access-table">
           <thead>
             <tr>
               <th scope="col">Code</th>
               <th scope="col">Status</th>
               <th scope="col">Redeem by</th>
-              <th scope="col">Accounts</th>
-              <th scope="col">Visitors</th>
               <th scope="col">Visitor lifetime</th>
               <th scope="col">Actions</th>
             </tr>
@@ -141,8 +136,8 @@
               <td>
                 <span
                   class="access-status"
-                  :data-status="lifecycleStatus(invitation).toLowerCase()"
-                  >{{ lifecycleStatus(invitation) }}</span
+                  :data-status="inviteStatus(invitation).toLowerCase()"
+                  >{{ inviteStatus(invitation) }}</span
                 >
               </td>
               <td>
@@ -151,14 +146,6 @@
                   :title="invitation.expires_at"
                   >{{ dateLabel(invitation.expires_at) }}</time
                 >
-              </td>
-              <td class="access-usage">
-                {{ invitation.redemption_count ?? "—" }} /
-                {{ invitation.max_redemptions ?? "—" }}
-              </td>
-              <td class="access-usage">
-                {{ invitation.guest_session_count ?? "—" }} /
-                {{ invitation.max_guest_sessions ?? "—" }}
               </td>
               <td>{{ durationLabel(invitation.guest_ttl_seconds) }}</td>
               <td>
@@ -180,7 +167,7 @@
               </td>
             </tr>
             <tr v-if="!data.invitations.length">
-              <td colspan="7" class="access-empty">
+              <td colspan="5" class="access-empty">
                 {{ loading ? "Loading…" : "No codes." }}
               </td>
             </tr>
@@ -455,20 +442,6 @@
               :max="90"
           /></label>
           <label
-            >Account redemptions<el-input-number
-              v-model="issueForm.max_redemptions"
-              aria-label="Maximum account redemptions"
-              :min="1"
-              :max="10000"
-          /></label>
-          <label
-            >Visitor sessions<el-input-number
-              v-model="issueForm.max_guest_sessions"
-              aria-label="Maximum visitor sessions"
-              :min="0"
-              :max="10000"
-          /></label>
-          <label
             >Visitor lifetime (seconds)<el-input-number
               v-model="issueForm.guest_ttl_seconds"
               aria-label="Visitor lifetime in seconds"
@@ -547,8 +520,6 @@ const offset = ref(0);
 const issueForm = ref({
   label: "",
   expires_days: 7,
-  max_redemptions: 1,
-  max_guest_sessions: 1,
   guest_ttl_seconds: 86400,
   request_id: null,
 });
@@ -559,6 +530,10 @@ const lifecycleStatus = (item) =>
     : item.expires_at && !(Date.parse(item.expires_at) > Date.now())
       ? "Expired"
       : "Active";
+const inviteStatus = (item) => {
+  const status = lifecycleStatus(item);
+  return status === "Active" && item.redemption_count > 0 ? "Used" : status;
+};
 const applicant = (request) =>
   request.username ||
   request.email ||
@@ -728,9 +703,6 @@ onBeforeUnmount(() => {
   text-align: left;
   font-size: 13px;
 }
-.access-codes-table {
-  min-width: 920px;
-}
 .access-table th {
   padding: 10px 16px;
   background: var(--site-hover);
@@ -798,10 +770,6 @@ onBeforeUnmount(() => {
 }
 .access-row-actions a {
   color: var(--site-link);
-}
-.access-usage {
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
 }
 .access-empty {
   color: var(--site-muted);

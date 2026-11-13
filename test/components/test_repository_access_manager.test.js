@@ -142,8 +142,6 @@ describe("repository manager workflows", () => {
       expect.objectContaining({
         request_id: 2,
         expires_days: 7,
-        max_redemptions: 1,
-        max_guest_sessions: 1,
         guest_ttl_seconds: 86400,
       }),
     );
