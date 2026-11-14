@@ -106,6 +106,7 @@ const repositoryAccessBase = ({ type, namespace, name }) =>
   `/api/${encodeURIComponent(type)}s/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/access`;
 
 export const repositoryAccessAPI = {
+  redeem: (token) => api.post("/api/repo-access/redeem", { token }),
   getAccess: (repo) => api.get(repositoryAccessBase(repo)),
   request: (repo, data) =>
     api.post(`${repositoryAccessBase(repo)}/requests`, data),

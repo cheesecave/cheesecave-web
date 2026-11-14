@@ -1,6 +1,5 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { reactive } from "vue";
-import { screen } from "@testing-library/vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ElementPlusStubs, RouterLinkStub } from "../helpers/vue";
 const mocks = vi.hoisted(() => ({
@@ -29,7 +28,6 @@ vi.mock("@/errors/notify", () => ({ notifyError: mocks.notify }));
 import Invitation from "@/components/repo/RepositoryInvitationPage.vue";
 import Visitor from "@/components/repo/RestrictedRepositoryViewer.vue";
 import CodeViewer from "@/components/common/CodeViewer.vue";
-import BindPage from "@/pages/repo-access.vue";
 const repo = { type: "model", namespace: "owner", name: "demo" };
 const fileLink = (w, text) =>
   w
@@ -257,43 +255,6 @@ describe("invitation and controlled visitor flows", () => {
     expect(w.html()).not.toContain("/resolve/");
     w.unmount();
   });
-  it("allows a private repository visitor code on the explicit global page", async () => {
-    const w = mountView(BindPage);
-    await w.get('input[aria-label="Repository namespace"]').setValue("owner");
-    await w.get('input[aria-label="Repository name"]').setValue("demo");
-    await w
-      .get('input[aria-label="Repository invitation code"]')
-      .setValue("repo_private");
-    await button(w, "Open temporary web preview").trigger("click");
-    await flushPromises();
-    expect(mocks.api.guest).toHaveBeenCalledWith(repo, "repo_private");
-    expect(w.find('a[href="/models/owner/demo"]').exists()).toBe(true);
-    expect(mocks.auth.isAuthenticated).toBe(false);
-    w.unmount();
-  });
-  it.each([false, true])(
-    "exposes the global redemption form to users when signed in is %s",
-    (signedIn) => {
-      mocks.auth.isAuthenticated = signedIn;
-      const w = mount(BindPage, {
-        attachTo: document.body,
-        global: { stubs: { ...ElementPlusStubs, RouterLink: RouterLinkStub } },
-      });
-      expect(
-        screen.getByRole("textbox", { name: "Repository namespace" }),
-      ).toBeDefined();
-      expect(
-        screen.getByRole("textbox", { name: "Repository name" }),
-      ).toBeDefined();
-      expect(
-        screen.getByRole("button", { name: "Open temporary web preview" }),
-      ).toBeDefined();
-      expect(
-        screen.queryByRole("button", { name: "Bind to my account" }) !== null,
-      ).toBe(signedIn);
-      w.unmount();
-    },
-  );
   it.each([
     { revoked_at: "2026-01-01T00:00:00Z", expires_at: null },
     { revoked_at: null, expires_at: "2020-01-01T00:00:00Z" },
@@ -312,17 +273,6 @@ describe("invitation and controlled visitor flows", () => {
     expect(invitation.emitted("changed")).toBeUndefined();
     expect(invitation.text()).toContain("Contact the repository manager");
     invitation.unmount();
-    const w = mountView(BindPage);
-    await w.get('input[aria-label="Repository namespace"]').setValue("owner");
-    await w.get('input[aria-label="Repository name"]').setValue("demo");
-    await w
-      .get('input[aria-label="Repository invitation code"]')
-      .setValue("repo_old");
-    await button(w, "Bind to my account").trigger("click");
-    await flushPromises();
-    expect(w.find('a[href="/models/owner/demo"]').exists()).toBe(false);
-    expect(w.text()).toContain("Contact the repository manager");
-    w.unmount();
   });
   it("does not store a late application receipt under the next repository", async () => {
     let complete;

@@ -4,7 +4,7 @@
     <h1 class="text-3xl font-bold mb-6">Settings</h1>
     <p class="mb-4">
       <RouterLink to="/repo-access" class="text-blue-500"
-        >Bind a repository invitation code</RouterLink
+        >Access repository</RouterLink
       >
     </p>
 
