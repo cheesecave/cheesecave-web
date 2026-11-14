@@ -40,7 +40,7 @@ describe("invitation controls follow application state", () => {
       }
       const link = wrapper
         .findAll("a")
-        .find((item) => item.text() === "Create an account");
+        .find((item) => item.text() === "Sign Up");
       const event = new MouseEvent("click", {
         bubbles: true,
         cancelable: true,
@@ -59,7 +59,7 @@ describe("invitation controls follow application state", () => {
       .setValue("repo_handoff_fixture");
     const link = wrapper
       .findAll("a")
-      .find((item) => item.text() === "Create an account");
+      .find((item) => item.text() === "Sign Up");
     const target = JSON.parse(link.attributes("href"));
     expect(target.path).toBe("/register");
     expect(link.attributes("href")).not.toContain("repo_handoff_fixture");

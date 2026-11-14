@@ -6,7 +6,7 @@
     @click.capture="prepare"
     @auxclick.capture="prepare"
     @contextmenu="prepare"
-    >Create an account</RouterLink
+    >Sign Up</RouterLink
   >
 </template>
 
