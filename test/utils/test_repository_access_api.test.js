@@ -3,6 +3,14 @@ import api, { repositoryAccessAPI as access, authAPI } from "@/utils/api";
 const repo = { type: "dataset", namespace: "an owner", name: "data.v1" };
 const base = "/api/datasets/an%20owner/data.v1/access";
 describe("repository access API contract", () => {
+  it("redeems a code for the current account without requiring a repository address", async () => {
+    const post = vi.spyOn(api, "post").mockResolvedValue({ data: {} });
+    post.mockClear();
+    await access.redeem("repo_fixture");
+    expect(post).toHaveBeenCalledExactlyOnceWith("/api/repo-access/redeem", {
+      token: "repo_fixture",
+    });
+  });
   it("uses controlled overview, complete file pages and history without raw endpoints", async () => {
     const get = vi.spyOn(api, "get").mockResolvedValue({});
     get.mockClear();
