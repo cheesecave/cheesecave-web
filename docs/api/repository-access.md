@@ -28,40 +28,47 @@ shares it with the applicant. Approval alone never creates a code.
 
 ## Management and code redemption
 
-Managers use the **Repository access** settings tab to review applications, issue
-codes, grant account access, revoke grants, revoke visitor sessions and inspect
-audit records. Code secrets are displayed once. Keep them separate from links;
-share the repository identity and `/repo-access` redemption page with the code.
+In repository Settings, **Repository access** has four independently paginated
+tables for applications, repository codes, account grants and the audit log.
+Managers can approve or reject applications, issue and revoke codes, and revoke
+account grants. A code is displayed once when issued.
 
-Both Private and Invite repositories can issue codes. An existing account binds
-a code through `/repo-access`, or directly on an invitation page. Registration has
-an optional repository-code field even when registration is open. Repository codes
-do not replace required site registration invitations. They grant access to one
-repository without organizational membership or access to other private content.
-HF clients use the registered account's own normal personal access token.
+Both Private and Invite repositories can issue codes. An existing account signs
+in at `/repo-access`, enters the code and selects **Open repository**. The page grants
+read access to the code's repository and opens it in one step.
 
-Code redemption expiry, account grant expiry and visitor lifetime are independent.
-Revoking a code stops future redemption and its derived visitor sessions. Revoke
-an already-bound account grant as a separate management action.
+The registration page has one **Invitation code** field for site and repository
+codes. **Sign Up** in the invitation dialog or an eligible visitor preview carries
+the repository invitation into registration. Signup and any required verification
+return the user to that repository after sign-in. An invitation-only site requires
+a site registration code. For HF access, use the authorized account's own personal
+access token.
+
+Each code can be bound to one account. Before binding, a valid code can open more
+than one temporary preview without consuming the account exchange. Code redemption
+expiry, account grant expiry and visitor lifetime are independent. Revoking a code
+stops new exchanges and its derived visitor sessions. Revoke an account grant
+separately. Previously signed download URLs retain their own expiration.
 
 ## Temporary previews
 
-Without creating an account, enter a code on the invitation page or `/repo-access`
-and choose **Open temporary web preview**. A separate, expiring repository visitor
-session provides only controlled previews. It does not replace an existing login.
-End temporary access from the preview page without logging out of the account.
+On the repository invitation page, enter a code and select **Open temporary web
+preview**. The independent visitor session expires on its own. **End access**
+ends that session while preserving the user's account login.
 
-The first release supports bounded text excerpts, raster thumbnails, limited
-CSV/TSV/JSONL rows and file metadata. The browser consumes only the controlled
-`access/guest/tree` and `access/guest/preview` APIs. It receives no original file,
-object-storage URL or arbitrary byte-range interface. Directory listings are capped
-at 100 entries and indicate when more entries are unavailable.
+The visitor view provides paginated directory and commit history listings, file
+metadata, bounded text and CSV/TSV/JSONL samples, raster thumbnails, rendered PDF
+pages and transcoded audio and video. Supported PDF and audio/video files can also
+be previewed from repository-scoped LFS objects. Archives, Parquet and model
+weights provide metadata. The preview APIs serve bounded content and generated
+media and enforce repository scope on each request.
 
-PDF, video, audio, archives (including TAR), Parquet and browser model inference
-are unavailable in temporary previews. LFS-backed files provide metadata only in
-this release. Unsupported files explain this limit instead of falling back to a
-raw download. These limits apply on the backend as well as in the interface.
+The server denies original-file downloads and bulk downloads for visitors. Content
+displayed in a browser can still be copied or saved.
 
-Temporary access prohibits original-file and bulk downloads. Content already
-displayed in a browser can still be copied or saved; this is not absolute copy
-protection.
+## Coordinated release
+
+Deploy the Backend and migrations 043/044 before this Web build: repository pages
+use the new access preflight even for ordinary repositories. Roll Web back before
+rolling Backend back. The [shared release guide](https://github.com/cheesecave/cheesecave-backend/blob/feat/invite-repo/docs/deployment/invitation-repositories.md)
+contains review findings, migration rehearsal, acceptance checks and rollback order.
