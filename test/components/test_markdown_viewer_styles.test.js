@@ -5,6 +5,22 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// This suite checks the viewer's styles and copy controls, not SVG layout.
+// Mermaid's real renderer requires getBBox, which jsdom does not implement.
+const diagrams = vi.hoisted(() => ({
+  initialize: vi.fn(),
+  render: vi.fn(),
+}));
+vi.mock("mermaid", () => ({ default: diagrams }));
+vi.mock("panzoom", () => ({
+  default: () => ({
+    zoomWithWheel: vi.fn(),
+    zoomIn: vi.fn(),
+    zoomOut: vi.fn(),
+    moveTo: vi.fn(),
+    zoomAbs: vi.fn(),
+  }),
+}));
 vi.mock("@/stores/markdownStyle", async () => {
   const { reactive } = await import("vue");
   const style = reactive({ resolved: "github" });
@@ -36,6 +52,9 @@ const mountViewer = (content = CODE) => {
 const root = () => wrapper.get(".markdown-body");
 
 beforeEach(() => {
+  diagrams.render.mockReset().mockResolvedValue({
+    svg: "<svg><text>Rendered diagram</text></svg>",
+  });
   setActivePinia(createPinia());
   style.resolved = "github";
   loader.load = null;
@@ -116,6 +135,11 @@ describe("the copy button of a code block", () => {
     const buttons = wrapper.findAll(".code-block .code-bar button.copy-code");
     expect(buttons).toHaveLength(2);
     expect(buttons[0].attributes("aria-label")).toBe("Copy code");
+    expect(diagrams.render).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.stringContaining("graph TD; A-->B"),
+    );
+    expect(wrapper.find(".mermaid-wrapper svg").exists()).toBe(true);
     expect(wrapper.find(".mermaid-wrapper .copy-code").exists()).toBe(false);
   });
 
