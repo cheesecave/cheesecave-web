@@ -181,7 +181,7 @@ describe("invitation and controlled visitor flows", () => {
       expect(safeLinks).toContain(link.attributes("href"));
     }
     expect(w.html()).not.toContain("/resolve/");
-    await button(w, "End temporary access").trigger("click");
+    await button(w, "End access").trigger("click");
     await flushPromises();
     expect(mocks.api.leaveGuest).toHaveBeenCalledWith(repo);
     expect(w.emitted("changed")).toHaveLength(1);

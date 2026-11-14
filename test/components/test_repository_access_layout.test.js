@@ -97,7 +97,7 @@ describe("restricted repository pages share the normal repository header", () =>
       within(header).getByRole("link", { name: "Create an account" }),
     ).toBeDefined();
     expect(
-      within(header).getByRole("button", { name: "End temporary access" }),
+      within(header).getByRole("button", { name: "End access" }),
     ).toBeDefined();
   });
   beforeEach(() => {
@@ -231,7 +231,7 @@ describe("restricted repository pages share the normal repository header", () =>
         visibility === "invite" ? "Invite" : "Private",
       );
       expect(
-        within(header).getByRole("button", { name: "End temporary access" }),
+        within(header).getByRole("button", { name: "End access" }),
       ).toBeDefined();
       expect(
         within(header)

@@ -12,7 +12,7 @@
         :repository="repository"
         :access="access"
       />
-      <el-button @click="leaveGuest">End temporary access</el-button>
+      <el-button @click="leaveGuest">End access</el-button>
     </template>
     <template v-if="headerMetadata" #metadata>
       <MetadataHeader
