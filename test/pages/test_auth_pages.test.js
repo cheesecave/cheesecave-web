@@ -14,6 +14,8 @@ import axios from "@/testing/axios";
 import { createMemoryHistory, createRouter } from "@/testing/router";
 
 import { useAuthStore } from "@/stores/auth";
+import { repositoryAccessAPI } from "@/utils/api";
+import InvitationPage from "@/components/repo/RepositoryInvitationPage.vue";
 import LoginPage from "@/pages/login.vue";
 import RegisterPage from "@/pages/register.vue";
 
@@ -92,6 +94,89 @@ describe("auth pages", () => {
         readRepositoryRegistration(location.query.repository_invitation),
     };
   }
+
+  it("carries an entered code through the real invitation registration link and a page unmount", async () => {
+    const repository = { type: "model", namespace: "owner", name: "demo" };
+    const repositoryPath = "/models/owner/demo";
+    const token = "repo_real_link_fixture";
+    const { readRepositoryRegistration } = await import(
+      "@/utils/repository-registration"
+    );
+    const router = await createTestRouter(repositoryPath);
+    // Route changes unmount pages while the SPA's router-owning root survives.
+    // Keep that root installed when swapping these independently mounted pages.
+    const routerHost = mount(
+      { render: () => null },
+      { global: { plugins: [router] } },
+    );
+    vi.spyOn(repositoryAccessAPI, "getRequest").mockResolvedValue({
+      data: { request: null },
+    });
+    const auth = useAuthStore();
+    auth.register = vi.fn().mockResolvedValue({
+      email_verified: true,
+      repository_url: repositoryPath,
+    });
+    auth.login = vi.fn().mockResolvedValue({ ok: true });
+    const invitation = mount(InvitationPage, {
+      props: {
+        repository,
+        access: { visibility: "invite", invite_markdown: "# Join" },
+        embedded: true,
+      },
+      global: { plugins: [router], stubs: { ...ElementPlusStubs } },
+    });
+    await flushPromises();
+    await invitation
+      .findAll("button")
+      .find((button) => button.text() === "Have an Invitation?")
+      .trigger("click");
+    await invitation
+      .get('input[aria-label="Repository invitation code"]')
+      .setValue(token);
+    const link = invitation
+      .findAll("a")
+      .find((anchor) => anchor.text() === "Create an account");
+    const href = new URL(link.attributes("href"), "http://localhost");
+    const handoffId = href.searchParams.get("repository_invitation");
+    expect(handoffId).toMatch(/^[a-f0-9]{32}$/);
+    expect(href.href).not.toContain(token);
+    expect(readRepositoryRegistration(handoffId)).toBeNull();
+
+    await link.trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe("/register");
+    expect(router.currentRoute.value.query.repository_invitation).toBe(
+      handoffId,
+    );
+    expect(readRepositoryRegistration(handoffId)).toEqual({
+      token,
+      repositoryPath,
+    });
+    invitation.unmount();
+    expect(router.currentRoute.value.path).toBe("/register");
+    expect(readRepositoryRegistration(handoffId)).toEqual({
+      token,
+      repositoryPath,
+    });
+
+    const registration = mountPage(RegisterPage, router);
+    await flushPromises();
+    expect(repositoryCodeInput(registration).element.value).toBe(token);
+    await fillRegistration(registration);
+    await submitRegistration(registration);
+    expect(auth.register).toHaveBeenCalledWith(
+      expect.objectContaining({ repo_invitation_token: token }),
+    );
+    expect(auth.login).toHaveBeenCalledWith({
+      username: "reader",
+      password: "long-enough-password",
+    });
+    expect(router.currentRoute.value.path).toBe(repositoryPath);
+    expect(readRepositoryRegistration(handoffId)).toBeNull();
+    registration.unmount();
+    routerHost.unmount();
+  });
 
   it.each([
     ["model", undefined, "/models/owner/invited"],
