@@ -186,10 +186,10 @@ describe("compact repository header", () => {
           { key: "files", label: "Files", disabledReason: "Access required" },
         ],
       },
-      slots: { actions: () => h("button", "End temporary access") },
+      slots: { actions: () => h("button", "End access") },
     });
     await position(observer, -1);
-    expect(wrapper.text()).toContain("End temporary access");
+    expect(wrapper.text()).toContain("End access");
     expect(wrapper.text()).not.toContain("Download");
     expect(wrapper.get('[aria-disabled="true"]').text()).toBe("Files");
     await wrapper.setProps({

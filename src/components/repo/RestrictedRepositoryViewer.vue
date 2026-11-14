@@ -589,7 +589,7 @@ defineExpose({ leave, navigate });
         :repository="repository"
         :access="access"
       />
-      <el-button @click="leave">End temporary access</el-button>
+      <el-button @click="leave">End access</el-button>
     </template>
     <div v-if="accessInvalid" role="status">Checking repository access…</div>
     <BlobFilePage
