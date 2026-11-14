@@ -94,7 +94,7 @@ describe("restricted repository pages share the normal repository header", () =>
     await flushPromises();
     const header = expectRestrictedHeader(wrapper);
     expect(
-      within(header).getByRole("link", { name: "Create an account" }),
+      within(header).getByRole("link", { name: "Sign Up" }),
     ).toBeDefined();
     expect(
       within(header).getByRole("button", { name: "End access" }),

@@ -36,7 +36,7 @@ describe("guest registration link", () => {
   });
   it("hides account creation when a normal account is already signed in", async () => {
     const wrapper = mountLink();
-    expect(wrapper.get("a").text()).toBe("Create an account");
+    expect(wrapper.get("a").text()).toBe("Sign Up");
     mocks.auth.isAuthenticated = true;
     await wrapper.vm.$nextTick();
     expect(wrapper.find("a").exists()).toBe(false);

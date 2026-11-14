@@ -89,7 +89,7 @@
           @click.capture="prepareRegistration"
           @auxclick.capture="prepareRegistration"
           @contextmenu="prepareRegistration"
-          >Create an account</RouterLink
+          >Sign Up</RouterLink
         >
         <el-button :loading="busy" @click="redeem(true)"
           >Open temporary web preview</el-button

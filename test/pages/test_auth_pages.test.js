@@ -190,7 +190,7 @@ describe("auth pages", () => {
       .setValue(token);
     const link = invitation
       .findAll("a")
-      .find((anchor) => anchor.text() === "Create an account");
+      .find((anchor) => anchor.text() === "Sign Up");
     const href = new URL(link.attributes("href"), "http://localhost");
     const handoffId = href.searchParams.get("repository_invitation");
     expect(handoffId).toMatch(/^[a-f0-9]{32}$/);
