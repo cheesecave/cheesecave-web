@@ -125,6 +125,7 @@ import { notifyError } from "@/errors";
 import { useAuthStore } from "@/stores/auth";
 import { authAPI } from "@/utils/api";
 import { confirmationProblem, passwordProblem } from "@/utils/password-policy";
+import { parseServerTime } from "@/utils/datetime";
 import { describeRemaining } from "@/utils/remaining-time";
 import { ElMessage } from "element-plus";
 
@@ -164,7 +165,7 @@ const rules = {
 
 // only shown once the link has been checked, so there is an expiry to describe
 const expiry = computed(() => {
-  const at = new Date(expiresAt.value);
+  const at = parseServerTime(expiresAt.value).toDate();
   return `${describeRemaining(at - Date.now())} (${at.toLocaleString()})`;
 });
 

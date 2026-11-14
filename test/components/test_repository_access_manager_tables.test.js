@@ -1,6 +1,7 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ElementPlusStubs } from "../helpers/vue";
+import { inZoneAsync } from "../helpers/zone";
 const api = vi.hoisted(() => ({
   manage: vi.fn(),
   review: vi.fn(),
@@ -108,6 +109,85 @@ beforeEach(() => {
   api.issue.mockResolvedValue({ data: { token: "repo_test_once" } });
 });
 describe("repository access management tables", () => {
+  it.each(["Asia/Shanghai", "America/Los_Angeles"])(
+    "keeps server expiry and user-local form time distinct in %s",
+    async (zone) =>
+      inZoneAsync(zone, async () => {
+        const clock = vi
+          .spyOn(Date, "now")
+          .mockReturnValue(Date.UTC(2026, 0, 1, 0));
+        const data = records();
+        data.invitations = [
+          {
+            id: 21,
+            label: "Future code",
+            expires_at: "2026-01-01T01:00:00",
+            redemption_count: 0,
+          },
+          {
+            id: 22,
+            label: "Past code",
+            expires_at: "2025-12-31T23:00:00",
+            redemption_count: 0,
+          },
+        ];
+        data.grants = [
+          {
+            id: 31,
+            username: "future-reader",
+            expires_at: "2026-01-01T01:00:00",
+          },
+          {
+            id: 32,
+            username: "past-reader",
+            expires_at: "2025-12-31T23:00:00",
+          },
+        ];
+        api.manage.mockImplementation(respond(data));
+        const w = mountManager();
+        try {
+          await flushPromises();
+          expect(
+            rowWith(namedTable(w, "Repository codes"), "Future code")
+              .get(".access-status")
+              .text(),
+          ).toBe("Active");
+          expect(
+            rowWith(namedTable(w, "Repository codes"), "Past code")
+              .get(".access-status")
+              .text(),
+          ).toBe("Expired");
+          expect(
+            rowWith(namedTable(w, "Account grants"), "future-reader")
+              .get(".access-status")
+              .attributes("data-status"),
+          ).toBe("active");
+          expect(
+            rowWith(namedTable(w, "Account grants"), "past-reader")
+              .get(".access-status")
+              .text(),
+          ).toBe("Expired");
+          await button(w, "Create code").trigger("click");
+          await w
+            .get('[aria-label="Invitation account grant expiry"]')
+            .setValue("2026-01-02T12:00");
+          await button(w, "Create repository code").trigger("click");
+          await flushPromises();
+          expect(api.issue).toHaveBeenCalledWith(
+            repository,
+            expect.objectContaining({
+              grant_expires_at:
+                zone === "Asia/Shanghai"
+                  ? "2026-01-02T04:00:00.000Z"
+                  : "2026-01-02T20:00:00.000Z",
+            }),
+          );
+        } finally {
+          w.unmount();
+          clock.mockRestore();
+        }
+      }),
+  );
   it("shows four named tables without visitor sessions or redundant grant controls", async () => {
     const w = mountManager();
     await flushPromises();

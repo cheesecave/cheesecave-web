@@ -496,28 +496,20 @@ export const repoAPI = {
   },
 
   /**
-   * Probe whether a single repo-relative path exists on a given
-   * revision. Used by the indexed-tar sibling-icon path: when the
-   * `.json` sidecar is not in the loaded page (because the listing is
-   * paginated and the sibling fell off the current page), we still
-   * want the icon to light up — but only when the file actually exists.
+   * Probe whether a single repo-relative path exists on a given revision,
+   * with a HEAD against `/resolve/.../path` (200 when it exists and the
+   * user may read it, 404 when not). Used for the indexed-tar sibling icon
+   * when the `.json` sidecar may sit on a page that is not loaded.
    *
-   * Implemented as a HEAD against `/resolve/.../path`. The backend
-   * returns 200 when the file exists (and the user is allowed to read
-   * it, which on a private repo means the SPA session cookie is being
-   * forwarded — see fix #52 for the same-origin credentials pin).
-   * Anything else (404 / 403 / network) resolves to `false` so the
-   * caller can fall back to the bare `.tar` row.
+   * The answer has three states, because a failed probe says nothing about
+   * the file: `yes` (2xx), `no` (404), `error` (anything else: 5xx, a
+   * timeout, a dropped connection). Treating `error` as `no` would hide an
+   * icon for good after one hiccup.
    *
-   * @param {string} type
-   * @param {string} namespace
-   * @param {string} name
-   * @param {string} revision
-   * @param {string} path - repo-relative path, no leading slash
-   * @returns {Promise<boolean>}
+   * @returns {Promise<{state: "yes"|"no"|"error", status: number|null}>}
    */
-  fileExists: async (type, namespace, name, revision, path) => {
-    if (!path) return false;
+  probeFile: async (type, namespace, name, revision, path) => {
+    if (!path) return { state: "error", status: null };
     const encodedPath = path
       .split("/")
       .map((seg) => encodeURIComponent(seg))
@@ -527,12 +519,14 @@ export const repoAPI = {
     )}/${encodedPath}`;
     try {
       const response = await api.head(url);
-      return response.status >= 200 && response.status < 300;
-    } catch {
-      // 404 / 403 / network — treat as "does not exist". The caller's
-      // UX (sibling-icon) is the only consumer right now and benefits
-      // from a soft fallback rather than a thrown error.
-      return false;
+      return {
+        state:
+          response.status >= 200 && response.status < 300 ? "yes" : "error",
+        status: response.status,
+      };
+    } catch (err) {
+      const status = err?.response?.status ?? null;
+      return { state: status === 404 ? "no" : "error", status };
     }
   },
 

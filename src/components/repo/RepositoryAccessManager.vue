@@ -457,7 +457,11 @@
 </template>
 <script setup>
 import { computed, ref, watch, onBeforeUnmount } from "vue";
-import { formatRelativeTime } from "@/utils/datetime";
+import {
+  formatRelativeTime,
+  localDateTimeToIso,
+  parseServerTime,
+} from "@/utils/datetime";
 import { repositoryAccessAPI } from "@/utils/api";
 import { copyToClipboard } from "@/utils/clipboard";
 import { decodeError, notifyError } from "@/errors";
@@ -502,11 +506,11 @@ const issueForm = ref({
   guest_ttl_seconds: 86400,
   request_id: null,
 });
-const expiry = (value) => (value ? new Date(value).toISOString() : null);
 const lifecycleStatus = (item) =>
   item.revoked_at
     ? "Revoked"
-    : item.expires_at && !(Date.parse(item.expires_at) > Date.now())
+    : item.expires_at &&
+        !(parseServerTime(item.expires_at).valueOf() > Date.now())
       ? "Expired"
       : "Active";
 const inviteStatus = (item) => {
@@ -518,9 +522,7 @@ const applicant = (request) =>
   request.email ||
   (request.user_id != null ? `Account ${request.user_id}` : "—");
 const dateLabel = (value) =>
-  typeof value === "string" && Number.isFinite(Date.parse(value))
-    ? formatRelativeTime(value, "—")
-    : "—";
+  typeof value === "string" ? formatRelativeTime(value, "—") : "—";
 function durationLabel(value) {
   if (!Number.isFinite(value) || value <= 0) return "—";
   const [amount, unit] =
@@ -622,7 +624,7 @@ async function issue() {
       ...values,
       ...(request_id ? { request_id } : {}),
       ...(grantExpiry.value
-        ? { grant_expires_at: expiry(grantExpiry.value) }
+        ? { grant_expires_at: localDateTimeToIso(grantExpiry.value) }
         : {}),
     });
     if (owner === generation) secret.value = response.data.token;

@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   auth: { isAuthenticated: true, canWriteToNamespace: () => true },
   repoAPI: {
     listTree: vi.fn(),
-    fileExists: vi.fn(),
+    probeFile: vi.fn(),
     getCommitOperations: vi.fn(),
     getCommitUnavailableFiles: vi.fn(),
   },
@@ -114,7 +114,7 @@ describe("repository details embedded in the repository shell", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.repoAPI.listTree.mockResolvedValue({ data: [] });
-    mocks.repoAPI.fileExists.mockResolvedValue(false);
+    mocks.repoAPI.probeFile.mockResolvedValue({ state: "no", status: 404 });
     mocks.repoAPI.getCommitOperations.mockResolvedValue({
       data: { can_write: false, operations: {} },
     });

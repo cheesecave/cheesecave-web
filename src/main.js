@@ -5,7 +5,6 @@ import { createRouter, createWebHistory } from "vue-router";
 import { routes } from "vue-router/auto-routes";
 import App from "./App.vue";
 import { installErrorHandling } from "./errors/install";
-import { initializeBrowserTimezone } from "./utils/datetime";
 import { createPageScrollBehavior } from "./utils/page-scroll";
 import { createRepoViewRoutes } from "./utils/repo-view-routes";
 import { installPageTitle } from "./utils/page-title";
@@ -30,7 +29,6 @@ import "./style.css";
 const app = createApp(App);
 const pinia = createPinia();
 
-initializeBrowserTimezone();
 
 // Create router
 const pageScroll = createPageScrollBehavior();

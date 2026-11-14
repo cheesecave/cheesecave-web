@@ -76,7 +76,7 @@ export function requestLine(error) {
 /**
  * @param {import("./appError").AppError} error
  * @param {{noun?:string, signedIn?:boolean, sessionExpired?:boolean, storage?:boolean}} [context]
- *   `storage`: the request went from the browser to the object-storage host, where a blocked request is usually missing CORS headers
+ *   `storage`: the request went from the browser to the object-storage host, where a failed request may be a network problem, a storage error or, rarely, missing CORS headers
  * @returns {{title:string, description:string, icon:string, tone:"warning"|"neutral"|"danger", actions:string[]}|null}
  */
 export function describeError(error, context = {}) {
@@ -260,8 +260,8 @@ export function describeError(error, context = {}) {
           )
         : storage
           ? make(
-              "Browser blocked the request",
-              "This looks like a CORS failure on the object-storage host. Preview needs the S3/MinIO backend to advertise Access-Control-Allow-Origin (see docs/development/local-dev.md, 'MinIO CORS'). If your connection dropped instead, try again.",
+              "Could not reach the storage server",
+              "The browser got no usable answer from the object-storage host. That is usually a network problem or an error on the storage side, so try again. If it keeps failing, the browser's Network tab shows the real status; only a request marked as a CORS error means the storage CORS setup is at fault (see docs/development/local-dev.md, 'MinIO CORS').",
               "i-carbon-cloud-offline",
               "neutral",
               ["retry"],

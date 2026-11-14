@@ -1,6 +1,7 @@
 // The page an administrator's reset link opens: it reads the token from the URL fragment, asks whose account it is,
 // takes a new password, and says what happened. Every state a person can land in is checked here.
 
+import { inZoneAsync } from "../helpers/zone";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -71,6 +72,19 @@ afterEach(() => {
   wrapper?.unmount();
   wrapper = null;
   vi.useRealTimers();
+});
+
+describe("the expiry of the link", () => {
+  it("reads a naive expires_at as UTC: 59 minutes left is 59 minutes left in any zone", async () => {
+    for (const zone of ["Asia/Shanghai", "America/Los_Angeles"]) {
+      mocks.authAPI.checkPasswordReset.mockResolvedValue({
+        data: { username: "alice", expires_at: new Date(NOW.getTime() + 59 * 60_000).toISOString().slice(0, 19) },
+      });
+      await inZoneAsync(zone, () => open("#token=abc123"));
+      expect(wrapper.get('[data-testid="reset-expiry"]').text(), zone).toContain("in 59 minutes");
+      wrapper.unmount();
+    }
+  });
 });
 
 describe("opening the link", () => {

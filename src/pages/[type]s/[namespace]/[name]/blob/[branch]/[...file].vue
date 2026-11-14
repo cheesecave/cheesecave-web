@@ -367,7 +367,34 @@
               :index-url="indexedTarSidecarUrl"
               :filename="fileName"
               :tar-tree-entry="indexedTarTreeEntry"
+              :prefetched-index="prefetchedTarIndex"
             />
+          </div>
+          <!-- Looking for the sidecar is not "this file type cannot be
+             previewed", and failing to look is not "no index". -->
+          <div
+            v-else-if="tarDetect === 'detecting'"
+            class="text-center py-16"
+            data-testid="tar-detecting"
+          >
+            <el-icon class="is-loading" :size="32"
+              ><div class="i-carbon-circle-dash"
+            /></el-icon>
+            <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">
+              Looking for the tar index…
+            </p>
+          </div>
+          <div
+            v-else-if="tarDetect === 'error'"
+            class="text-center py-16"
+            data-testid="tar-detect-error"
+          >
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+              Could not check whether this tar has an index.
+            </p>
+            <el-button class="mt-3" type="primary" @click="loadFileInfo"
+              >Retry</el-button
+            >
           </div>
           <!-- Zip inline browser: same panel in zip mode. The central
              directory is the index, so no sibling lookup is needed. -->
@@ -595,7 +622,11 @@ import TarBrowserPanel from "@/components/repo/preview/TarBrowserPanel.vue";
 import FileMetadataPanel from "@/components/repo/preview/FileMetadataPanel.vue";
 import PsdPreview from "@/components/repo/preview/PsdPreview.vue";
 import { createHttpRangeSource, isPsdPath } from "@/utils/psd-preview";
-import { hasIndexSibling, tarSidecarPath } from "@/utils/indexed-tar";
+import {
+  IndexedTarFetchError,
+  IndexedTarFormatError,
+  parseTarIndex,
+} from "@/utils/indexed-tar";
 import {
   buildResolveUrl,
   getPreviewKind,
@@ -688,6 +719,9 @@ const deleting = ref(false);
 // sidecar.
 const indexedTarTreeEntry = ref(null);
 const isIndexedTar = ref(false);
+// The ordinary TAR path keeps its detection state and preloaded sidecar.
+const tarDetect = ref("idle");
+const prefetchedTarIndex = ref(null);
 const isZipArchive = computed(
   () => !restricted.value && isZipArchivePath(filePath.value),
 );
@@ -759,13 +793,11 @@ const fileUrl = computed(() => {
   return `/${repoType.value}s/${namespace.value}/${name.value}/resolve/${branch.value}/${filePath.value}`;
 });
 
-const indexedTarSidecarUrl = computed(() => {
-  if (!isIndexedTar.value) return "";
-  const dot = filePath.value.lastIndexOf(".");
-  if (dot < 0) return "";
-  const base = filePath.value.slice(0, dot);
-  return `/${repoType.value}s/${namespace.value}/${name.value}/resolve/${branch.value}/${base}.json`;
-});
+// `<basename>.json` next to the `.tar` (only read for a `.tar` page).
+const indexedTarSidecarUrl = computed(
+  () =>
+    `/${repoType.value}s/${namespace.value}/${name.value}/resolve/${branch.value}/${filePath.value.replace(/\.tar$/i, ".json")}`,
+);
 
 const languageLabel = computed(() => {
   const langMap = {
@@ -993,6 +1025,11 @@ async function fetchFileSize() {
     const entry = data.find(
       (e) => e.type === "file" && e.path === filePath.value,
     );
+    // One request answers both the size and, for an indexed tar, the
+    // record the panel's hash banner compares against the sidecar.
+    if (entry && fileName.value.toLowerCase().endsWith(".tar")) {
+      indexedTarTreeEntry.value = entry;
+    }
     return entry ? entry.size : null;
   } catch {
     return null;
@@ -1061,17 +1098,14 @@ async function loadFileInfo() {
   imageFailed.value = false;
   isIndexedTar.value = false;
   indexedTarTreeEntry.value = null;
+  tarDetect.value = "idle";
+  prefetchedTarIndex.value = null;
 
   // Indexed-tar detection runs in parallel with the file body load —
-  // if the current file is a `.tar` and the parent folder also
-  // contains a `<basename>.json` sibling, we render the inline tar
-  // browser instead of the binary fallback. The detection is best
-  // effort: a failure here should not break the standard preview
-  // path, so all errors are swallowed silently.
+  // if the current file is a `.tar` with a sibling `<basename>.json`,
+  // we render the inline tar browser instead of the binary fallback.
   if (fileName.value.toLowerCase().endsWith(".tar")) {
-    detectIndexedTar().catch((err) => {
-      console.warn("indexed-tar sibling detection failed", err);
-    });
+    detectIndexedTar();
   }
 
   try {
@@ -1127,49 +1161,37 @@ async function loadFileInfo() {
   }
 }
 
+// Is this tar indexed? Ask for the sidecar itself, in one request. A 200
+// answers "yes" and its body is the index the panel needs anyway, so it is
+// handed over instead of being fetched twice; a 404 answers "no". Anything
+// else (dropped connection, timeout, 5xx; parseTarIndex has already retried
+// it) says nothing about the file, so it is shown as "could not check" with
+// a Retry rather than as "not indexed". The earlier check listed the whole
+// parent folder (up to 1000 entries) and then probed with HEAD; both could
+// fail or stall, and a failure was read as "no index" for good.
+let tarDetectRun = 0;
 async function detectIndexedTar() {
-  // Fetch the parent folder listing to look for a sibling .json with
-  // the same basename. The tree API already returns the full file
-  // record (oid + size + lfs) so we keep the entry around to feed
-  // the panel's hash banner — same data source as RepoViewer.
-  const parts = filePath.value.split("/").filter(Boolean);
-  const parentPath = parts.length > 1 ? "/" + parts.slice(0, -1).join("/") : "";
-  const response = await repoAPI.listTree(
-    repoType.value,
-    namespace.value,
-    name.value,
-    branch.value,
-    parentPath,
-    {},
-  );
-  const entries = response.data || [];
-  // Loaded-listing fast path mirrors the RepoViewer behaviour. The
-  // listing returns up to TREE_PAGE_SIZE (1000) entries — enough to
-  // cover most directories — but a single folder can hold more than
-  // that, in which case the sidecar might sit on a later page.
-  if (hasIndexSibling(filePath.value, entries)) {
-    const tarEntry = entries.find((e) => e.path === filePath.value);
-    if (tarEntry) indexedTarTreeEntry.value = tarEntry;
+  const run = ++tarDetectRun;
+  tarDetect.value = "detecting";
+  try {
+    const payload = await parseTarIndex(indexedTarSidecarUrl.value);
+    if (run !== tarDetectRun) return;
+    prefetchedTarIndex.value = payload;
     isIndexedTar.value = true;
-    return;
+    tarDetect.value = "indexed";
+  } catch (err) {
+    if (run !== tarDetectRun) return;
+    if (err instanceof IndexedTarFormatError) {
+      // A json that is not an index: the panel says what is wrong with it.
+      isIndexedTar.value = true;
+      tarDetect.value = "indexed";
+    } else if (err instanceof IndexedTarFetchError && err.status === 404) {
+      tarDetect.value = "none";
+    } else {
+      console.warn("indexed-tar sidecar check failed", err);
+      tarDetect.value = "error";
+    }
   }
-  // Fallback: probe the sidecar directly via HEAD /resolve/. Cheap
-  // enough that running it on every blob page open is fine, and
-  // unblocks indexed-tar UX once the parent folder grows past the
-  // single tree-page cap.
-  const sidecar = tarSidecarPath(filePath.value);
-  if (!sidecar) return;
-  const exists = await repoAPI.fileExists(
-    repoType.value,
-    namespace.value,
-    name.value,
-    branch.value,
-    sidecar,
-  );
-  if (!exists) return;
-  const tarEntry = entries.find((e) => e.path === filePath.value);
-  if (tarEntry) indexedTarTreeEntry.value = tarEntry;
-  isIndexedTar.value = true;
 }
 
 async function downloadFile() {

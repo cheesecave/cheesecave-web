@@ -1,5 +1,6 @@
 // The account settings page reports failed saves through notifyError.
 
+import { inZone } from "../helpers/zone";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -166,5 +167,15 @@ describe("account settings failures", () => {
     expectFallback("Failed to add token");
     await wrapper.vm.startEditToken(source);
     expectFallback("Failed to update token");
+  });
+});
+
+
+describe("the dates the settings page shows", () => {
+  it("are the viewer's own day: a token's naive created_at is UTC", () => {
+    const wrapper = mountPage();
+    inZone("Asia/Shanghai", () => expect(wrapper.vm.formatDate("2025-10-18T20:00:00")).toBe("Oct 19, 2025"));
+    inZone("America/Los_Angeles", () => expect(wrapper.vm.formatDate("2025-10-18T20:00:00")).toBe("Oct 18, 2025"));
+    inZone("Asia/Shanghai", () => expect(wrapper.vm.formatDate("2025-10-18T20:00:00Z")).toBe("Oct 19, 2025"));
   });
 });
