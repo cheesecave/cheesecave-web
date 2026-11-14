@@ -20,6 +20,7 @@ import RegisterPage from "@/pages/register.vue";
 describe("auth pages", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
     setActivePinia(createPinia());
     vi.spyOn(axios, "get").mockResolvedValue({
       data: { invitation_only: false },
@@ -53,6 +54,218 @@ describe("auth pages", () => {
       },
     });
   }
+
+  const repositoryCodeInput = (wrapper) =>
+    wrapper.get('input[placeholder="Optional repository invitation code"]');
+
+  async function fillRegistration(wrapper) {
+    await wrapper
+      .get('input[placeholder="Choose a username"]')
+      .setValue("reader");
+    await wrapper
+      .get('input[placeholder="your@email.com"]')
+      .setValue("reader@example.com");
+    await wrapper
+      .get('input[placeholder="Create a password"]')
+      .setValue("long-enough-password");
+  }
+
+  async function submitRegistration(wrapper) {
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text().includes("Sign Up"))
+      .trigger("click");
+    await flushPromises();
+  }
+
+  async function repositoryRegistration(type = "model") {
+    const { createRepositoryRegistration, readRepositoryRegistration } =
+      await import("@/utils/repository-registration");
+    const repository = { type, namespace: "owner", name: "invited" };
+    const token = "repo_registration_fixture";
+    const location = createRepositoryRegistration(repository, token);
+    return {
+      location,
+      token,
+      repositoryPath: `/${type}s/owner/invited`,
+      read: () =>
+        readRepositoryRegistration(location.query.repository_invitation),
+    };
+  }
+
+  it.each([
+    ["model", undefined, "/models/owner/invited"],
+    ["dataset", "/datasets/owner/approved", "/datasets/owner/approved"],
+    ["space", "https://other.example/private", "/spaces/owner/invited"],
+  ])(
+    "registers from a %s invitation without putting its code in the URL",
+    async (type, repositoryUrl, expectedPath) => {
+      const context = await repositoryRegistration(type);
+      expect(JSON.stringify(context.location)).not.toContain(context.token);
+      const router = await createTestRouter(context.location);
+      const auth = useAuthStore();
+      auth.register = vi
+        .fn()
+        .mockResolvedValue({
+          email_verified: true,
+          repository_url: repositoryUrl,
+        });
+      auth.login = vi.fn().mockResolvedValue({ ok: true });
+      const wrapper = mountPage(RegisterPage, router);
+      await flushPromises();
+      expect(router.currentRoute.value.fullPath).not.toContain(context.token);
+      expect(repositoryCodeInput(wrapper).element.value).toBe(context.token);
+      await fillRegistration(wrapper);
+      await submitRegistration(wrapper);
+      expect(auth.register).toHaveBeenCalledWith({
+        username: "reader",
+        email: "reader@example.com",
+        password: "long-enough-password",
+        repo_invitation_token: context.token,
+      });
+      expect(auth.login).toHaveBeenCalledTimes(1);
+      expect(router.currentRoute.value.path).toBe(expectedPath);
+      expect(context.read()).toBeNull();
+      expect(repositoryCodeInput(wrapper).element.value).toBe("");
+      wrapper.unmount();
+    },
+  );
+
+  it("keeps the repository destination for login when email verification is required", async () => {
+    const context = await repositoryRegistration("dataset");
+    const router = await createTestRouter(context.location);
+    const auth = useAuthStore();
+    auth.register = vi.fn().mockResolvedValue({ email_verified: false });
+    auth.login = vi.fn();
+    const wrapper = mountPage(RegisterPage, router);
+    await flushPromises();
+    await fillRegistration(wrapper);
+    await submitRegistration(wrapper);
+    expect(auth.login).not.toHaveBeenCalled();
+    expect(router.currentRoute.value.path).toBe("/login");
+    expect(router.currentRoute.value.query.return).toBe(context.repositoryPath);
+    expect(router.currentRoute.value.fullPath).not.toContain(context.token);
+    expect(context.read()).toBeNull();
+    expect(repositoryCodeInput(wrapper).element.value).toBe("");
+    wrapper.unmount();
+  });
+
+  it("routes to login after account creation succeeds but automatic login fails", async () => {
+    const context = await repositoryRegistration();
+    const router = await createTestRouter(context.location);
+    const auth = useAuthStore();
+    auth.register = vi.fn().mockResolvedValue({ email_verified: true });
+    auth.login = vi
+      .fn()
+      .mockRejectedValue(new Error("Temporary login failure"));
+    const wrapper = mountPage(RegisterPage, router);
+    await flushPromises();
+    await fillRegistration(wrapper);
+    await submitRegistration(wrapper);
+    expect(auth.register).toHaveBeenCalledTimes(1);
+    expect(router.currentRoute.value.path).toBe("/login");
+    expect(router.currentRoute.value.query.return).toBe(context.repositoryPath);
+    expect(context.read()).toBeNull();
+    expect(repositoryCodeInput(wrapper).element.value).toBe("");
+    wrapper.unmount();
+  });
+
+  it("retains the repository handoff after failed registration and consumes it only after a successful retry", async () => {
+    const context = await repositoryRegistration();
+    const router = await createTestRouter(context.location);
+    const auth = useAuthStore();
+    auth.register = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Try again"))
+      .mockResolvedValueOnce({ email_verified: true });
+    auth.login = vi.fn().mockResolvedValue({ ok: true });
+    const wrapper = mountPage(RegisterPage, router);
+    await flushPromises();
+    await fillRegistration(wrapper);
+    await submitRegistration(wrapper);
+    expect(router.currentRoute.value.path).toBe("/register");
+    expect(context.read()).toEqual({
+      token: context.token,
+      repositoryPath: context.repositoryPath,
+    });
+    expect(repositoryCodeInput(wrapper).element.value).toBe(context.token);
+    expect(auth.login).not.toHaveBeenCalled();
+    await submitRegistration(wrapper);
+    expect(auth.register).toHaveBeenCalledTimes(2);
+    for (const [payload] of auth.register.mock.calls)
+      expect(payload.repo_invitation_token).toBe(context.token);
+    expect(router.currentRoute.value.path).toBe(context.repositoryPath);
+    expect(context.read()).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("does not let a repository registration handoff bypass invitation-only registration", async () => {
+    const context = await repositoryRegistration();
+    axios.get.mockResolvedValueOnce({ data: { invitation_only: true } });
+    const router = await createTestRouter(context.location);
+    const auth = useAuthStore();
+    auth.register = vi.fn();
+    const wrapper = mountPage(RegisterPage, router);
+    await flushPromises();
+    expect(wrapper.text()).toContain("Registration is Invitation-Only");
+    expect(
+      wrapper.find('input[placeholder="Choose a username"]').exists(),
+    ).toBe(false);
+    expect(auth.register).not.toHaveBeenCalled();
+    expect(context.read().token).toBe(context.token);
+    wrapper.unmount();
+  });
+
+  it("sends a separate site invitation alongside the repository registration handoff", async () => {
+    const context = await repositoryRegistration();
+    context.location.query.invitation = "site_registration_fixture";
+    axios.get.mockResolvedValueOnce({ data: { invitation_only: true } });
+    const router = await createTestRouter(context.location);
+    const auth = useAuthStore();
+    auth.register = vi.fn().mockResolvedValue({ email_verified: true });
+    auth.login = vi.fn().mockResolvedValue({ ok: true });
+    const wrapper = mountPage(RegisterPage, router);
+    await flushPromises();
+    await fillRegistration(wrapper);
+    await submitRegistration(wrapper);
+    expect(auth.register).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invitation_token: "site_registration_fixture",
+        repo_invitation_token: context.token,
+      }),
+    );
+    expect(router.currentRoute.value.path).toBe(context.repositoryPath);
+    expect(context.read()).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("preserves legacy repository-code prefill and uses the server repository destination", async () => {
+    const router = await createTestRouter(
+      "/register?invitation=repo_legacy_fixture",
+    );
+    const auth = useAuthStore();
+    auth.register = vi
+      .fn()
+      .mockResolvedValue({
+        email_verified: true,
+        repository_url: "/models/owner/legacy",
+      });
+    auth.login = vi.fn().mockResolvedValue({ ok: true });
+    const wrapper = mountPage(RegisterPage, router);
+    await flushPromises();
+    expect(repositoryCodeInput(wrapper).element.value).toBe(
+      "repo_legacy_fixture",
+    );
+    await fillRegistration(wrapper);
+    await submitRegistration(wrapper);
+    expect(auth.register).toHaveBeenCalledWith(
+      expect.objectContaining({ repo_invitation_token: "repo_legacy_fixture" }),
+    );
+    expect(auth.register.mock.calls[0][0].invitation_token).toBeUndefined();
+    expect(router.currentRoute.value.path).toBe("/models/owner/legacy");
+    expect(repositoryCodeInput(wrapper).element.value).toBe("");
+    wrapper.unmount();
+  });
 
   it.each([
     ["login", LoginPage, "/login"],

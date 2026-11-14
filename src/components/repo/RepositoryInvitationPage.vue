@@ -82,7 +82,13 @@
           @click="redeem(false)"
           >Bind to my account</el-button
         >
-        <RouterLink v-else :to="{ path: '/register' }" class="text-blue-500"
+        <RouterLink
+          v-else
+          :to="registrationTarget"
+          class="text-blue-500"
+          @click.capture="prepareRegistration"
+          @auxclick.capture="prepareRegistration"
+          @contextmenu="prepareRegistration"
           >Create an account</RouterLink
         >
         <el-button :loading="busy" @click="redeem(true)"
@@ -104,6 +110,11 @@ import {
 import { notifyError } from "@/errors";
 import { ElMessage } from "element-plus";
 import RepositoryAccessLayout from "./RepositoryAccessLayout.vue";
+import {
+  createRepositoryRegistration,
+  newRepositoryRegistrationId,
+  repositoryRegistrationTarget,
+} from "@/utils/repository-registration";
 import "@/markdown-styles/base.css";
 const props = defineProps({
   repository: { type: Object, required: true },
@@ -119,6 +130,27 @@ const busy = ref(false);
 const requestState = ref(null);
 const bindingNotice = ref("");
 const codeDialogOpen = ref(false);
+const registrationId = ref(newRepositoryRegistrationId());
+const registrationTarget = computed(() =>
+  repositoryRegistrationTarget(props.repository, registrationId.value),
+);
+function prepareRegistration(event) {
+  if (busy.value || !token.value.trim()) {
+    event.preventDefault();
+    if (!busy.value) ElMessage.warning("Enter an invitation code");
+    return;
+  }
+  try {
+    createRepositoryRegistration(
+      props.repository,
+      token.value,
+      registrationId.value,
+    );
+  } catch (error) {
+    event.preventDefault();
+    notifyError(error, { fallback: "Could not carry repository invitation" });
+  }
+}
 watch(
   codeDialogOpen,
   (open) => {
@@ -219,6 +251,7 @@ watch(
   () => JSON.stringify(props.repository),
   () => {
     generation++;
+    registrationId.value = newRepositoryRegistrationId();
     requestState.value = null;
     bindingNotice.value = "";
     codeDialogOpen.value = false;

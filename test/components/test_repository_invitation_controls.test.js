@@ -10,6 +10,7 @@ vi.mock("@/utils/api", () => ({
   collectionsAPI: {},
 }));
 import Invitation from "@/components/repo/RepositoryInvitationPage.vue";
+import { readRepositoryRegistration } from "@/utils/repository-registration";
 
 const repository = { type: "model", namespace: "owner", name: "demo" };
 const action = (wrapper, name) =>
@@ -24,6 +25,53 @@ const mountInvitation = () =>
   });
 
 describe("invitation controls follow application state", () => {
+  it.each(["empty code", "unavailable storage"])(
+    "keeps registration on the invitation page for %s",
+    async (failure) => {
+      const wrapper = mountInvitation();
+      await action(wrapper, "Have an Invitation?").trigger("click");
+      if (failure === "unavailable storage") {
+        await wrapper
+          .get('input[aria-label="Repository invitation code"]')
+          .setValue("repo_storage_fixture");
+        vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+          throw new Error("Storage unavailable");
+        });
+      }
+      const link = wrapper
+        .findAll("a")
+        .find((item) => item.text() === "Create an account");
+      const event = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+      });
+      link.element.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(sessionStorage.length).toBe(0);
+      wrapper.unmount();
+    },
+  );
+  it("carries the entered code to registration without putting it in the link", async () => {
+    const wrapper = mountInvitation();
+    await action(wrapper, "Have an Invitation?").trigger("click");
+    await wrapper
+      .get('input[aria-label="Repository invitation code"]')
+      .setValue("repo_handoff_fixture");
+    const link = wrapper
+      .findAll("a")
+      .find((item) => item.text() === "Create an account");
+    const target = JSON.parse(link.attributes("href"));
+    expect(target.path).toBe("/register");
+    expect(link.attributes("href")).not.toContain("repo_handoff_fixture");
+    await link.trigger("click");
+    expect(
+      readRepositoryRegistration(target.query.repository_invitation),
+    ).toEqual({
+      token: "repo_handoff_fixture",
+      repositoryPath: "/models/owner/demo",
+    });
+    wrapper.unmount();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
