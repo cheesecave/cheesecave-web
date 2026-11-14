@@ -63,7 +63,10 @@
           />
         </el-form-item>
 
-        <el-form-item label="Repository invitation code (optional)">
+        <el-form-item
+          v-if="!repositoryRegistration?.guestRepositoryId"
+          label="Repository invitation code (optional)"
+        >
           <el-input
             v-model="repoInvitationToken"
             type="password"
@@ -203,6 +206,9 @@ async function handleSubmit() {
 
       if (repoInvitationToken.value.trim())
         registerData.repo_invitation_token = repoInvitationToken.value.trim();
+      else if (repositoryRegistration?.guestRepositoryId)
+        registerData.repo_guest_repository_id =
+          repositoryRegistration.guestRepositoryId;
       const result = await authStore.register(registerData);
       const serverDestination = result.repository_url;
       const destination =

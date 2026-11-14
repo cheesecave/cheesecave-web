@@ -16,6 +16,7 @@ import { createMemoryHistory, createRouter } from "@/testing/router";
 import { useAuthStore } from "@/stores/auth";
 import { repositoryAccessAPI } from "@/utils/api";
 import InvitationPage from "@/components/repo/RepositoryInvitationPage.vue";
+import GuestRegistrationLink from "@/components/repo/RepositoryGuestRegistrationLink.vue";
 import LoginPage from "@/pages/login.vue";
 import RegisterPage from "@/pages/register.vue";
 
@@ -94,6 +95,59 @@ describe("auth pages", () => {
         readRepositoryRegistration(location.query.repository_invitation),
     };
   }
+
+  it.each(["model", "dataset"])(
+    "registers from an active %s preview using its existing cookie context",
+    async (type) => {
+      const repository = { type, namespace: "owner", name: "preview" };
+      const repositoryPath = `/${type}s/owner/preview`;
+      const router = await createTestRouter(repositoryPath + "/tree/main");
+      const host = mount(
+        { render: () => null },
+        { global: { plugins: [router] } },
+      );
+      const auth = useAuthStore();
+      auth.register = vi.fn().mockResolvedValue({
+        email_verified: true,
+        repository_url: repositoryPath,
+      });
+      auth.login = vi.fn().mockResolvedValue({ ok: true });
+      const link = mount(GuestRegistrationLink, {
+        props: {
+          repository,
+          access: { access: "guest", registration_repository_id: 42 },
+        },
+        global: { plugins: [router] },
+      });
+      await link.get("a").trigger("click");
+      await flushPromises();
+      const handoffId = router.currentRoute.value.query.repository_invitation;
+      expect(router.currentRoute.value.path).toBe("/register");
+      link.unmount();
+      const page = mountPage(RegisterPage, router);
+      await flushPromises();
+      expect(
+        page
+          .find('input[placeholder="Optional repository invitation code"]')
+          .exists(),
+      ).toBe(false);
+      await fillRegistration(page);
+      await submitRegistration(page);
+      expect(auth.register).toHaveBeenCalledWith({
+        username: "reader",
+        email: "reader@example.com",
+        password: "long-enough-password",
+        repo_guest_repository_id: 42,
+      });
+      expect(auth.login).toHaveBeenCalledOnce();
+      expect(router.currentRoute.value.fullPath).toBe(repositoryPath);
+      expect(
+        sessionStorage.getItem(`repository-registration:${handoffId}`),
+      ).toBeNull();
+      page.unmount();
+      host.unmount();
+    },
+  );
 
   it("carries an entered code through the real invitation registration link and a page unmount", async () => {
     const repository = { type: "model", namespace: "owner", name: "demo" };
@@ -189,12 +243,10 @@ describe("auth pages", () => {
       expect(JSON.stringify(context.location)).not.toContain(context.token);
       const router = await createTestRouter(context.location);
       const auth = useAuthStore();
-      auth.register = vi
-        .fn()
-        .mockResolvedValue({
-          email_verified: true,
-          repository_url: repositoryUrl,
-        });
+      auth.register = vi.fn().mockResolvedValue({
+        email_verified: true,
+        repository_url: repositoryUrl,
+      });
       auth.login = vi.fn().mockResolvedValue({ ok: true });
       const wrapper = mountPage(RegisterPage, router);
       await flushPromises();
@@ -329,12 +381,10 @@ describe("auth pages", () => {
       "/register?invitation=repo_legacy_fixture",
     );
     const auth = useAuthStore();
-    auth.register = vi
-      .fn()
-      .mockResolvedValue({
-        email_verified: true,
-        repository_url: "/models/owner/legacy",
-      });
+    auth.register = vi.fn().mockResolvedValue({
+      email_verified: true,
+      repository_url: "/models/owner/legacy",
+    });
     auth.login = vi.fn().mockResolvedValue({ ok: true });
     const wrapper = mountPage(RegisterPage, router);
     await flushPromises();
