@@ -10,12 +10,13 @@ import { server } from "../setup/msw-server";
 
 async function load() {
   vi.resetModules();
-  const [{ default: api }, axiosModule, errors] = await Promise.all([
+  const [{ default: api }, axiosModule, errors, session] = await Promise.all([
     import("@/utils/api"),
     import("axios"),
-    import("@/errors"),
+    import("@/errors/appError"),
+    import("@/errors/session"),
   ]);
-  return { api, axios: axiosModule.default, ...errors };
+  return { api, axios: axiosModule.default, ...errors, ...session };
 }
 
 beforeEach(() => localStorage.clear());

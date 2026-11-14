@@ -2,7 +2,9 @@
 import axios from "axios";
 import { mediaKind } from "./media-types";
 import { formatAuthHeader, getExternalTokens } from "./externalTokens";
-import { KIND, decodeError, decodeResponse, emitAuthRequired } from "@/errors";
+import { KIND } from "@/errors/appError";
+import { decodeError, decodeResponse } from "@/errors/decode";
+import { emitAuthRequired } from "@/errors/session";
 
 const api = axios.create({
   timeout: 30000,
