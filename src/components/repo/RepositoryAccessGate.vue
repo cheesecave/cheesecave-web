@@ -8,6 +8,10 @@
     @like="invokeHeader('like')"
   >
     <template v-if="access?.access === 'guest' && !loading && !error" #actions>
+      <RepositoryGuestRegistrationLink
+        :repository="repository"
+        :access="access"
+      />
       <el-button @click="leaveGuest">End temporary access</el-button>
     </template>
     <template v-if="headerMetadata" #metadata>
@@ -85,6 +89,7 @@ import ErrorState from "@/components/common/ErrorState.vue";
 import RepositoryInvitationPage from "./RepositoryInvitationPage.vue";
 import RestrictedRepositoryViewer from "./RestrictedRepositoryViewer.vue";
 import RepositoryHeader from "./RepositoryHeader.vue";
+import RepositoryGuestRegistrationLink from "./RepositoryGuestRegistrationLink.vue";
 import MetadataHeader from "./metadata/MetadataHeader.vue";
 
 const props = defineProps({

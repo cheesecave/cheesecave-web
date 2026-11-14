@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearRepositoryRegistration,
   createRepositoryRegistration,
+  createGuestRepositoryRegistration,
   readRepositoryRegistration,
 } from "@/utils/repository-registration";
 
@@ -9,6 +10,21 @@ const repository = { type: "dataset", namespace: "owner", name: "demo" };
 beforeEach(() => sessionStorage.clear());
 
 describe("repository registration handoff", () => {
+  it("carries a guest repository without storing or recovering an invitation secret", () => {
+    const target = createGuestRepositoryRegistration(repository, 42);
+    const id = target.query.repository_invitation;
+    expect(readRepositoryRegistration(id)).toEqual({
+      guestRepositoryId: 42,
+      repositoryPath: "/datasets/owner/demo",
+    });
+    expect(
+      sessionStorage.getItem(`repository-registration:${id}`),
+    ).not.toContain("token");
+    clearRepositoryRegistration(id);
+    expect(readRepositoryRegistration(id)).toBeNull();
+    expect(() => createGuestRepositoryRegistration(repository, "42")).toThrow();
+    expect(() => createGuestRepositoryRegistration(repository, -1)).toThrow();
+  });
   it("uses an opaque link and tab-local storage without changing normal authentication", () => {
     localStorage.setItem("hf_token", "normal-token-fixture");
     const target = createRepositoryRegistration(
@@ -26,12 +42,12 @@ describe("repository registration handoff", () => {
     clearRepositoryRegistration(id);
     expect(readRepositoryRegistration(id)).toBeNull();
   });
-  it("expires abandoned handoffs without restoring their codes", () => {
+  it.each(["code", "guest"])("expires abandoned %s handoffs", (kind) => {
     const clock = vi.spyOn(Date, "now").mockReturnValue(1000);
-    const target = createRepositoryRegistration(
-      repository,
-      "repo_expiration_fixture",
-    );
+    const target =
+      kind === "guest"
+        ? createGuestRepositoryRegistration(repository, 42)
+        : createRepositoryRegistration(repository, "repo_expiration_fixture");
     clock.mockReturnValue(1000 + 30 * 60 * 1000);
     expect(
       readRepositoryRegistration(target.query.repository_invitation),

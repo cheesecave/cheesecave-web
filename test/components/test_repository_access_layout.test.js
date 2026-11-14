@@ -79,6 +79,27 @@ function expectRestrictedHeader(wrapper, visibility = "Invite") {
 }
 
 describe("restricted repository pages share the normal repository header", () => {
+  it("places account registration alongside the guest exit in the shared header", async () => {
+    mocks.auth.isAuthenticated = false;
+    mocks.getAccess.mockResolvedValue({
+      data: {
+        access: "guest",
+        visibility: "invite",
+        registration_repository_id: 12,
+      },
+    });
+    const wrapper = mountView(Gate, {
+      route: { path: "/models/owner/invited/tree/main" },
+    });
+    await flushPromises();
+    const header = expectRestrictedHeader(wrapper);
+    expect(
+      within(header).getByRole("link", { name: "Create an account" }),
+    ).toBeDefined();
+    expect(
+      within(header).getByRole("button", { name: "End temporary access" }),
+    ).toBeDefined();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.auth = reactive({ isAuthenticated: true, username: "reader" });

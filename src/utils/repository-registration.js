@@ -54,20 +54,52 @@ export function clearRepositoryRegistration(id) {
   }
 }
 
+export function createGuestRepositoryRegistration(
+  repository,
+  guestRepositoryId,
+  id = newRepositoryRegistrationId(),
+) {
+  const target = repositoryRegistrationTarget(repository, id);
+  if (!Number.isSafeInteger(guestRepositoryId) || guestRepositoryId <= 0)
+    throw new Error("Repository registration is unavailable");
+  // The nonsecret ID selects a repository; only its HttpOnly guest cookie can
+  // authorize registration. The backend rechecks the invitation at signup.
+  sessionStorage.setItem(
+    PREFIX + id,
+    JSON.stringify({
+      guestRepositoryId,
+      repositoryPath: target.query.return,
+      expiresAt: Date.now() + LIFETIME_MS,
+    }),
+  );
+  return target;
+}
+
 export function readRepositoryRegistration(id) {
   if (!validId(id)) return null;
   try {
     const context = JSON.parse(sessionStorage.getItem(PREFIX + id));
+    const hasToken =
+      typeof context?.token === "string" &&
+      context.token.length > 0 &&
+      context.token.length <= 256;
+    const hasGuest =
+      Number.isSafeInteger(context?.guestRepositoryId) &&
+      context.guestRepositoryId > 0;
     if (
       context &&
-      typeof context.token === "string" &&
-      context.token.length > 0 &&
-      context.token.length <= 256 &&
+      ((hasToken && context.guestRepositoryId === undefined) ||
+        (hasGuest && context.token === undefined)) &&
       validPath(context.repositoryPath) &&
       Number.isFinite(context.expiresAt) &&
       context.expiresAt > Date.now()
     )
-      return { token: context.token, repositoryPath: context.repositoryPath };
+      return {
+        ...(hasToken
+          ? { token: context.token }
+          : { guestRepositoryId: context.guestRepositoryId }),
+        repositoryPath: context.repositoryPath,
+      };
     clearRepositoryRegistration(id);
   } catch {
     // Unavailable storage or an expired/malformed handoff cannot supply a code.

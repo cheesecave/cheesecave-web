@@ -7,6 +7,7 @@ import { formatRelativeTime } from "@/utils/datetime";
 import { decodeError, notifyError } from "@/errors";
 import ErrorState from "@/components/common/ErrorState.vue";
 import RepositoryAccessLayout from "./RepositoryAccessLayout.vue";
+import RepositoryGuestRegistrationLink from "./RepositoryGuestRegistrationLink.vue";
 import RepositoryFiles from "./RepositoryFiles.vue";
 import BlobFilePage from "@/pages/[type]s/[namespace]/[name]/blob/[branch]/[...file].vue";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
@@ -583,9 +584,13 @@ defineExpose({ leave, navigate });
     :view="activeView"
     @navigate="navigate"
   >
-    <template v-if="!embedded" #actions
-      ><el-button @click="leave">End temporary access</el-button></template
-    >
+    <template v-if="!embedded" #actions>
+      <RepositoryGuestRegistrationLink
+        :repository="repository"
+        :access="access"
+      />
+      <el-button @click="leave">End temporary access</el-button>
+    </template>
     <div v-if="accessInvalid" role="status">Checking repository access…</div>
     <BlobFilePage
       v-else-if="activeView === 'files' && selectedPath"
