@@ -18,18 +18,19 @@ User authentication, registration, API token management, and email verification.
 
 **Authentication:** Public (no auth required)
 
-**Query Parameters:**
-- `invitation_token` (optional): Required if server is in invitation-only mode
+The optional JSON field `invitation_code` accepts a site or repository code. The
+server identifies the code and applies the site's registration policy. Invitation-only
+sites require a valid site registration invitation. A repository code grants
+read and download access to one repository, including during open registration.
 
-The body may additionally contain `repo_invitation_token`. This grants the new
-account read access to that single repository, including normal downloads. Supply
-it even when site registration is open. It does not replace a site registration
-invitation when the site is invitation-only, join an organization, create a
-temporary account, or issue a Hugging Face access token.
+The `invitation_token` query parameter and `repo_invitation_token` body field remain
+available to existing clients. When registration includes repository access, the
+response supplies `repository_url` for the return after sign-in or required email
+verification. The Web can carry the repository invitation from the invitation
+dialog or an eligible visitor session.
 
-Existing accounts can bind a repository code at `/repo-access`. Temporary web
-preview access uses a separate repository visitor cookie and leaves the normal
-login and personal token unchanged.
+Signed-in accounts can submit a repository code at `/repo-access` to gain access
+and open its repository. See [Repository invitation access](repository-access.md).
 
 **Request Body:**
 ```json
