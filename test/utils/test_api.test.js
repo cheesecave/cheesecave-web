@@ -18,6 +18,40 @@ describe("frontend API client", () => {
     vi.restoreAllMocks();
   });
 
+  it("forwards the unified invitation and automatic repository context without classifying codes", async () => {
+    const { apiClient, authAPI } = await loadModules();
+    const postSpy = vi.spyOn(apiClient, "post").mockResolvedValue({ data: {} });
+    const account = {
+      username: "reader",
+      email: "reader@example.com",
+      password: "fixture-password",
+    };
+    await authAPI.register({
+      ...account,
+      invitation_code: "site-code-fixture",
+      repo_guest_repository_id: 42,
+    });
+    expect(postSpy).toHaveBeenLastCalledWith(
+      "/api/auth/register",
+      {
+        ...account,
+        invitation_code: "site-code-fixture",
+        repo_guest_repository_id: 42,
+      },
+      { params: {} },
+    );
+    await authAPI.register({
+      ...account,
+      invitation_code: "repo-code-fixture",
+      invitation_token: "site-link-fixture",
+    });
+    expect(postSpy).toHaveBeenLastCalledWith(
+      "/api/auth/register",
+      { ...account, invitation_code: "repo-code-fixture" },
+      { params: { invitation_token: "site-link-fixture" } },
+    );
+  });
+
   it("changes and resets passwords through the auth endpoints", async () => {
     const { apiClient, authAPI } = await loadModules();
     const postSpy = vi.spyOn(apiClient, "post").mockResolvedValue({ data: {} });
