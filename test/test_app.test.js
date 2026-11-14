@@ -19,6 +19,7 @@ const routeState = ref({
 });
 
 vi.mock("vue-router/auto", () => ({
+  useRouter: () => ({ push: vi.fn() }),
   useRoute: () => ({
     get path() {
       return routeState.value.path;
@@ -91,11 +92,12 @@ import { repositoryAccessAPI } from "@/utils/api";
 describe("App shell", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    vi.clearAllMocks();
     repositoryAccessAPI.getAccess.mockResolvedValue({
       data: { access: "full" },
     });
   });
-  it("scrolls one site header with model and dataset views, leaving Spaces and other pages in the existing shell", async () => {
+  it("scrolls one site header with all repository browsing and Settings views, leaving other pages in the existing shell", async () => {
     const prefix = "/[type]s/[namespace]/[name]";
     const cases = [
       ["/models/team/demo", `${prefix}/`, "model", true],
@@ -112,12 +114,12 @@ describe("App shell", () => {
         "dataset",
         true,
       ],
-      ["/spaces/team/demo", `${prefix}/`, "space", false],
+      ["/spaces/team/demo", `${prefix}/`, "space", true],
       [
         "/spaces/team/demo/tree/main",
         `${prefix}/tree/[branch]/`,
         "space",
-        false,
+        true,
       ],
       [
         "/models/team/demo/blob/main/README.md",
@@ -135,15 +137,15 @@ describe("App shell", () => {
         "/spaces/team/demo/blob/main/README.md",
         `${prefix}/blob/[branch]/[...file]`,
         "space",
-        false,
+        true,
       ],
       [
         "/spaces/team/demo/commit/abc123",
         `${prefix}/commit/[commit_id]`,
         "space",
-        false,
+        true,
       ],
-      ["/datasets/team/demo/settings", `${prefix}/settings`, "dataset", false],
+      ["/datasets/team/demo/settings", `${prefix}/settings`, "dataset", true],
       ["/models", "/models", undefined, false],
       ["/new?type=model", "/new", undefined, false],
       ["/team", "/[username]/", undefined, false],
@@ -168,11 +170,11 @@ describe("App shell", () => {
     wrapper.unmount();
   });
 
-  it("hides the footer on every model or dataset repository route while keeping discovery and Spaces unchanged", async () => {
+  it("hides the footer on every repository route while keeping discovery and other pages unchanged", async () => {
     const wrapper = mount(App, {
       global: { components: { RouterView: RouterViewStub } },
     });
-    for (const type of ["model", "dataset"]) {
+    for (const type of ["model", "dataset", "space"]) {
       for (const suffix of [
         "",
         "/tree/main",
@@ -196,9 +198,8 @@ describe("App shell", () => {
       "/datasets",
       "/models/new",
       "/datasets/new",
-      "/spaces/team/demo",
-      "/spaces/team/demo/tree/main",
-      "/spaces/team/demo/settings",
+      "/spaces",
+      "/spaces/new",
       "/organizations/team",
     ]) {
       routeState.value = { path };
@@ -269,7 +270,7 @@ describe("App shell", () => {
     wrapper.unmount();
   });
 
-  it("separates hyphenated repository identities and restores each cached instance", async () => {
+  it("separates hyphenated repository identities and rechecks access before mounting a returned repository", async () => {
     mountCounts.repoViewer = 0;
     routeState.value = { path: "/models/a-b/c" };
     const wrapper = mount(App, {
@@ -277,12 +278,30 @@ describe("App shell", () => {
     });
     await flushPromises();
     expect(mountCounts.repoViewer).toBe(1);
+    expect(repositoryAccessAPI.getAccess).toHaveBeenLastCalledWith({
+      type: "model",
+      namespace: "a-b",
+      name: "c",
+    });
     routeState.value = { path: "/models/a/b-c" };
     await flushPromises();
     expect(mountCounts.repoViewer).toBe(2);
+    expect(repositoryAccessAPI.getAccess).toHaveBeenLastCalledWith({
+      type: "model",
+      namespace: "a",
+      name: "b-c",
+    });
     routeState.value = { path: "/models/a-b/c/tree/main" };
     await flushPromises();
-    expect(mountCounts.repoViewer).toBe(2);
+    // Protected views are discarded when the repository identity changes.
+    // Returning must authorize and mount again, rather than revive old content.
+    expect(mountCounts.repoViewer).toBe(3);
+    expect(repositoryAccessAPI.getAccess).toHaveBeenCalledTimes(3);
+    expect(repositoryAccessAPI.getAccess).toHaveBeenLastCalledWith({
+      type: "model",
+      namespace: "a-b",
+      name: "c",
+    });
     wrapper.unmount();
   });
 

@@ -15,6 +15,7 @@ import {
   brokenButtons,
   checkButtonCascade,
   main,
+  runBrowser,
   stylesheets,
 } from "../../scripts/check-button-cascade.mjs";
 
@@ -163,5 +164,99 @@ describe("check-button-cascade", () => {
       }),
     ).toThrow("chrome crashed");
     expect(() => read(join(dir, "button-cascade.html"))).toThrow();
+  });
+});
+
+describe("portable headless browser selection", () => {
+  it("uses an explicit browser path as one executable argument", () => {
+    const run = vi.fn().mockReturnValue("rendered");
+    expect(
+      runBrowser("file:///fixture.html", {
+        env: { CHROME_BIN: "C:\\Browser With Spaces\\chrome.exe" },
+        platform: "win32",
+        run,
+      }),
+    ).toBe("rendered");
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(run).toHaveBeenCalledWith(
+      "C:\\Browser With Spaces\\chrome.exe",
+      expect.arrayContaining([
+        "--headless=new",
+        "--dump-dom",
+        "file:///fixture.html",
+      ]),
+      expect.objectContaining({
+        encoding: "utf8",
+        stdio: "pipe",
+        timeout: 30000,
+      }),
+    );
+  });
+  it("discovers Windows installations before PATH commands", () => {
+    const run = vi
+      .fn()
+      .mockImplementationOnce(() => {
+        throw Object.assign(new Error("missing"), { code: "ENOENT" });
+      })
+      .mockReturnValue("rendered");
+    expect(
+      runBrowser("file:///fixture.html", {
+        env: { ProgramFiles: "C:\\Apps", "ProgramFiles(x86)": "C:\\Apps32" },
+        platform: "win32",
+        run,
+      }),
+    ).toBe("rendered");
+    expect(run.mock.calls.map(([executable]) => executable)).toEqual([
+      "C:\\Apps\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Apps32\\Google\\Chrome\\Application\\chrome.exe",
+    ]);
+  });
+  it("reports a missing explicit browser without silently using another", () => {
+    const run = vi.fn(() => {
+      throw Object.assign(new Error("missing"), { code: "ENOENT" });
+    });
+    expect(() =>
+      runBrowser("file:///fixture.html", {
+        env: { CHROME_BIN: "missing-browser" },
+        platform: "linux",
+        run,
+      }),
+    ).toThrow(/CHROME_BIN/);
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+  it.each([
+    ["linux", "chromium"],
+    [
+      "darwin",
+      "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    ],
+    ["win32", "C:\\Apps\\Microsoft\\Edge\\Application\\msedge.exe"],
+  ])("can fall back to an available browser on %s", (platform, available) => {
+    const run = vi.fn((executable) => {
+      if (executable === available) return "rendered";
+      throw Object.assign(new Error("missing"), { code: "ENOENT" });
+    });
+    expect(
+      runBrowser("file:///fixture.html", {
+        env: { ProgramFiles: "C:\\Apps" },
+        platform,
+        run,
+      }),
+    ).toBe("rendered");
+    expect(run).toHaveBeenLastCalledWith(
+      available,
+      expect.any(Array),
+      expect.any(Object),
+    );
+  });
+  it("preserves a real browser failure rather than falling through to another", () => {
+    const failure = Object.assign(new Error("browser crashed"), { status: 1 });
+    const run = vi.fn(() => {
+      throw failure;
+    });
+    expect(() =>
+      runBrowser("file:///fixture.html", { env: {}, platform: "linux", run }),
+    ).toThrow(failure);
+    expect(run).toHaveBeenCalledTimes(1);
   });
 });

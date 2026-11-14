@@ -57,6 +57,7 @@
     v-model="codeDialogOpen"
     title="Repository invitation"
     width="min(440px, calc(100vw - 32px))"
+    append-to-body
     destroy-on-close
   >
     <div class="space-y-3">
