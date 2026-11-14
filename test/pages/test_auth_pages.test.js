@@ -58,8 +58,8 @@ describe("auth pages", () => {
     });
   }
 
-  const repositoryCodeInput = (wrapper) =>
-    wrapper.get('input[placeholder="Optional repository invitation code"]');
+  const invitationCodeInput = (wrapper) =>
+    wrapper.get('input[placeholder="Invitation code"]');
 
   async function fillRegistration(wrapper) {
     await wrapper
@@ -96,6 +96,127 @@ describe("auth pages", () => {
     };
   }
 
+  it.each([
+    [false, "admin-site-fixture"],
+    [true, "admin-site-fixture"],
+    [false, "repo_ambiguous-prefix-fixture"],
+    [true, "repo_ambiguous-prefix-fixture"],
+  ])(
+    "uses one generic field and delegates code recognition to the server (required: %s, code: %s)",
+    async (invitationOnly, code) => {
+      axios.get.mockResolvedValueOnce({
+        data: { invitation_only: invitationOnly },
+      });
+      const router = await createTestRouter("/register");
+      const auth = useAuthStore();
+      auth.register = vi.fn().mockResolvedValue({ email_verified: false });
+      const wrapper = mountPage(RegisterPage, router);
+      await flushPromises();
+      const input = invitationCodeInput(wrapper);
+      expect(input.attributes("aria-label")).toBe("Invitation code");
+      expect(
+        wrapper
+          .findComponent({ name: "ElForm" })
+          .props("rules")
+          .invitationCode.some((rule) => rule.required === invitationOnly),
+      ).toBe(true);
+      expect(wrapper.html()).not.toContain("Repository invitation code");
+      expect(wrapper.text()).not.toMatch(
+        /Using Invitation|Grants read access|replace a required site registration invitation|You're registering with an invitation link/,
+      );
+      await fillRegistration(wrapper);
+      await input.setValue(` ${code} `);
+      await submitRegistration(wrapper);
+      expect(auth.register).toHaveBeenCalledWith({
+        username: "reader",
+        email: "reader@example.com",
+        password: "long-enough-password",
+        invitation_code: code,
+      });
+      wrapper.unmount();
+    },
+  );
+
+  it("waits for the registration policy before allowing signup", async () => {
+    let finishConfig;
+    axios.get.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishConfig = resolve;
+      }),
+    );
+    const router = await createTestRouter("/register");
+    const auth = useAuthStore();
+    auth.register = vi.fn();
+    const wrapper = mountPage(RegisterPage, router);
+    await fillRegistration(wrapper);
+    await submitRegistration(wrapper);
+    expect(auth.register).not.toHaveBeenCalled();
+    finishConfig({ data: { invitation_only: true } });
+    await flushPromises();
+    await submitRegistration(wrapper);
+    expect(auth.register).not.toHaveBeenCalled();
+    expect(invitationCodeInput(wrapper).element.value).toBe("");
+    wrapper.unmount();
+  });
+
+  it("accepts a site invitation without losing an existing visitor registration context", async () => {
+    const { createGuestRepositoryRegistration, readRepositoryRegistration } =
+      await import("@/utils/repository-registration");
+    const target = createGuestRepositoryRegistration(
+      { type: "dataset", namespace: "owner", name: "preview" },
+      42,
+    );
+    axios.get.mockResolvedValueOnce({ data: { invitation_only: true } });
+    const router = await createTestRouter(target);
+    const auth = useAuthStore();
+    auth.register = vi.fn().mockResolvedValue({
+      email_verified: true,
+      repository_url: "/datasets/owner/preview",
+    });
+    auth.login = vi.fn().mockResolvedValue({ ok: true });
+    const wrapper = mountPage(RegisterPage, router);
+    await flushPromises();
+    expect(invitationCodeInput(wrapper).element.value).toBe("");
+    await fillRegistration(wrapper);
+    await submitRegistration(wrapper);
+    expect(auth.register).not.toHaveBeenCalled();
+    await invitationCodeInput(wrapper).setValue("site-guest-fixture");
+    await submitRegistration(wrapper);
+    expect(auth.register).toHaveBeenCalledWith({
+      username: "reader",
+      email: "reader@example.com",
+      password: "long-enough-password",
+      invitation_code: "site-guest-fixture",
+      repo_guest_repository_id: 42,
+    });
+    expect(router.currentRoute.value.path).toBe("/datasets/owner/preview");
+    expect(
+      readRepositoryRegistration(target.query.repository_invitation),
+    ).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("uses the edited invitation code instead of resubmitting the original link", async () => {
+    const router = await createTestRouter(
+      "/register?invitation=original-fixture",
+    );
+    const auth = useAuthStore();
+    auth.register = vi.fn().mockResolvedValue({ email_verified: false });
+    const wrapper = mountPage(RegisterPage, router);
+    await flushPromises();
+    expect(invitationCodeInput(wrapper).element.value).toBe("original-fixture");
+    await invitationCodeInput(wrapper).setValue("second-fixture");
+    await fillRegistration(wrapper);
+    await submitRegistration(wrapper);
+    expect(auth.register).toHaveBeenCalledWith({
+      username: "reader",
+      email: "reader@example.com",
+      password: "long-enough-password",
+      invitation_code: "second-fixture",
+    });
+    wrapper.unmount();
+  });
+
   it.each(["model", "dataset"])(
     "registers from an active %s preview using its existing cookie context",
     async (type) => {
@@ -126,11 +247,9 @@ describe("auth pages", () => {
       link.unmount();
       const page = mountPage(RegisterPage, router);
       await flushPromises();
-      expect(
-        page
-          .find('input[placeholder="Optional repository invitation code"]')
-          .exists(),
-      ).toBe(false);
+      expect(page.find('input[placeholder="Invitation code"]').exists()).toBe(
+        false,
+      );
       await fillRegistration(page);
       await submitRegistration(page);
       expect(auth.register).toHaveBeenCalledWith({
@@ -216,11 +335,11 @@ describe("auth pages", () => {
 
     const registration = mountPage(RegisterPage, router);
     await flushPromises();
-    expect(repositoryCodeInput(registration).element.value).toBe(token);
+    expect(invitationCodeInput(registration).element.value).toBe(token);
     await fillRegistration(registration);
     await submitRegistration(registration);
     expect(auth.register).toHaveBeenCalledWith(
-      expect.objectContaining({ repo_invitation_token: token }),
+      expect.objectContaining({ invitation_code: token }),
     );
     expect(auth.login).toHaveBeenCalledWith({
       username: "reader",
@@ -251,19 +370,19 @@ describe("auth pages", () => {
       const wrapper = mountPage(RegisterPage, router);
       await flushPromises();
       expect(router.currentRoute.value.fullPath).not.toContain(context.token);
-      expect(repositoryCodeInput(wrapper).element.value).toBe(context.token);
+      expect(invitationCodeInput(wrapper).element.value).toBe(context.token);
       await fillRegistration(wrapper);
       await submitRegistration(wrapper);
       expect(auth.register).toHaveBeenCalledWith({
         username: "reader",
         email: "reader@example.com",
         password: "long-enough-password",
-        repo_invitation_token: context.token,
+        invitation_code: context.token,
       });
       expect(auth.login).toHaveBeenCalledTimes(1);
       expect(router.currentRoute.value.path).toBe(expectedPath);
       expect(context.read()).toBeNull();
-      expect(repositoryCodeInput(wrapper).element.value).toBe("");
+      expect(invitationCodeInput(wrapper).element.value).toBe("");
       wrapper.unmount();
     },
   );
@@ -283,7 +402,7 @@ describe("auth pages", () => {
     expect(router.currentRoute.value.query.return).toBe(context.repositoryPath);
     expect(router.currentRoute.value.fullPath).not.toContain(context.token);
     expect(context.read()).toBeNull();
-    expect(repositoryCodeInput(wrapper).element.value).toBe("");
+    expect(invitationCodeInput(wrapper).element.value).toBe("");
     wrapper.unmount();
   });
 
@@ -303,7 +422,7 @@ describe("auth pages", () => {
     expect(router.currentRoute.value.path).toBe("/login");
     expect(router.currentRoute.value.query.return).toBe(context.repositoryPath);
     expect(context.read()).toBeNull();
-    expect(repositoryCodeInput(wrapper).element.value).toBe("");
+    expect(invitationCodeInput(wrapper).element.value).toBe("");
     wrapper.unmount();
   });
 
@@ -325,12 +444,12 @@ describe("auth pages", () => {
       token: context.token,
       repositoryPath: context.repositoryPath,
     });
-    expect(repositoryCodeInput(wrapper).element.value).toBe(context.token);
+    expect(invitationCodeInput(wrapper).element.value).toBe(context.token);
     expect(auth.login).not.toHaveBeenCalled();
     await submitRegistration(wrapper);
     expect(auth.register).toHaveBeenCalledTimes(2);
     for (const [payload] of auth.register.mock.calls)
-      expect(payload.repo_invitation_token).toBe(context.token);
+      expect(payload.invitation_code).toBe(context.token);
     expect(router.currentRoute.value.path).toBe(context.repositoryPath);
     expect(context.read()).toBeNull();
     wrapper.unmount();
@@ -344,12 +463,29 @@ describe("auth pages", () => {
     auth.register = vi.fn();
     const wrapper = mountPage(RegisterPage, router);
     await flushPromises();
-    expect(wrapper.text()).toContain("Registration is Invitation-Only");
-    expect(
-      wrapper.find('input[placeholder="Choose a username"]').exists(),
-    ).toBe(false);
+    expect(wrapper.get('input[placeholder="Choose a username"]').exists()).toBe(
+      true,
+    );
+    expect(invitationCodeInput(wrapper).element.value).toBe("");
+    await fillRegistration(wrapper);
+    await submitRegistration(wrapper);
     expect(auth.register).not.toHaveBeenCalled();
     expect(context.read().token).toBe(context.token);
+    auth.register.mockResolvedValue({
+      email_verified: true,
+      repository_url: context.repositoryPath,
+    });
+    auth.login = vi.fn().mockResolvedValue({ ok: true });
+    await invitationCodeInput(wrapper).setValue("admin-manual-fixture");
+    await submitRegistration(wrapper);
+    expect(auth.register).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invitation_code: "admin-manual-fixture",
+        repo_invitation_token: context.token,
+      }),
+    );
+    expect(router.currentRoute.value.path).toBe(context.repositoryPath);
+    expect(context.read()).toBeNull();
     wrapper.unmount();
   });
 
@@ -367,7 +503,7 @@ describe("auth pages", () => {
     await submitRegistration(wrapper);
     expect(auth.register).toHaveBeenCalledWith(
       expect.objectContaining({
-        invitation_token: "site_registration_fixture",
+        invitation_code: "site_registration_fixture",
         repo_invitation_token: context.token,
       }),
     );
@@ -388,17 +524,17 @@ describe("auth pages", () => {
     auth.login = vi.fn().mockResolvedValue({ ok: true });
     const wrapper = mountPage(RegisterPage, router);
     await flushPromises();
-    expect(repositoryCodeInput(wrapper).element.value).toBe(
+    expect(invitationCodeInput(wrapper).element.value).toBe(
       "repo_legacy_fixture",
     );
     await fillRegistration(wrapper);
     await submitRegistration(wrapper);
     expect(auth.register).toHaveBeenCalledWith(
-      expect.objectContaining({ repo_invitation_token: "repo_legacy_fixture" }),
+      expect.objectContaining({ invitation_code: "repo_legacy_fixture" }),
     );
     expect(auth.register.mock.calls[0][0].invitation_token).toBeUndefined();
     expect(router.currentRoute.value.path).toBe("/models/owner/legacy");
-    expect(repositoryCodeInput(wrapper).element.value).toBe("");
+    expect(invitationCodeInput(wrapper).element.value).toBe("");
     wrapper.unmount();
   });
 
@@ -631,24 +767,29 @@ describe("auth pages", () => {
     expect(wrapper.text()).not.toContain("Sign up");
   });
 
-  it("blocks registration without an invitation and routes visitors to login", async () => {
+  it("allows an invitation to be entered when registration requires one", async () => {
     const router = await createTestRouter("/register");
-    const pushSpy = vi.spyOn(router, "push");
     axios.get.mockResolvedValueOnce({
       data: { invitation_only: true },
     });
 
     const wrapper = mountPage(RegisterPage, router);
     await flushPromises();
-
-    expect(wrapper.text()).toContain("Registration is Invitation-Only");
-
-    await wrapper
-      .findAll("button")
-      .find((button) => button.text().includes("Go to Login"))
-      .trigger("click");
-
-    expect(pushSpy).toHaveBeenCalledWith("/login");
+    const auth = useAuthStore();
+    auth.register = vi.fn().mockResolvedValue({ email_verified: false });
+    expect(wrapper.get('input[placeholder="Choose a username"]').exists()).toBe(
+      true,
+    );
+    expect(invitationCodeInput(wrapper).element.value).toBe("");
+    await fillRegistration(wrapper);
+    await submitRegistration(wrapper);
+    expect(auth.register).not.toHaveBeenCalled();
+    await invitationCodeInput(wrapper).setValue("admin-site-fixture");
+    await submitRegistration(wrapper);
+    expect(auth.register).toHaveBeenCalledWith(
+      expect.objectContaining({ invitation_code: "admin-site-fixture" }),
+    );
+    wrapper.unmount();
   });
 
   it("registers with an invitation token and auto-logins verified users", async () => {
@@ -665,6 +806,10 @@ describe("auth pages", () => {
 
     const wrapper = mountPage(RegisterPage, router);
     await flushPromises();
+    expect(invitationCodeInput(wrapper).element.value).toBe("invite-123");
+    expect(wrapper.text()).not.toMatch(
+      /Using Invitation|You're registering with an invitation link|Grants read access/,
+    );
 
     await wrapper
       .find('input[placeholder="Choose a username"]')
@@ -685,7 +830,7 @@ describe("auth pages", () => {
       username: "ivy_ops",
       email: "ivy@example.com",
       password: "securepass",
-      invitation_token: "invite-123",
+      invitation_code: "invite-123",
     });
     expect(authStore.login).toHaveBeenCalledWith({
       username: "ivy_ops",
@@ -709,28 +854,36 @@ describe("auth pages", () => {
     await w
       .get('input[placeholder="Create a password"]')
       .setValue("long-enough-password");
-    await w
-      .get('input[placeholder="Optional repository invitation code"]')
-      .setValue("repo_secret");
+    await w.get('input[placeholder="Invitation code"]').setValue("repo_secret");
     await w
       .findAll("button")
       .find((b) => b.text().includes("Sign Up"))
       .trigger("click");
     await flushPromises();
     expect(authStore.register).toHaveBeenCalledWith(
-      expect.objectContaining({ repo_invitation_token: "repo_secret" }),
+      expect.objectContaining({ invitation_code: "repo_secret" }),
     );
     w.unmount();
   });
-  it("does not treat a repository-code link as a site registration invitation", async () => {
+  it("leaves invitation eligibility to the server instead of classifying a query code in the browser", async () => {
     const router = await createTestRouter("/register?invitation=repo_private");
     axios.get.mockResolvedValueOnce({ data: { invitation_only: true } });
     const w = mountPage(RegisterPage, router);
     await flushPromises();
-    expect(w.text()).toContain("Registration is Invitation-Only");
-    expect(w.find('input[placeholder="Choose a username"]').exists()).toBe(
-      false,
+    const auth = useAuthStore();
+    auth.register = vi
+      .fn()
+      .mockRejectedValue(new Error("Invalid invitation code"));
+    auth.login = vi.fn();
+    expect(invitationCodeInput(w).element.value).toBe("repo_private");
+    await fillRegistration(w);
+    await submitRegistration(w);
+    expect(auth.register).toHaveBeenCalledWith(
+      expect.objectContaining({ invitation_code: "repo_private" }),
     );
+    expect(auth.login).not.toHaveBeenCalled();
+    expect(router.currentRoute.value.path).toBe("/register");
+    expect(invitationCodeInput(w).element.value).toBe("repo_private");
     w.unmount();
   });
 
@@ -766,7 +919,7 @@ describe("auth pages", () => {
       username: "ivy_ops",
       email: "ivy@example.com",
       password: "securepass",
-      invitation_token: "invite-123",
+      invitation_code: "invite-123",
     });
     expect(pushSpy).toHaveBeenCalledWith("/");
   });
@@ -832,7 +985,7 @@ describe("auth pages", () => {
     expect(pushSpy).toHaveBeenCalledWith("/");
   });
 
-  it("keeps the register page stable when submission fails", async () => {
+  it("does not submit registration when the site settings cannot load", async () => {
     const router = await createTestRouter("/register");
     const pushSpy = vi.spyOn(router, "push");
     axios.get.mockRejectedValueOnce(new Error("boom"));
@@ -859,6 +1012,7 @@ describe("auth pages", () => {
 
     expect(pushSpy).not.toHaveBeenCalledWith("/");
     expect(pushSpy).not.toHaveBeenCalledWith("/login");
+    expect(authStore.register).not.toHaveBeenCalled();
   });
 
   it("uses the default success message and skips invalid register submissions", async () => {
