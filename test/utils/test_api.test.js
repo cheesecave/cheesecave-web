@@ -764,54 +764,42 @@ describe("frontend API client", () => {
     );
   });
 
-  it("fileExists resolves true on a 2xx HEAD and false on any non-2xx / error", async () => {
+  it("probeFile tells a present file, a missing file and a failed probe apart", async () => {
     const { apiClient, repoAPI } = await loadModules();
     const headSpy = vi
       .spyOn(apiClient, "head")
       .mockResolvedValueOnce({ status: 200 })
-      .mockResolvedValueOnce({ status: 404 })
+      .mockResolvedValueOnce({ status: 302 })
+      .mockRejectedValueOnce({ response: { status: 404 } })
+      .mockRejectedValueOnce({ response: { status: 503 } })
       .mockRejectedValueOnce(new Error("network down"));
 
-    const ok = await repoAPI.fileExists(
-      "dataset",
-      "team",
-      "private set",
-      "main",
-      "archives/raw bundle.json",
-    );
-    const missing = await repoAPI.fileExists(
-      "dataset",
-      "team",
-      "set",
-      "main",
-      "missing.json",
-    );
-    const errored = await repoAPI.fileExists(
-      "dataset",
-      "team",
-      "set",
-      "main",
-      "errored.json",
-    );
+    const ok = await repoAPI.probeFile("dataset", "team", "private set", "main", "archives/raw bundle.json");
+    const odd = await repoAPI.probeFile("dataset", "team", "set", "main", "odd.json");
+    const missing = await repoAPI.probeFile("dataset", "team", "set", "main", "missing.json");
+    const busy = await repoAPI.probeFile("dataset", "team", "set", "main", "busy.json");
+    const down = await repoAPI.probeFile("dataset", "team", "set", "main", "down.json");
 
-    expect(ok).toBe(true);
-    expect(missing).toBe(false);
-    expect(errored).toBe(false);
-    expect(headSpy).toHaveBeenCalledTimes(3);
-    // Path segments must be percent-encoded individually so spaces
-    // and Unicode survive the wire — the resolve handler keys off the
-    // post-decoding path and would otherwise 404 on every space.
+    expect(ok).toEqual({ state: "yes", status: 200 });
+    // anything that is neither a 2xx nor a 404 says nothing about the file
+    expect(odd).toEqual({ state: "error", status: 302 });
+    expect(missing).toEqual({ state: "no", status: 404 });
+    expect(busy).toEqual({ state: "error", status: 503 });
+    expect(down).toEqual({ state: "error", status: null });
+    expect(headSpy).toHaveBeenCalledTimes(5);
+    // Path segments are percent-encoded one by one so spaces and Unicode survive
     expect(headSpy.mock.calls[0][0]).toBe(
       "/api/datasets/team/private set/resolve/main/archives/raw%20bundle.json",
     );
   });
 
-  it("fileExists short-circuits to false when called with an empty path", async () => {
+  it("probeFile short-circuits to an error state for an empty path", async () => {
     const { apiClient, repoAPI } = await loadModules();
     const headSpy = vi.spyOn(apiClient, "head");
-    expect(
-      await repoAPI.fileExists("dataset", "team", "set", "main", ""),
-    ).toBe(false);
+    expect(await repoAPI.probeFile("dataset", "team", "set", "main", "")).toEqual({
+      state: "error",
+      status: null,
+    });
     expect(headSpy).not.toHaveBeenCalled();
   });
 

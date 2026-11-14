@@ -1,5 +1,6 @@
 import MarkdownIt from "markdown-it";
 import { getRepositoryType } from "./repository-types";
+import { parseServerTime } from "./datetime";
 
 export function guestRepositoryTabs(repository) {
   const path = `/${repository.type}s/${encodeURIComponent(repository.namespace)}/${encodeURIComponent(repository.name)}`;
@@ -43,7 +44,7 @@ export function isAccountGrantActive(grant, now = Date.now()) {
   return Boolean(
     grant &&
       !grant.revoked_at &&
-      (!grant.expires_at || Date.parse(grant.expires_at) > now),
+      (!grant.expires_at || parseServerTime(grant.expires_at).valueOf() > now),
   );
 }
 

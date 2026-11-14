@@ -23,6 +23,7 @@
 // Anything missing or shape-violating raises IndexedTarFormatError so
 // the modal can fall back to the shared <ErrorState>.
 
+import { withRetry } from "@/utils/retry";
 import { mediaKind, mediaMime } from "@/utils/media-types";
 import { sortByName } from "@/utils/natural-sort";
 import { memberSource } from "@/utils/range-source";
@@ -70,6 +71,7 @@ export class IndexedTarFormatError extends Error {
  *     "parsing" running JSON.parse + shape validation
  *     "done"    parsed + tree built
  * @param {AbortSignal} [options.signal]
+ * @param {number[]} [options.retryWaits] pauses between attempts (tests pass `[0, 0]`)
  * @returns {Promise<{
  *   filesize: number,
  *   hash: string,
@@ -78,24 +80,34 @@ export class IndexedTarFormatError extends Error {
  * }>}
  */
 export async function parseTarIndex(url, options = {}) {
-  const { onProgress = () => {}, signal } = options;
+  const { onProgress = () => {}, signal, retryWaits } = options;
 
-  onProgress("fetch");
   // `same-origin` forwards the SPA session cookie on the /resolve/ hop
   // — private repos return 404 without it — and the browser drops
   // cookies on the cross-origin redirect to the presigned object URL,
   // so the S3/MinIO `Access-Control-Allow-Origin: *` response stays
   // compatible with credentialed CORS.
-  const response = await fetch(url, {
-    signal,
-    mode: "cors",
-    credentials: "same-origin",
-  });
-  if (!response.ok) {
-    throw await IndexedTarFetchError.fromResponse(response, "tar index JSON");
-  }
-
-  const text = await response.text();
+  //
+  // A dropped connection, a 429 or a 5xx from the storage host is tried
+  // again twice before it counts as a failure (see utils/retry.js).
+  const text = await withRetry(
+    async () => {
+      onProgress("fetch");
+      const response = await fetch(url, {
+        signal,
+        mode: "cors",
+        credentials: "same-origin",
+      });
+      if (!response.ok) {
+        throw await IndexedTarFetchError.fromResponse(
+          response,
+          "tar index JSON",
+        );
+      }
+      return response.text();
+    },
+    { waits: retryWaits, signal },
+  );
 
   onProgress("parsing");
   let parsed;
@@ -321,10 +333,11 @@ export function createMemberSource(tarUrl, node) {
  * @param {{offset:number, size:number, sha256?:string}} info
  * @param {object} [options]
  * @param {AbortSignal} [options.signal]
+ * @param {number[]} [options.retryWaits] pauses between attempts (tests pass `[0, 0]`)
  * @returns {Promise<Uint8Array>}
  */
 export async function extractMemberBytes(tarUrl, info, options = {}) {
-  const { signal } = options;
+  const { signal, retryWaits } = options;
   // Defensive: a wrapper object that drops .offset (e.g. UI state
   // copied for display) used to fall through to a Range header with
   // "undefined" in it; MinIO ignored the header and returned the full
@@ -356,22 +369,27 @@ export async function extractMemberBytes(tarUrl, info, options = {}) {
   // Same credentials story as parseTarIndex above: send the session
   // cookie on the same-origin /resolve/ hop, drop it on the cross-origin
   // redirect to the presigned tar URL.
-  const response = await fetch(tarUrl, {
-    headers: { Range: buildMemberRangeHeader(info) },
-    signal,
-    mode: "cors",
-    credentials: "same-origin",
-  });
-  if (response.status !== 200 && response.status !== 206) {
-    throw await IndexedTarFetchError.fromResponse(response, "tar member");
-  }
-  const buf = new Uint8Array(await response.arrayBuffer());
-  if (buf.length !== info.size) {
-    throw new IndexedTarFetchError(
-      `Tar member range read returned ${buf.length} bytes, expected ${info.size}`,
-    );
-  }
-  return buf;
+  return withRetry(
+    async () => {
+      const response = await fetch(tarUrl, {
+        headers: { Range: buildMemberRangeHeader(info) },
+        signal,
+        mode: "cors",
+        credentials: "same-origin",
+      });
+      if (response.status !== 200 && response.status !== 206) {
+        throw await IndexedTarFetchError.fromResponse(response, "tar member");
+      }
+      const buf = new Uint8Array(await response.arrayBuffer());
+      if (buf.length !== info.size) {
+        throw new IndexedTarFetchError(
+          `Tar member range read returned ${buf.length} bytes, expected ${info.size}`,
+        );
+      }
+      return buf;
+    },
+    { waits: retryWaits, signal },
+  );
 }
 
 /**
@@ -606,6 +624,10 @@ export function hasIndexSibling(tarPath, siblings) {
   if (dot < 0) return false;
   const base = tarPath.slice(0, dot);
   const wanted = `${base}.json`;
+  // A Set of the loaded file paths (built once per page load) answers in
+  // O(1). Scanning the entries instead is O(n) per call, which is O(n^2)
+  // when it runs for every row of a long list on every render.
+  if (siblings instanceof Set) return siblings.has(wanted);
   if (!siblings || typeof siblings[Symbol.iterator] !== "function")
     return false;
   for (const entry of siblings) {
@@ -615,6 +637,48 @@ export function hasIndexSibling(tarPath, siblings) {
   }
   return false;
 }
+
+/**
+ * The greatest key of a page of tree entries, or null for an empty page.
+ * The server returns a folder's entries in key order and in contiguous
+ * pages, so every key up to this one has been loaded.
+ *
+ * @param {Array<{path: string}>|null|undefined} entries
+ * @returns {string|null}
+ */
+export function lastKeyOf(entries) {
+  if (!entries || entries.length === 0) return null;
+  let last = entries[0].path;
+  for (const entry of entries) if (entry.path > last) last = entry.path;
+  return last;
+}
+
+/**
+ * Can a missing sidecar be called absent without asking the server?
+ * Pages are contiguous in key order, so a sidecar that is not among the
+ * loaded rows does not exist when (a) the whole folder is loaded, or (b)
+ * its key sorts at or before the last loaded key: the page has already
+ * passed that position. (`x.json` sorts before `x.tar`, so for ordinary
+ * names the answer is always yes.) A sidecar that sorts after the last
+ * loaded key (`X.json` after `X.TAR`) may sit on a later page, and so may
+ * anything we cannot compare safely: the server orders by UTF-8 bytes,
+ * which only matches a plain string comparison for ASCII names.
+ *
+ * @param {string} sidecarPath
+ * @param {string|null} lastLoadedKey
+ * @param {boolean} hasMore - another page follows
+ * @returns {boolean}
+ */
+export function sidecarKnownAbsent(sidecarPath, lastLoadedKey, hasMore) {
+  if (!hasMore) return true;
+  if (lastLoadedKey === null) return false;
+  if (!ASCII_ONLY.test(sidecarPath) || !ASCII_ONLY.test(lastLoadedKey)) {
+    return false;
+  }
+  return sidecarPath <= lastLoadedKey;
+}
+
+const ASCII_ONLY = /^[\x00-\x7f]*$/;
 
 /**
  * Compute the expected `.json` sidecar path for a given `.tar` path.

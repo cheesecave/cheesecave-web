@@ -240,16 +240,29 @@ describe("actual ordinary blob workbench with controlled repository source", () 
     );
   });
 
-  it("does not enable ordinary archive, parquet or tensor byte readers for a controlled source", async () => {
-    const w = open("weights.safetensors", {
-      kind: "unsupported",
-      message: "Unsupported preview",
-    });
-    await flushPromises();
-    expect(w.text()).toContain("Unsupported preview");
-    expect(w.findComponent({ name: "FileMetadataPanel" }).exists()).toBe(false);
-    expect(mocks.raw).not.toHaveBeenCalled();
-  });
+  it.each([
+    "weights.safetensors",
+    "samples.parquet",
+    "bundle.zip",
+    "bundle.tar",
+  ])(
+    "does not enable ordinary byte readers for controlled %s",
+    async (path) => {
+      const w = open(path, {
+        kind: "unsupported",
+        message: "Unsupported preview",
+      });
+      await flushPromises();
+      expect(w.text()).toContain("Unsupported preview");
+      expect(w.findComponent({ name: "FileMetadataPanel" }).exists()).toBe(
+        false,
+      );
+      expect(w.findComponent({ name: "TarBrowserPanel" }).exists()).toBe(false);
+      expect(mocks.raw).not.toHaveBeenCalled();
+      for (const api of Object.values(mocks.api))
+        expect(api).not.toHaveBeenCalled();
+    },
+  );
   it("forwards a processed PDF to the actual shared PDF component without an original URL", async () => {
     const w = open("manual.pdf", {
       kind: "pdf",

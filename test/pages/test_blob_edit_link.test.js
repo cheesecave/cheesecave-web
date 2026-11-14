@@ -30,7 +30,7 @@ vi.mock("@/stores/auth", () => ({ useAuthStore: () => mocks.auth }));
 vi.mock("@/utils/api", () => ({
   repoAPI: {
     listTree: vi.fn(async () => ({ data: [] })),
-    fileExists: vi.fn(async () => false),
+    probeFile: vi.fn(async () => ({ state: "no", status: 404 })),
   },
 }));
 

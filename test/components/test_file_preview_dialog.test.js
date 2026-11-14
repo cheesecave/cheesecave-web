@@ -565,7 +565,7 @@ describe("FilePreviewDialog", () => {
     wrapper.unmount();
   });
 
-  it("flags likely-CORS errors with a docs pointer", async () => {
+  it("explains a failed storage request without claiming CORS, with a docs pointer", async () => {
     const wrapper = mountDialog({
       kind: "safetensors",
       resolveUrl: "http://host/repo/resolve/main/model.safetensors",
@@ -573,14 +573,14 @@ describe("FilePreviewDialog", () => {
     });
     await flushPromises();
 
-    // TypeError("Failed to fetch") is the canonical Chromium CORS
-    // signature — no other browser signal ever reaches JS.
+    // TypeError("Failed to fetch") is all JS gets for a CORS failure, a dropped
+    // connection, a timeout and a storage error answer without CORS headers alike.
     safetensorsCtrl.deferred.reject(new TypeError("Failed to fetch"));
     await flushPromises();
 
-    expect(wrapper.text()).toContain("Browser blocked the request");
-    expect(wrapper.text()).toContain("looks like a CORS failure");
-    expect(wrapper.text()).toMatch(/Access-Control-Allow-Origin/);
+    expect(wrapper.text()).toContain("Could not reach the storage server");
+    expect(wrapper.text()).not.toContain("looks like a CORS failure");
+    expect(wrapper.text()).toMatch(/Network tab/);
     expect(wrapper.text()).toMatch(/MinIO CORS/);
 
     wrapper.unmount();

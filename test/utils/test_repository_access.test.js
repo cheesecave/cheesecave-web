@@ -3,7 +3,45 @@ import {
   repositoryFromRoute,
   visibilityPayload,
   renderPublicInviteMarkdown,
+  isAccountGrantActive,
 } from "@/utils/repository-access";
+import { inZone } from "../helpers/zone";
+
+describe("repository account grant expiry", () => {
+  it.each(["UTC", "Asia/Shanghai", "America/Los_Angeles"])(
+    "reads naive server expiry as UTC in %s",
+    (zone) =>
+      inZone(zone, () => {
+        const now = Date.UTC(2026, 0, 1, 0);
+        expect(
+          isAccountGrantActive({ expires_at: "2026-01-01T01:00:00" }, now),
+        ).toBe(true);
+        expect(
+          isAccountGrantActive({ expires_at: "2025-12-31T23:00:00" }, now),
+        ).toBe(false);
+        expect(
+          isAccountGrantActive({ expires_at: "2026-01-01T00:00:00" }, now),
+        ).toBe(false);
+        expect(
+          isAccountGrantActive(
+            { expires_at: "2026-01-01T09:00:00+08:00" },
+            now,
+          ),
+        ).toBe(true);
+        expect(isAccountGrantActive({ expires_at: "invalid" }, now)).toBe(
+          false,
+        );
+        expect(isAccountGrantActive({ expires_at: null }, now)).toBe(true);
+        expect(
+          isAccountGrantActive(
+            { revoked_at: "2025-12-31", expires_at: null },
+            now,
+          ),
+        ).toBe(false);
+        expect(isAccountGrantActive(null, now)).toBe(false);
+      }),
+  );
+});
 
 describe("repository invitation boundaries", () => {
   it.each([

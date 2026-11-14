@@ -1,5 +1,6 @@
 // The organization settings page: what happens when everything works (test_org_settings_errors covers the failures).
 
+import { inZone } from "../helpers/zone";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -345,6 +346,12 @@ describe("the invitations", () => {
       }),
     ).toBe("Expired or unavailable");
     expect(vm.formatDate("2026-03-04T12:00:00Z")).toBe("Mar 4, 2026");
+  });
+
+  it("shows an organization's naive created_at (UTC) as the viewer's own day", async () => {
+    const vm = await mountPage();
+    inZone("Asia/Shanghai", () => expect(vm.formatDate("2026-03-04T20:00:00")).toBe("Mar 5, 2026"));
+    inZone("America/Los_Angeles", () => expect(vm.formatDate("2026-03-04T20:00:00")).toBe("Mar 4, 2026"));
   });
 });
 

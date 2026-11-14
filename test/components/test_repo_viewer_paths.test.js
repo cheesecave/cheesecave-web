@@ -1157,77 +1157,230 @@ describe("RepoViewer path handling", () => {
     wrapper.unmount();
   });
 
-  it("indexed-tar sibling icon: lights up when the .json sibling exists on a different page and stays dark when HEAD says it does not", async () => {
-    const headProbes = [];
+  // --- indexed-tar sidecar probes ---------------------------------------------------------------------
+  const TREE = "/api/datasets/open-media-lab/hierarchy-crawl-fixtures/tree/main";
+  const RESOLVE = "/api/datasets/open-media-lab/hierarchy-crawl-fixtures/resolve/main";
+  const file = (path) => ({ type: "file", path, size: 100, lastModified: "2026-04-21T13:53:39.000000Z" });
+  const withNext = (entries, cursor) =>
+    HttpResponse.json(entries, {
+      headers: cursor ? { Link: `<${TREE}?cursor=${cursor}>; rel="next"` } : {},
+    });
+  const tarIcons = (wrapper) =>
+    wrapper
+      .findAll("button")
+      .filter((b) => (b.attributes("aria-label") || "").startsWith("Preview metadata for"));
+  // msw answers on a macrotask: let real time pass, so "was never asked" cannot pass just because it was too early
+  const settle = async () => {
+    for (let i = 0; i < 3; i++) {
+      await new Promise((r) => setTimeout(r, 40));
+      await flushPromises();
+    }
+  };
+  const emptyPathsInfo = () =>
+    http.post(
+      "/api/datasets/open-media-lab/hierarchy-crawl-fixtures/paths-info/main",
+      () => jsonResponse([]),
+    );
+
+  it("asks only about a sidecar that may sit on a later page, and lights the icon when it exists", async () => {
+    const probes = [];
     server.use(
-      http.get(
-        "/api/datasets/open-media-lab/hierarchy-crawl-fixtures/tree/main",
-        () =>
-          jsonResponse([
-            {
-              type: "file",
-              path: "with-sibling.tar",
-              size: 100,
-              lastModified: "2026-04-21T13:53:39.000000Z",
-            },
-            {
-              type: "file",
-              path: "no-sibling.tar",
-              size: 100,
-              lastModified: "2026-04-21T13:53:39.000000Z",
-            },
-          ]),
-      ),
-      http.post(
-        "/api/datasets/open-media-lab/hierarchy-crawl-fixtures/paths-info/main",
-        () => jsonResponse([]),
-      ),
-      // HEAD probes mimic the backend: 200 for the existing sidecar,
-      // 404 for the bare tar's missing sidecar.
-      http.head(
-        "/api/datasets/open-media-lab/hierarchy-crawl-fixtures/resolve/main/with-sibling.json",
-        () => {
-          headProbes.push("with-sibling.json");
-          return new HttpResponse(null, { status: 200 });
-        },
-      ),
-      http.head(
-        "/api/datasets/open-media-lab/hierarchy-crawl-fixtures/resolve/main/no-sibling.json",
-        () => {
-          headProbes.push("no-sibling.json");
-          return new HttpResponse(null, { status: 404 });
-        },
-      ),
+      // more pages follow; 'j' sorts after 'T', so WITH-SIBLING.json comes after the last loaded key
+      // (WITH-SIBLING.TAR) while NO-SIBLING.json (N < W) is already behind it
+      http.get(TREE, () => withNext([file("NO-SIBLING.TAR"), file("WITH-SIBLING.TAR")], "c1")),
+      emptyPathsInfo(),
+      http.head(`${RESOLVE}/WITH-SIBLING.json`, () => {
+        probes.push("WITH-SIBLING.json");
+        return new HttpResponse(null, { status: 200 });
+      }),
+      http.head(`${RESOLVE}/NO-SIBLING.json`, () => {
+        probes.push("NO-SIBLING.json");
+        return new HttpResponse(null, { status: 404 });
+      }),
     );
-
     const wrapper = mountViewer({ currentPath: "" });
-    await flushPromises();
-    await flushPromises();
-    await flushPromises();
+    await settle();
 
-    // Both probes should have fired exactly once (one per .tar row
-    // whose sibling is not in the loaded page).
-    expect(headProbes.sort()).toEqual(["no-sibling.json", "with-sibling.json"]);
+    expect(probes).toEqual(["WITH-SIBLING.json"]);
+    const icons = tarIcons(wrapper);
+    expect(icons).toHaveLength(1);
+    expect(icons[0].attributes("aria-label")).toContain("WITH-SIBLING.TAR");
+    expect(icons[0].attributes("title")).toContain("Browse indexed tar contents");
+    wrapper.unmount();
+  });
 
-    // The confirmed tar gets the indexed-tar icon (Carbon's archive),
-    // the unconfirmed one stays bare.
-    const previewButtons = wrapper.findAll(
-      "button[aria-label^='Preview metadata for'], button[aria-label^='Preview metadata for ']",
+  it("sends no probe at all when the whole folder is loaded: a tar without its .json on the page has none", async () => {
+    const head = vi.fn(() => new HttpResponse(null, { status: 200 }));
+    server.use(
+      http.get(TREE, () => withNext([file("a.tar"), file("b.tar"), file("c.json"), file("c.tar")])),
+      emptyPathsInfo(),
+      http.head(`${RESOLVE}/a.json`, head),
+      http.head(`${RESOLVE}/b.json`, head),
     );
-    // ElButton stubs render as <button>; iterate all of them and
-    // collect the ones the icon predicate says are previewable.
-    const allButtons = wrapper.findAll("button");
-    const tarPreviewButtons = allButtons.filter((b) =>
-      (b.attributes("aria-label") || "").startsWith("Preview metadata for"),
-    );
-    const titles = tarPreviewButtons.map((b) => b.attributes("title") || "");
-    // One previewable .tar row only — the confirmed one.
-    expect(tarPreviewButtons).toHaveLength(1);
-    expect(titles[0]).toContain("Browse indexed tar contents");
-    // unused alias kept to silence the linter when the future patch
-    // adds a second selector — drop on the next touch.
-    void previewButtons;
+    const wrapper = mountViewer({ currentPath: "" });
+    await settle();
+    expect(head).not.toHaveBeenCalled();
+    const icons = tarIcons(wrapper);
+    expect(icons).toHaveLength(1);
+    expect(icons[0].attributes("aria-label")).toContain("c.tar");
+    wrapper.unmount();
+  });
 
+  it("does not probe for a tar whose sidecar sorts before the last loaded key, even with more pages to come", async () => {
+    const head = vi.fn(() => new HttpResponse(null, { status: 200 }));
+    server.use(
+      http.get(TREE, () => withNext([file("a.tar"), file("b.tar"), file("z.txt")], "c1")),
+      emptyPathsInfo(),
+      http.head(`${RESOLVE}/a.json`, head),
+      http.head(`${RESOLVE}/b.json`, head),
+    );
+    const wrapper = mountViewer({ currentPath: "" });
+    await settle();
+    expect(head).not.toHaveBeenCalled();
+    expect(tarIcons(wrapper)).toHaveLength(0);
+    wrapper.unmount();
+  });
+
+  it("retries a failed probe once and lights the icon when the retry succeeds", async () => {
+    let calls = 0;
+    server.use(
+      http.get(TREE, () => withNext([file("é1.tar")], "c1")),
+      emptyPathsInfo(),
+      http.head(`${RESOLVE}/${encodeURIComponent("é1.json")}`, () => {
+        calls += 1;
+        return new HttpResponse(null, { status: calls === 1 ? 503 : 200 });
+      }),
+    );
+    const wrapper = mountViewer({ currentPath: "" });
+    await new Promise((r) => setTimeout(r, 450)); // the retry waits 300 ms
+    await settle();
+    expect(calls).toBe(2);
+    expect(tarIcons(wrapper)).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it("does not read a probe that keeps failing as 'no sidecar': no icon, no error, two attempts only", async () => {
+    let calls = 0;
+    server.use(
+      http.get(TREE, () => withNext([file("é2.tar")], "c1")),
+      emptyPathsInfo(),
+      http.head(`${RESOLVE}/${encodeURIComponent("é2.json")}`, () => {
+        calls += 1;
+        return new HttpResponse(null, { status: 503 });
+      }),
+    );
+    const wrapper = mountViewer({ currentPath: "" });
+    await new Promise((r) => setTimeout(r, 450));
+    await settle();
+    expect(calls).toBe(2);
+    expect(tarIcons(wrapper)).toHaveLength(0);
+    expect(wrapper.text()).not.toContain("Failed");
+    wrapper.unmount();
+  });
+
+  it("has at most four probes in flight at once", async () => {
+    let running = 0;
+    let peak = 0;
+    const names = Array.from({ length: 10 }, (_, i) => `é${i}`);
+    server.use(
+      http.get(TREE, () => withNext(names.map((n) => file(`${n}.tar`)), "c1")),
+      emptyPathsInfo(),
+      ...names.map((n) =>
+        http.head(`${RESOLVE}/${encodeURIComponent(n + ".json")}`, async () => {
+          running += 1;
+          peak = Math.max(peak, running);
+          await new Promise((r) => setTimeout(r, 15));
+          running -= 1;
+          return new HttpResponse(null, { status: 200 });
+        }),
+      ),
+    );
+    const wrapper = mountViewer({ currentPath: "" });
+    await new Promise((r) => setTimeout(r, 300));
+    await settle();
+    expect(peak).toBe(4);
+    expect(tarIcons(wrapper)).toHaveLength(10);
+    wrapper.unmount();
+  });
+
+  it("finds the sidecar of a tar on a later page among the rows loaded earlier, with no probe", async () => {
+    const head = vi.fn(() => new HttpResponse(null, { status: 200 }));
+    server.use(
+      http.get(TREE, ({ request }) =>
+        new URL(request.url).searchParams.get("cursor")
+          ? withNext([file("m.tar")])
+          : withNext([file("m.json")], "c1"),
+      ),
+      emptyPathsInfo(),
+      http.head(`${RESOLVE}/m.json`, head),
+    );
+    const wrapper = mountViewer({ currentPath: "" });
+    await settle();
+    expect(tarIcons(wrapper)).toHaveLength(0); // m.tar is not loaded yet
+    const more = wrapper.findAll("button").find((b) => b.text().includes("Load More"));
+    expect(more).toBeTruthy();
+    await more.trigger("click");
+    await settle();
+    expect(head).not.toHaveBeenCalled();
+    const icons = tarIcons(wrapper);
+    expect(icons).toHaveLength(1);
+    expect(icons[0].attributes("aria-label")).toContain("m.tar");
+    wrapper.unmount();
+  });
+
+  it("records a 404 for a sidecar that may sit on a later page: no icon, asked once", async () => {
+    let calls = 0;
+    server.use(
+      http.get(TREE, () => withNext([file("é3.tar")], "c1")),
+      emptyPathsInfo(),
+      http.head(`${RESOLVE}/${encodeURIComponent("é3.json")}`, () => {
+        calls += 1;
+        return new HttpResponse(null, { status: 404 });
+      }),
+    );
+    const wrapper = mountViewer({ currentPath: "" });
+    await settle();
+    expect(calls).toBe(1);
+    expect(tarIcons(wrapper)).toHaveLength(0);
+    wrapper.unmount();
+  });
+
+  it("an empty Load More page changes nothing on screen", async () => {
+    server.use(
+      http.get(TREE, ({ request }) =>
+        new URL(request.url).searchParams.get("cursor")
+          ? withNext([])
+          : withNext([file("m.json"), file("m.tar")], "c1"),
+      ),
+      emptyPathsInfo(),
+    );
+    const wrapper = mountViewer({ currentPath: "" });
+    await settle();
+    const more = wrapper.findAll("button").find((b) => b.text().includes("Load More"));
+    await more.trigger("click");
+    await settle();
+    expect(tarIcons(wrapper)).toHaveLength(1);
+    expect(wrapper.text()).toContain("m.tar");
+    wrapper.unmount();
+  });
+
+  it("drops the answer of a probe that belongs to a listing that has since been replaced", async () => {
+    const gate = deferred();
+    server.use(
+      http.get(TREE, () => withNext([file("é9.tar")], "c1")),
+      emptyPathsInfo(),
+      http.head(`${RESOLVE}/${encodeURIComponent("é9.json")}`, async () => {
+        await gate.promise;
+        return new HttpResponse(null, { status: 200 });
+      }),
+    );
+    const wrapper = mountViewer({ currentPath: "" });
+    await settle();
+    await wrapper.setProps({ currentPath: "other" }); // a different folder: the listing is replaced
+    await settle();
+    gate.resolve();
+    await settle();
+    expect(tarIcons(wrapper)).toHaveLength(0);
     wrapper.unmount();
   });
 

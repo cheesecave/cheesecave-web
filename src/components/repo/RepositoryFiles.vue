@@ -5,7 +5,7 @@ import ErrorState from "@/components/common/ErrorState.vue";
 import RepoHistoryLink from "./RepoHistoryLink.vue";
 import RepoLatestCommit from "./RepoLatestCommit.vue";
 import { useErrorContext } from "@/composables/useErrorContext";
-import { formatRelativeTime } from "@/utils/datetime";
+import { formatRelativeTimeCached } from "@/utils/datetime";
 const props = defineProps({
   repoType: { type: String, required: true },
   namespace: { type: String, required: true },
@@ -56,7 +56,7 @@ const pathSegments = computed(() =>
 const getFileName = (path) => path.split("/").pop() || path;
 const getEntryCommitTitle = (file) => file.lastCommit?.title || "-";
 const getEntryUpdatedAt = (file) =>
-  formatRelativeTime(file.lastCommit?.date || file.lastModified, "-");
+  formatRelativeTimeCached(file.lastCommit?.date || file.lastModified, "-");
 function formatEntrySize(file) {
   const bytes = file.size;
   if (!bytes || bytes === 0) return "-";

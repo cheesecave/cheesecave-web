@@ -38,7 +38,7 @@ vi.mock("@/utils/api", () => ({
   repoAPI: {
     commitFiles: (...a) => mocks.commit(...a),
     listTree: vi.fn(async () => ({ data: [] })),
-    fileExists: vi.fn(async () => false),
+    probeFile: vi.fn(async () => ({ state: "no", status: 404 })),
   },
 }));
 vi.mock("element-plus", async (importOriginal) => {

@@ -163,7 +163,7 @@ import { ElMessage } from "element-plus";
 import ErrorState from "@/components/common/ErrorState.vue";
 import { KIND, decodeError, notifyError } from "@/errors";
 import { useErrorContext } from "@/composables/useErrorContext";
-import dayjs from "dayjs";
+import { formatServerDate } from "@/utils/datetime";
 
 const route = useRoute();
 const router = useRouter();
@@ -176,7 +176,7 @@ const error = ref(null);
 const errorContext = useErrorContext();
 
 function formatDate(date) {
-  return dayjs(date).format("MMM D, YYYY [at] h:mm A");
+  return formatServerDate(date, "MMM D, YYYY [at] h:mm A");
 }
 
 function getRoleType(role) {
