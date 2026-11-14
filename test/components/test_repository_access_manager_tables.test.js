@@ -261,9 +261,11 @@ describe("repository access management tables", () => {
       expect.objectContaining({ request_id: 12 }),
     );
     expect(w.text()).toContain("repo_test_once");
+    expect(w.vm.secret).toBe("repo_test_once");
     w.vm.issueDialogOpen = false;
     w.getComponent({ name: "ElDialog" }).vm.$emit("close");
     await flushPromises();
+    expect(w.vm.secret).toBe("");
     expect(w.text()).not.toContain("repo_test_once");
     w.unmount();
   });

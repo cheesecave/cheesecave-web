@@ -5,9 +5,6 @@ const api = vi.hoisted(() => ({
   manage: vi.fn(),
   review: vi.fn(),
   issue: vi.fn(),
-  revokeInvitation: vi.fn(),
-  grant: vi.fn(),
-  revokeGrant: vi.fn(),
 }));
 const confirm = vi.hoisted(() => vi.fn());
 vi.mock("element-plus", async (importOriginal) => ({
@@ -153,9 +150,6 @@ describe("repository manager workflows", () => {
     api.issue.mockResolvedValue({
       data: { token: "repo_once", invitation: { id: 9 } },
     });
-    api.grant.mockResolvedValue({});
-    api.revokeGrant.mockResolvedValue({});
-    api.revokeInvitation.mockResolvedValue({});
   });
   const mountManager = async () => {
     const w = mount(Manager, {
@@ -182,45 +176,6 @@ describe("repository manager workflows", () => {
     expect(confirm).toHaveBeenCalled();
     expect(api.review).not.toHaveBeenCalled();
     expect(api.issue).not.toHaveBeenCalled();
-    w.unmount();
-  });
-  it("issues a code for an approved anonymous application only when requested", async () => {
-    const w = await mountManager();
-    await button(application(w, "anon@example.com"), "Invite").trigger("click");
-    if (!w.find("[data-el-dialog]").exists()) {
-      await button(w, "Create code").trigger("click");
-    }
-    await button(w, "Create repository code").trigger("click");
-    await flushPromises();
-    expect(api.issue).toHaveBeenCalledWith(
-      repo,
-      expect.objectContaining({
-        request_id: 2,
-        expires_days: 7,
-        guest_ttl_seconds: 86400,
-      }),
-    );
-    expect(w.text()).toContain("repo_once");
-    w.vm.issueDialogOpen = false;
-    w.getComponent({ name: "ElDialog" }).vm.$emit("close");
-    await flushPromises();
-    expect(w.text()).not.toContain("repo_once");
-    w.unmount();
-  });
-  it("revokes an invitation separately from an account grant", async () => {
-    const w = await mountManager();
-    await button(
-      w.get('table[aria-label="Repository codes"]'),
-      "Revoke",
-    ).trigger("click");
-    await flushPromises();
-    expect(api.revokeInvitation).toHaveBeenCalledWith(repo, 4);
-    expect(api.revokeGrant).not.toHaveBeenCalled();
-    await button(w.get('table[aria-label="Account grants"]'), "Revoke").trigger(
-      "click",
-    );
-    await flushPromises();
-    expect(api.revokeGrant).toHaveBeenCalledWith(repo, 5);
     w.unmount();
   });
 });
