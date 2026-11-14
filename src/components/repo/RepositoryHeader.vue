@@ -1,9 +1,19 @@
 <script setup>
-import { computed } from "vue";
-import LinkButton from "@/components/common/LinkButton.vue";
+import {
+  computed,
+  inject,
+  ref,
+  onMounted,
+  onActivated,
+  onDeactivated,
+  onBeforeUnmount,
+  watch,
+  nextTick,
+} from "vue";
 import AddToCollectionMenu from "@/components/collections/AddToCollectionMenu.vue";
 import { externalRepoUrl } from "@/utils/external-repo";
 import { getRepositoryType } from "@/utils/repository-types";
+import { formatRelativeTime } from "@/utils/datetime";
 
 const props = defineProps({
   repoType: { type: String, required: true },
@@ -11,6 +21,7 @@ const props = defineProps({
   name: { type: String, required: true },
   namespaceLink: { type: String, required: true },
   repoInfo: { type: Object, default: null },
+  visibility: { type: String, default: null },
   signedIn: { type: Boolean, default: false },
   isOwner: { type: Boolean, default: false },
   liked: { type: Boolean, default: false },
@@ -19,6 +30,12 @@ const props = defineProps({
   tabs: { type: Array, required: true },
   activeTab: { type: String, required: true },
 });
+const access = inject("repositoryAccess", ref(null));
+const visibilityLabel = computed(() =>
+  (props.visibility || access.value?.visibility) === "invite"
+    ? "Invite"
+    : "Private",
+);
 defineEmits(["copy", "clone", "download", "like"]);
 const repoPath = computed(
   () => `/${props.repoType}s/${props.namespace}/${props.name}`,
@@ -31,21 +48,129 @@ const sourceUrl = computed(() =>
       )
     : null,
 );
-const typeLabel = computed(() =>
-  props.repoType === "model" ? "Model" : "Dataset",
-);
+const typeLabel = computed(() => getRepositoryType(props.repoType).label);
 const typeIcon = computed(() => getRepositoryType(props.repoType).icon);
+// Keep one set of controls in the DOM. The full header remains the scroll
+// sentinel and holds its measured space while its inner row floats above content.
+const headerElement = ref(null);
+const innerElement = ref(null);
+const stickyOffset = inject("repositoryStickyOffset", ref(0));
+let sizeObserver = null;
+const compact = ref(false);
+const returning = ref(false);
+const fullHeight = ref(0);
+let observer = null;
+let returnTimer = null;
+function finishReturn() {
+  clearTimeout(returnTimer);
+  returnTimer = null;
+  compact.value = false;
+  returning.value = false;
+  stickyOffset.value = 0;
+}
+function returnToHeader() {
+  if (!compact.value || returning.value) return;
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+    finishReturn();
+    return;
+  }
+  returning.value = true;
+  // Also release the placeholder if animation events are suppressed/backgrounded.
+  returnTimer = setTimeout(finishReturn, 220);
+}
+function measureCompact() {
+  if (compact.value && innerElement.value) {
+    stickyOffset.value = Math.ceil(
+      innerElement.value.getBoundingClientRect().height,
+    );
+  }
+}
+watch(compact, async (active) => {
+  if (!active) return;
+  await nextTick();
+  measureCompact();
+});
+function observeHeader() {
+  if (
+    observer ||
+    !headerElement.value ||
+    typeof IntersectionObserver === "undefined"
+  )
+    return;
+  const element = headerElement.value;
+  const current = new IntersectionObserver(
+    (entries) => {
+      if (observer !== current) return;
+      const entry = entries.find((item) => item.target === element);
+      if (!entry) return;
+      const passedTop =
+        !entry.isIntersecting &&
+        entry.boundingClientRect.bottom <= (entry.rootBounds?.top ?? 0);
+      if (!passedTop) {
+        returnToHeader();
+        return;
+      }
+      clearTimeout(returnTimer);
+      returnTimer = null;
+      returning.value = false;
+      if (!compact.value) {
+        const height = entry.boundingClientRect.height;
+        if (!(height > 0)) return;
+        fullHeight.value = height;
+        compact.value = true;
+      }
+    },
+    { root: element.closest(".page-scroll-wrap"), threshold: 0 },
+  );
+  observer = current;
+  current.observe(element);
+  if (typeof ResizeObserver !== "undefined") {
+    sizeObserver = new ResizeObserver(measureCompact);
+    sizeObserver.observe(innerElement.value);
+  }
+}
+function stopObserving() {
+  observer?.disconnect();
+  observer = null;
+  sizeObserver?.disconnect();
+  sizeObserver = null;
+  finishReturn();
+}
+function finishAnimation(event) {
+  if (
+    event.target === event.currentTarget &&
+    event.animationName.startsWith("repository-header-out") &&
+    returning.value
+  )
+    finishReturn();
+}
+onMounted(observeHeader);
+onActivated(observeHeader);
+onDeactivated(stopObserving);
+onBeforeUnmount(stopObserving);
+
 const tabIcons = {
   card: "i-carbon-document",
   files: "i-carbon-folder",
   commits: "i-carbon-change-catalog",
   metadata: "i-carbon-information",
+  settings: "i-carbon-settings",
 };
 </script>
 
 <template>
-  <header class="repo-composite-header" aria-label="Repository header">
-    <div class="repository-header-inner">
+  <header
+    ref="headerElement"
+    class="repo-composite-header"
+    aria-label="Repository header"
+    :style="compact ? { height: `${fullHeight}px` } : undefined"
+  >
+    <div
+      ref="innerElement"
+      class="repository-header-inner"
+      :class="{ 'is-compact': compact, 'is-returning': returning }"
+      @animationend="finishAnimation"
+    >
       <div class="repository-heading-row">
         <div class="repository-identity">
           <span
@@ -54,7 +179,7 @@ const tabIcons = {
             aria-hidden="true"
           />
           <div class="repository-title-group">
-            <h1>
+            <h1 :title="`${namespace}/${name}`">
               <RouterLink :to="`/${repoType}s`" class="repository-title-type"
                 >{{ typeLabel }}:</RouterLink
               >
@@ -66,43 +191,52 @@ const tabIcons = {
                 name
               }}</RouterLink>
             </h1>
-            <template v-if="repoInfo">
+            <template v-if="repoInfo || visibility">
               <span
-                v-if="repoInfo.private"
+                v-if="repoInfo?.private || visibility"
                 class="repository-visibility"
-                aria-label="Private repository"
+                :aria-label="`${visibilityLabel} repository`"
               >
-                <span class="i-carbon-locked" aria-hidden="true" /> Private
+                <span class="i-carbon-locked" aria-hidden="true" />
+                {{ visibilityLabel }}
               </span>
-              <button
-                v-else-if="signedIn"
-                type="button"
-                class="repository-like"
-                :class="{ 'is-liked': liked }"
-                :aria-label="liked ? 'Unlike repository' : 'Like repository'"
-                :aria-pressed="liked"
-                :disabled="liking"
-                @click="$emit('like')"
+              <template
+                v-if="
+                  repoInfo &&
+                  (repoType === 'space' || !(repoInfo.private || visibility))
+                "
               >
+                <button
+                  v-if="signedIn"
+                  type="button"
+                  class="repository-like"
+                  :class="{ 'is-liked': liked }"
+                  :aria-label="liked ? 'Unlike repository' : 'Like repository'"
+                  :aria-pressed="liked"
+                  :disabled="liking"
+                  @click="$emit('like')"
+                >
+                  <span
+                    :class="
+                      liked ? 'i-carbon-favorite-filled' : 'i-carbon-favorite'
+                    "
+                    aria-hidden="true"
+                  />
+                  <span>Like</span
+                  ><span class="repository-like-count">{{ likesCount }}</span>
+                </button>
                 <span
-                  :class="
-                    liked ? 'i-carbon-favorite-filled' : 'i-carbon-favorite'
-                  "
-                  aria-hidden="true"
-                />
-                <span>Like</span
-                ><span class="repository-like-count">{{ likesCount }}</span>
-              </button>
-              <span
-                v-else
-                class="repository-like"
-                aria-label="Repository likes"
-              >
-                <span class="i-carbon-favorite" aria-hidden="true" />
-                <span>{{ likesCount }} likes</span>
-              </span>
+                  v-else
+                  class="repository-like"
+                  aria-label="Repository likes"
+                >
+                  <span class="i-carbon-favorite" aria-hidden="true" />
+                  <span>{{ likesCount }} likes</span>
+                </span>
+              </template>
             </template>
             <AddToCollectionMenu
+              class="repository-collection"
               v-if="repoInfo && signedIn && !repoInfo.private"
               :repo-type="repoType"
               :repo-id="`${namespace}/${name}`"
@@ -119,21 +253,23 @@ const tabIcons = {
           </div>
         </div>
         <div
-          v-if="repoInfo"
+          v-if="repoInfo || $slots.actions"
           class="repository-actions"
           aria-label="Repository actions"
         >
-          <el-button @click="$emit('download')">
-            <span class="i-carbon-document-download" aria-hidden="true" />
-            Download
-          </el-button>
-          <LinkButton v-if="isOwner" :to="`${repoPath}/settings`">
-            <span class="i-carbon-settings" aria-hidden="true" /> Settings
-          </LinkButton>
-          <el-button type="primary" @click="$emit('clone')">
-            <span class="i-carbon-code" aria-hidden="true" /> Clone
-          </el-button>
+          <slot name="actions">
+            <el-button @click="$emit('download')">
+              <span class="i-carbon-document-download" aria-hidden="true" />
+              Download
+            </el-button>
+            <el-button type="primary" @click="$emit('clone')">
+              <span class="i-carbon-code" aria-hidden="true" /> Clone
+            </el-button>
+          </slot>
         </div>
+      </div>
+      <div v-if="repoType === 'space' && repoInfo" class="repository-summary">
+        Updated {{ formatRelativeTime(repoInfo.lastModified, "Unknown") }}
       </div>
       <div
         v-if="repoInfo?._source && repoInfo._source !== 'local'"
@@ -150,7 +286,7 @@ const tabIcons = {
         /></a>
         <span v-else class="repository-source">{{ repoInfo._source }}</span>
       </div>
-      <div class="repository-metadata">
+      <div v-if="$slots.metadata" class="repository-metadata">
         <slot name="metadata" />
       </div>
       <nav
@@ -186,6 +322,8 @@ const tabIcons = {
 <style scoped>
 .repo-composite-header {
   --repository-tag-height: 24px;
+  --repo-tabs-surface: var(--site-card, #fffdf7);
+  --repo-tabs-text: var(--site-card-text, #2c332b);
   background: var(--site-card);
   color: var(--site-card-text);
   border-bottom: 1px solid var(--site-border);
@@ -421,6 +559,144 @@ button:focus-visible {
   }
   .repository-tab {
     padding: 12px 10px;
+  }
+}
+
+/* Floating chrome takes no space away from the original header's placeholder. */
+.repository-header-inner.is-compact {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 100;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: "identity navigation actions";
+  align-items: center;
+  gap: 16px;
+  min-height: 56px;
+  padding: 0 24px;
+  background: var(--site-card);
+  border-bottom: 1px solid var(--site-border);
+  box-shadow: 0 3px 12px rgb(0 0 0 / 8%);
+  animation: repository-header-in 180ms ease-out both;
+}
+.repository-header-inner.is-returning {
+  animation: repository-header-out 180ms ease-in both;
+  pointer-events: none;
+}
+.is-compact .repository-heading-row {
+  display: contents;
+}
+.is-compact .repository-identity {
+  grid-area: identity;
+  gap: 8px;
+}
+.is-compact .repository-title-group {
+  flex-wrap: nowrap;
+  min-width: 0;
+  gap: 8px;
+}
+.is-compact h1 {
+  flex-wrap: nowrap;
+  font-size: 16px;
+  white-space: nowrap;
+}
+.is-compact .repository-owner,
+.is-compact .repository-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.is-compact .repository-slash {
+  flex-shrink: 0;
+}
+.is-compact .repository-type-icon {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  font-size: 20px;
+}
+.is-compact .repository-title-type,
+.is-compact .repository-like,
+.is-compact .repository-collection,
+.is-compact .repository-copy,
+.is-compact .repository-summary,
+.is-compact .repository-metadata {
+  display: none;
+}
+.is-compact .repository-visibility {
+  min-height: 26px;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+.is-compact .repository-navigation {
+  grid-area: navigation;
+  align-self: stretch;
+  min-width: 0;
+}
+.is-compact .repository-navigation {
+  scrollbar-width: none;
+}
+.is-compact .repository-navigation::-webkit-scrollbar {
+  display: none;
+}
+.is-compact .repository-tab {
+  padding: 12px 10px;
+  font-size: 13px;
+}
+.is-compact .repository-actions {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: nowrap;
+  width: auto;
+  gap: 6px;
+}
+.is-compact .repository-actions :deep(.el-button) {
+  min-height: 30px;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+@keyframes repository-header-in {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes repository-header-out {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-100%);
+  }
+}
+@media (max-width: 1000px) {
+  .repository-header-inner.is-compact {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "identity actions" "navigation navigation";
+    gap: 0 12px;
+    padding: 8px 16px 0;
+  }
+  .is-compact .repository-navigation {
+    margin-top: 4px;
+  }
+}
+@media (max-width: 640px) {
+  .is-compact .repository-visibility,
+  .is-compact .repository-owner,
+  .is-compact .repository-slash {
+    display: none;
+  }
+  .is-compact h1 {
+    font-size: 14px;
+  }
+  .is-compact .repository-tab {
+    padding: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .repository-header-inner.is-compact {
+    animation: none;
   }
 }
 </style>

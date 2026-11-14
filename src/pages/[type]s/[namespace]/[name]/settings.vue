@@ -1,56 +1,40 @@
 <!-- src/pages/[type]s/[namespace]/[name]/settings.vue -->
 <template>
-  <div class="container-main">
-    <!-- Breadcrumb Navigation -->
-    <el-breadcrumb separator="/" class="mb-6 text-gray-700 dark:text-gray-300">
-      <el-breadcrumb-item>
-        <RouterLink
-          to="/"
-          class="text-blue-600 dark:text-blue-400 hover:underline"
-        >
-          Home
-        </RouterLink>
-      </el-breadcrumb-item>
-      <el-breadcrumb-item>
-        <RouterLink
-          :to="`/${repoType}s`"
-          class="text-blue-600 dark:text-blue-400 hover:underline"
-        >
-          {{
-            repoType === "model"
-              ? "Models"
-              : repoType === "dataset"
-                ? "Datasets"
-                : "Spaces"
-          }}
-        </RouterLink>
-      </el-breadcrumb-item>
-      <el-breadcrumb-item>
-        <RouterLink
-          :to="`/${route.params.namespace}`"
-          class="text-blue-600 dark:text-blue-400 hover:underline"
-        >
-          {{ route.params.namespace }}
-        </RouterLink>
-      </el-breadcrumb-item>
-      <el-breadcrumb-item>
-        <RouterLink
-          :to="`/${repoType}s/${route.params.namespace}/${route.params.name}`"
-          class="text-blue-600 dark:text-blue-400 hover:underline"
-        >
-          {{ route.params.name }}
-        </RouterLink>
-      </el-breadcrumb-item>
-      <el-breadcrumb-item>Settings</el-breadcrumb-item>
-    </el-breadcrumb>
-
-    <h1 class="text-3xl font-bold mb-6">
-      Repository Settings: {{ route.params.name }}
-    </h1>
-
-    <el-tabs v-model="activeTab">
+  <section
+    class="repository-settings"
+    :class="{ 'is-standalone': !embedded }"
+    aria-label="Repository settings"
+  >
+    <nav
+      class="repository-settings-sidebar"
+      aria-label="Repository settings sections"
+    >
+      <RouterLink
+        v-for="item in settingsSections"
+        :key="item.key"
+        :to="settingsTarget(item.key)"
+        class="repository-settings-nav-link"
+        :class="{ 'is-active': activeTab === item.key }"
+        :aria-current="activeTab === item.key ? 'page' : undefined"
+        ><span :class="item.icon" aria-hidden="true" />{{
+          item.label
+        }}</RouterLink
+      >
+    </nav>
+    <div
+      class="repository-settings-content"
+      role="region"
+      :aria-labelledby="`repository-settings-${activeTab}`"
+    >
+      <h2
+        v-if="activeTab !== 'access'"
+        :id="`repository-settings-${activeTab}`"
+        class="repository-settings-heading"
+      >
+        {{ activeSection.label }}
+      </h2>
       <!-- General Settings -->
-      <el-tab-pane label="General" name="general">
+      <section v-show="activeTab === 'general'" data-settings-panel="general">
         <ErrorState
           v-if="infoError"
           :error="infoError"
@@ -58,66 +42,24 @@
           mode="inline-panel"
           :retry="loadRepoInfo"
         />
-        <div v-else class="max-w-2xl space-y-6">
+        <div v-else class="settings-form-sections space-y-6">
           <!-- Visibility -->
           <div class="card">
             <h2 class="text-xl font-semibold mb-4">Visibility</h2>
             <el-form label-position="top">
               <el-form-item label="Repository Visibility">
-                <div class="visibility-options">
-                  <div
-                    :class="[
-                      'visibility-option',
-                      { selected: !settings.private },
-                    ]"
-                    @click="settings.private = false"
-                  >
-                    <div class="option-radio">
-                      <div
-                        :class="[
-                          'radio-circle',
-                          { checked: !settings.private },
-                        ]"
-                      >
-                        <div v-if="!settings.private" class="radio-dot" />
-                      </div>
-                    </div>
-                    <div class="option-icon">
-                      <div class="i-carbon-unlocked text-xl" />
-                    </div>
-                    <div class="option-content">
-                      <div class="option-title">Public</div>
-                      <div class="option-description">
-                        Anyone can see this repository
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    :class="[
-                      'visibility-option',
-                      { selected: settings.private },
-                    ]"
-                    @click="settings.private = true"
-                  >
-                    <div class="option-radio">
-                      <div
-                        :class="['radio-circle', { checked: settings.private }]"
-                      >
-                        <div v-if="settings.private" class="radio-dot" />
-                      </div>
-                    </div>
-                    <div class="option-icon">
-                      <div class="i-carbon-locked text-xl" />
-                    </div>
-                    <div class="option-content">
-                      <div class="option-title">Private</div>
-                      <div class="option-description">
-                        Only you and collaborators can see this repository
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <el-select
+                  v-model="settings.visibility"
+                  aria-label="Repository visibility"
+                >
+                  <el-option label="Public" value="public" />
+                  <el-option label="Private" value="private" />
+                  <el-option label="Invite" value="invite" />
+                </el-select>
+                <p class="mt-2 text-sm text-gray-500">
+                  Invite keeps content private and publishes only the invitation
+                  page.
+                </p>
               </el-form-item>
 
               <el-button type="primary" @click="saveGeneralSettings">
@@ -214,11 +156,11 @@
             </div>
           </div>
         </div>
-      </el-tab-pane>
+      </section>
 
       <!-- Branches & Tags -->
-      <el-tab-pane label="Branches & Tags" name="branches">
-        <div class="max-w-2xl space-y-6">
+      <section v-show="activeTab === 'branches'" data-settings-panel="branches">
+        <div class="settings-form-sections space-y-6">
           <!-- Branches -->
           <div class="card">
             <h2 class="text-xl font-semibold mb-4">Branches</h2>
@@ -277,10 +219,10 @@
             </div>
           </div>
         </div>
-      </el-tab-pane>
+      </section>
 
       <!-- LFS Settings -->
-      <el-tab-pane label="LFS Settings" name="lfs">
+      <section v-show="activeTab === 'lfs'" data-settings-panel="lfs">
         <ErrorState
           v-if="lfsError"
           :error="lfsError"
@@ -288,7 +230,7 @@
           mode="inline-panel"
           :retry="loadLfsSettings"
         />
-        <div v-else class="max-w-2xl space-y-6">
+        <div v-else class="settings-form-sections space-y-6">
           <!-- LFS Threshold -->
           <div class="card">
             <h2 class="text-xl font-semibold mb-4">LFS Threshold</h2>
@@ -475,10 +417,10 @@
             </el-button>
           </div>
         </div>
-      </el-tab-pane>
+      </section>
 
       <!-- Storage & Quota -->
-      <el-tab-pane label="Storage & Quota" name="quota">
+      <section v-show="activeTab === 'quota'" data-settings-panel="quota">
         <ErrorState
           v-if="quotaError"
           :error="quotaError"
@@ -486,7 +428,7 @@
           mode="inline-panel"
           :retry="loadQuotaInfo"
         />
-        <div v-else class="max-w-2xl space-y-6">
+        <div v-else class="settings-form-sections space-y-6">
           <!-- Storage Usage Card -->
           <div class="card">
             <h2 class="text-xl font-semibold mb-4">Storage Usage</h2>
@@ -605,12 +547,37 @@
             </div>
           </div>
         </div>
-      </el-tab-pane>
-    </el-tabs>
-  </div>
+      </section>
+      <section
+        v-if="accessContext?.can_manage && activeTab === 'access'"
+        data-settings-panel="access"
+      >
+        <RepositoryAccessManager
+          v-if="activeTab === 'access'"
+          :repository="{
+            type: repoType,
+            namespace: route.params.namespace,
+            name: route.params.name,
+          }"
+        >
+          <template #heading>
+            <h2
+              id="repository-settings-access"
+              class="repository-settings-heading is-inline"
+            >
+              Repository access
+            </h2>
+          </template>
+        </RepositoryAccessManager>
+      </section>
+    </div>
+  </section>
 </template>
 
 <script setup>
+import { inject } from "vue";
+import { visibilityPayload } from "@/utils/repository-access";
+import RepositoryAccessManager from "@/components/repo/RepositoryAccessManager.vue";
 import { NAMESPACE_UNLIMITED, UNLIMITED_BRACKET } from "@/utils/unlimited";
 import { useRoute, useRouter } from "vue-router";
 import { repoAPI, settingsAPI, validationAPI, quotaAPI } from "@/utils/api";
@@ -621,13 +588,54 @@ import { KIND, decodeError, notifyError } from "@/errors";
 import { useErrorContext } from "@/composables/useErrorContext";
 import { getRepositoryOperationCapabilities } from "@/utils/repositoryOperationCapabilities";
 
+defineProps({ embedded: { type: Boolean, default: false } });
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 
+const accessContext = inject("repositoryAccess", ref(null));
+const reloadAccess = inject("reloadRepositoryAccess", () => {});
 const activeTab = ref("general");
+const settingsSections = computed(() => [
+  { key: "general", label: "General", icon: "i-carbon-settings" },
+  { key: "branches", label: "Branches & Tags", icon: "i-carbon-branch" },
+  { key: "lfs", label: "LFS Settings", icon: "i-carbon-data-blob" },
+  { key: "quota", label: "Storage & Quota", icon: "i-carbon-data-volume" },
+  ...(accessContext.value?.can_manage
+    ? [
+        {
+          key: "access",
+          label: "Repository access",
+          icon: "i-carbon-user-access",
+        },
+      ]
+    : []),
+]);
+const activeSection = computed(
+  () =>
+    settingsSections.value.find((item) => item.key === activeTab.value) ||
+    settingsSections.value[0],
+);
+function settingsTarget(tab) {
+  return {
+    path: `/${repoType.value}s/${encodeURIComponent(route.params.namespace)}/${encodeURIComponent(route.params.name)}/settings`,
+    query: { ...(route.query || {}), tab },
+    hash: route.hash || "",
+  };
+}
+watch(
+  [() => route.query?.tab, () => Boolean(accessContext.value?.can_manage)],
+  ([tab]) => {
+    activeTab.value =
+      typeof tab === "string" &&
+      settingsSections.value.some((item) => item.key === tab)
+        ? tab
+        : "general";
+  },
+  { immediate: true },
+);
 const settings = ref({
-  private: false,
+  visibility: "private",
 });
 const moveToRepo = ref("");
 const moveToRepoValidation = ref({
@@ -698,7 +706,8 @@ async function loadRepoInfo() {
       route.params.name,
       ["private"],
     );
-    settings.value.private = data.private || false;
+    settings.value.visibility =
+      accessContext.value?.visibility || (data.private ? "private" : "public");
     moveToRepo.value = repoId.value;
     infoReady.value = true;
   } catch (err) {
@@ -730,10 +739,11 @@ async function saveGeneralSettings() {
       route.params.namespace,
       route.params.name,
       {
-        private: settings.value.private,
+        ...visibilityPayload(settings.value.visibility),
       },
     );
     ElMessage.success("Settings updated successfully");
+    reloadAccess();
   } catch (err) {
     console.error("Failed to update settings:", err);
     notifyError(err, { fallback: "Failed to update settings" });
@@ -1218,6 +1228,123 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.repository-settings {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  align-items: start;
+  gap: 40px;
+  width: 100%;
+  max-width: 1440px;
+  min-width: 0;
+  margin: 0 auto;
+}
+.repository-settings.is-standalone {
+  padding: 24px;
+}
+.repository-settings-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  position: sticky;
+  top: calc(var(--repository-sticky-offset, 0px) + 24px);
+}
+.repository-settings-nav-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: var(--site-card-text);
+  font-size: 14px;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.repository-settings-nav-link:hover {
+  background: var(--site-hover);
+}
+.repository-settings-nav-link.is-active {
+  background: var(--site-hover);
+  font-weight: 600;
+}
+.repository-settings-nav-link.is-active::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--site-primary, var(--site-link));
+}
+.repository-settings-nav-link:focus-visible {
+  outline: 2px solid var(--site-primary, var(--site-link));
+  outline-offset: 2px;
+}
+.repository-settings-nav-link > span {
+  flex-shrink: 0;
+  color: var(--site-muted);
+  font-size: 18px;
+}
+.repository-settings-content {
+  min-width: 0;
+}
+.repository-settings-heading {
+  margin: 0 0 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--site-border);
+  color: var(--site-card-text);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.repository-settings-heading.is-inline {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.settings-form-sections {
+  max-width: 900px;
+}
+.repository-settings-content :deep(.card) {
+  box-shadow: none;
+}
+.repository-settings-content :deep(.el-form--inline .el-form-item) {
+  max-width: 100%;
+}
+@media (max-width: 900px) {
+  .repository-settings {
+    grid-template-columns: 190px minmax(0, 1fr);
+    gap: 24px;
+  }
+}
+@media (max-width: 767px) {
+  .repository-settings {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  .repository-settings.is-standalone {
+    padding: 20px 16px;
+  }
+  .repository-settings-sidebar {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--site-border);
+  }
+  .repository-settings-nav-link {
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+  .repository-settings-nav-link.is-active::before {
+    left: 0;
+  }
+}
+
 /* Visibility options container */
 .visibility-options {
   display: flex;

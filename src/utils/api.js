@@ -1,7 +1,10 @@
 // src/kohaku-hub-ui/src/utils/api.js
 import axios from "axios";
+import { mediaKind } from "./media-types";
 import { formatAuthHeader, getExternalTokens } from "./externalTokens";
-import { KIND, decodeError, decodeResponse, emitAuthRequired } from "@/errors";
+import { KIND } from "@/errors/appError";
+import { decodeError, decodeResponse } from "@/errors/decode";
+import { emitAuthRequired } from "@/errors/session";
 
 const api = axios.create({
   timeout: 30000,
@@ -98,6 +101,69 @@ export const workspaceAPI = {
 };
 
 export default api;
+
+const repositoryAccessBase = ({ type, namespace, name }) =>
+  `/api/${encodeURIComponent(type)}s/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/access`;
+
+export const repositoryAccessAPI = {
+  redeem: (token) => api.post("/api/repo-access/redeem", { token }),
+  getAccess: (repo) => api.get(repositoryAccessBase(repo)),
+  request: (repo, data) =>
+    api.post(`${repositoryAccessBase(repo)}/requests`, data),
+  getRequest: (repo, receipt) =>
+    api.get(`${repositoryAccessBase(repo)}/request`, {
+      headers: receipt ? { "X-Repository-Request-Receipt": receipt } : {},
+    }),
+  manage: (repo, params = {}) =>
+    api.get(`${repositoryAccessBase(repo)}/manage`, { params }),
+  review: (repo, id, data) =>
+    api.post(`${repositoryAccessBase(repo)}/requests/${id}/review`, data),
+  issue: (repo, data) =>
+    api.post(`${repositoryAccessBase(repo)}/invites`, data),
+  revokeInvitation: (repo, id) =>
+    api.post(`${repositoryAccessBase(repo)}/invites/${id}/revoke`),
+  grant: (repo, data) => api.post(`${repositoryAccessBase(repo)}/grants`, data),
+  revokeGrant: (repo, id) =>
+    api.post(`${repositoryAccessBase(repo)}/grants/${id}/revoke`),
+  revokeGuest: (repo, id) =>
+    api.post(`${repositoryAccessBase(repo)}/guests/${id}/revoke`),
+  bind: (repo, token) =>
+    api.post(`${repositoryAccessBase(repo)}/bind`, { token }),
+  guest: (repo, token) =>
+    api.post(`${repositoryAccessBase(repo)}/guest`, { token }),
+  leaveGuest: (repo) => api.delete(`${repositoryAccessBase(repo)}/guest`),
+  guestOverview: (repo) =>
+    api.get(`${repositoryAccessBase(repo)}/guest/overview`),
+  guestTree: (repo, path = "", options = {}) =>
+    api.get(`${repositoryAccessBase(repo)}/guest/tree`, {
+      params: {
+        path,
+        ...(options.cursor ? { cursor: options.cursor } : {}),
+        ...(options.search ? { search: options.search } : {}),
+      },
+    }),
+  guestCommits: (repo, params = {}) =>
+    api.get(`${repositoryAccessBase(repo)}/guest/commits`, { params }),
+  guestFileInfo: (repo, path) =>
+    api.get(`${repositoryAccessBase(repo)}/guest/file-info`, {
+      params: { path },
+    }),
+  guestMediaPlaylistURL: (repo, path, snapshot) =>
+    `${repositoryAccessBase(repo)}/guest/media/hls/playlist?path=${encodeURIComponent(path)}&snapshot=${encodeURIComponent(snapshot)}`,
+  guestPdfPage: (repo, path, page, snapshot) =>
+    api.get(`${repositoryAccessBase(repo)}/guest/media/pdf/page`, {
+      params: { path, page, snapshot },
+      responseType: "blob",
+      timeout: 180000,
+    }),
+  guestPreview: (repo, path) =>
+    api.get(`${repositoryAccessBase(repo)}/guest/preview`, {
+      params: { path },
+      ...(/\.pdf$/i.test(path) || ["video", "audio"].includes(mediaKind(path))
+        ? { timeout: 180000 }
+        : {}),
+    }),
+};
 
 // RFC 8288: `<url>; rel="next"`, possibly with other relations and parameters
 function getNextLinkFromHeader(linkHeader) {
@@ -1282,7 +1348,11 @@ const ITEM_ID = /^[0-9a-f]{24}$/i;
 
 function notFound() {
   return Object.assign(new Error("Collection not found"), {
-    response: { status: 404, data: { error: "Collection not found" }, headers: {} },
+    response: {
+      status: 404,
+      data: { error: "Collection not found" },
+      headers: {},
+    },
   });
 }
 
@@ -1317,7 +1387,8 @@ export const collectionsAPI = {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
       for (const one of Array.isArray(value) ? value : [value]) {
-        if (one !== undefined && one !== null && one !== "") query.append(key, one);
+        if (one !== undefined && one !== null && one !== "")
+          query.append(key, one);
       }
     }
     return api.get(`/api/collections?${query.toString()}`);
@@ -1399,5 +1470,8 @@ export const preferencesAPI = {
   get: (username) =>
     api.get(`/api/users/${encodeURIComponent(username)}/preferences`),
   update: (username, preferences) =>
-    api.put(`/api/users/${encodeURIComponent(username)}/preferences`, preferences),
+    api.put(
+      `/api/users/${encodeURIComponent(username)}/preferences`,
+      preferences,
+    ),
 };

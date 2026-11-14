@@ -59,6 +59,8 @@ const props = defineProps({
     type: String,
     default: "main",
   },
+  controlledSource: { type: Object, default: null },
+  filePath: { type: String, default: "README.md" },
   // Levels to move the headings down, for a page that has its own <h1>
   headingOffset: {
     type: Number,
@@ -72,6 +74,9 @@ const renderedHTML = computed(() => {
   return renderMarkdown(props.content, {
     stripFrontmatter: props.stripFrontmatter,
     headingOffset: props.headingOffset,
+    controlledResources: props.controlledSource
+      ? { filePath: props.filePath }
+      : null,
     repoContext:
       props.repoType && props.namespace && props.name
         ? {
@@ -120,6 +125,20 @@ function addCopyButtons() {
   }
 }
 async function onClick(event) {
+  const link = event.target.closest?.("a[data-guest-path]");
+  if (
+    props.controlledSource?.openFile &&
+    link &&
+    !event.button &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.shiftKey &&
+    !event.altKey
+  ) {
+    event.preventDefault();
+    props.controlledSource.openFile(link.dataset.guestPath);
+    return;
+  }
   const button = event.target.closest?.(".copy-code");
   if (!button) return;
   const code = button.closest(".code-block")?.querySelector("pre code");
@@ -136,6 +155,95 @@ async function onClick(event) {
   }
 }
 watch(renderedHTML, () => nextTick(addCopyButtons), { immediate: true });
+
+// The parser emits inert image placeholders. Only these vetted server-produced
+// raster thumbnails acquire a src, and an old repository/content cannot finish
+// loading images into a newly rendered document.
+let thumbnailGeneration = 0;
+function previewDenied(error) {
+  const status = error?.response?.status ?? error?.status;
+  const headers = error?.response?.headers;
+  const code =
+    headers?.get?.("x-error-code") ||
+    headers?.["x-error-code"] ||
+    headers?.["X-Error-Code"];
+  return (
+    [401, 403].includes(status) || (status === 404 && code === "RepoNotFound")
+  );
+}
+watch(
+  [
+    renderedHTML,
+    () => props.controlledSource,
+    () => props.repoType,
+    () => props.namespace,
+    () => props.name,
+    () => props.branch,
+    () => props.filePath,
+  ],
+  async () => {
+    const owner = ++thumbnailGeneration;
+    const source = props.controlledSource;
+    for (const placeholder of markdownContainer.value?.querySelectorAll(
+      "[data-guest-image]",
+    ) || []) {
+      placeholder.textContent = placeholder.dataset.imageAlt || "";
+    }
+    if (!source) return;
+    await nextTick();
+    if (owner !== thumbnailGeneration || !markdownContainer.value) return;
+    const placeholders = [
+      ...markdownContainer.value.querySelectorAll("[data-guest-image]"),
+    ];
+    const paths = [
+      ...new Set(placeholders.map((el) => el.dataset.guestImage)),
+    ].slice(0, 16);
+    async function worker() {
+      while (paths.length && owner === thumbnailGeneration) {
+        const path = paths.shift();
+        try {
+          const response = await source.loadThumbnail?.(path);
+          if (owner !== thumbnailGeneration) return;
+          const data = response?.data || response;
+          if (
+            data?.kind !== "image" ||
+            typeof data.data_url !== "string" ||
+            data.data_url.length > 2 * 1024 * 1024 ||
+            !/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(
+              data.data_url,
+            )
+          )
+            continue;
+          for (const placeholder of placeholders.filter(
+            (el) => el.dataset.guestImage === path,
+          )) {
+            if (!markdownContainer.value?.contains(placeholder)) continue;
+            const image = document.createElement("img");
+            image.src = data.data_url;
+            image.alt = placeholder.dataset.imageAlt || "";
+            image.loading = "lazy";
+            placeholder.replaceChildren(image);
+          }
+        } catch (error) {
+          if (owner !== thumbnailGeneration) return;
+          if (previewDenied(error)) {
+            thumbnailGeneration++;
+            for (const image of markdownContainer.value?.querySelectorAll(
+              "[data-guest-image] img",
+            ) || [])
+              image.remove();
+            source.onAccessDenied?.(error);
+            return;
+          }
+        }
+      }
+    }
+    const workers = Math.min(3, paths.length);
+    for (let index = 0; index < workers; index++) worker();
+  },
+  { immediate: true, flush: "sync" },
+);
+onBeforeUnmount(() => thumbnailGeneration++);
 
 // `#images` should reach the heading whose id is `user-content-images`
 function scrollToHash() {
@@ -168,16 +276,19 @@ const getMermaidConfig = (dark) => ({
 });
 
 // Initialize Mermaid
-mermaid.initialize(getMermaidConfig(isDark.value));
+if (!props.controlledSource) mermaid.initialize(getMermaidConfig(isDark.value));
 
 // Render mermaid diagrams after content updates
 async function renderMermaidDiagrams() {
+  if (props.controlledSource) return;
   await nextTick();
+  if (props.controlledSource) return;
 
   if (!markdownContainer.value) return;
 
   // Re-initialize with current theme before rendering
-  mermaid.initialize(getMermaidConfig(isDark.value));
+  if (!props.controlledSource)
+    mermaid.initialize(getMermaidConfig(isDark.value));
 
   // Check if this is initial render or theme change
   const mermaidBlocks = markdownContainer.value.querySelectorAll(
@@ -246,6 +357,7 @@ async function renderSingleDiagram(wrapper, code, index) {
   let svg;
   try {
     const result = await mermaid.render(id, code);
+    if (props.controlledSource) return;
     svg = result.svg;
   } catch (err) {
     // Don't show Mermaid's error diagram, show our own error message
@@ -343,7 +455,7 @@ async function renderSingleDiagram(wrapper, code, index) {
 
 // Watch for content changes and re-render mermaid
 watch(
-  () => props.content,
+  () => [props.content, Boolean(props.controlledSource)],
   async () => {
     await nextTick();
     await renderMermaidDiagrams();
@@ -353,6 +465,7 @@ watch(
 
 // Watch for theme changes and re-initialize mermaid
 watch(isDark, (newValue) => {
+  if (props.controlledSource) return;
   mermaid.initialize(getMermaidConfig(newValue));
   // Re-render diagrams when theme changes
   renderMermaidDiagrams();

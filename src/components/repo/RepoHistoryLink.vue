@@ -13,12 +13,26 @@ const props = defineProps({
   branch: { type: String, required: true },
   external: { type: Boolean, default: false },
   sourceUrl: { type: String, default: null },
+  source: { type: Object, default: null },
 });
 
 const errorContext = useErrorContext();
 const resource = useAsyncResource(
   async ({ signal }) => {
     if (props.external) return null;
+    const source = props.source;
+    if (source) {
+      try {
+        const count = (await source.commitCount?.({ signal })) ?? null;
+        if (count !== null && (!Number.isSafeInteger(count) || count < 0))
+          throw new Error("Invalid commit count response");
+        return count;
+      } catch (cause) {
+        if (!signal.aborted && source === props.source)
+          source.onAccessDenied?.(cause);
+        throw cause;
+      }
+    }
     const { data } = await repoAPI.getCommitCount(
       props.repoType,
       props.namespace,
@@ -39,6 +53,7 @@ const resource = useAsyncResource(
       () => props.name,
       () => props.branch,
       () => props.external,
+      () => props.source,
     ],
   },
 );
@@ -56,6 +71,9 @@ const errorTitle = computed(() =>
     ? describeError(resource.error.value, errorContext("commit count"))?.title
     : undefined,
 );
+function retryLoad() {
+  return props.source?.reload ? props.source.reload() : resource.reload();
+}
 </script>
 
 <template>
@@ -86,7 +104,7 @@ const errorTitle = computed(() =>
       class="repository-history-retry"
       aria-label="Retry commit count"
       :title="errorTitle"
-      @click="resource.reload"
+      @click="retryLoad"
     >
       <span class="i-carbon-renew" aria-hidden="true" />
     </button>

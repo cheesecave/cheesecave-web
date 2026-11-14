@@ -434,13 +434,20 @@ describe("repository header metadata on a direct route load", () => {
     }
   });
 
-  it("does not fetch README for a Space Files page", async () => {
+  it("loads README metadata for the shared Space Files header", async () => {
     install("space");
     const wrapper = mountViewer("files", { repoType: "space" });
     try {
       await vi.waitFor(() => expect(wrapper.text()).toContain("data.csv"));
-      expect(requests).not.toContain("readme-probe");
-      expect(requests).not.toContain("readme:main");
+      await vi.waitFor(() =>
+        expect(headerTags(wrapper)).toContain("CC BY 4.0"),
+      );
+      expect(
+        requests.filter((request) => request === "readme-probe"),
+      ).toHaveLength(1);
+      expect(
+        requests.filter((request) => request === "readme:main"),
+      ).toHaveLength(1);
     } finally {
       wrapper.unmount();
     }
@@ -835,20 +842,24 @@ describe("RepoViewer loading on a big repository", () => {
   );
 
   it.each(["blob", "commit"])(
-    "leaves Space %s details unembedded without fetching wrapper repository data",
+    "embeds Space %s details in the shared header without loading Files or history",
     async (detailView) => {
-      const unused = vi.fn(() => jsonResponse([]));
+      const tabRequests = vi.fn(() => jsonResponse([]));
+      const info = vi.fn(() =>
+        jsonResponse({
+          id: "open-media-lab/big-repo",
+          private: false,
+          tags: [],
+        }),
+      );
+      const probe = vi.fn(() => jsonResponse([]));
       const base = "/api/spaces/open-media-lab/big-repo";
       server.use(
-        http.get(base, unused),
-        http.get(`${base}/tree/:branch`, unused),
-        http.get(`${base}/commits/:branch`, unused),
-        http.get(`${base}/commit-count/:branch`, unused),
-        http.post(`${base}/paths-info/:branch`, unused),
-        http.get(
-          "/spaces/open-media-lab/big-repo/resolve/:branch/README.md",
-          unused,
-        ),
+        http.get(base, info),
+        http.get(`${base}/tree/:branch`, tabRequests),
+        http.get(`${base}/commits/:branch`, tabRequests),
+        http.get(`${base}/commit-count/:branch`, tabRequests),
+        http.post(`${base}/paths-info/:branch`, probe),
       );
       const wrapper = mountViewer("files", {
         repoType: "space",
@@ -865,12 +876,16 @@ describe("RepoViewer loading on a big repository", () => {
         wrapper
           .get(`[data-detail-probe='${detailView}']`)
           .attributes("data-embedded"),
-      ).toBe("false");
+      ).toBe("true");
       expect(wrapper.find('[aria-label="Repository header"]').exists()).toBe(
-        false,
+        true,
       );
-      expect(wrapper.find(".repo-tabs").exists()).toBe(false);
-      expect(unused).not.toHaveBeenCalled();
+      expect(wrapper.get('.repo-tabs a[aria-current="page"]').text()).toBe(
+        "Files",
+      );
+      expect(info).toHaveBeenCalledTimes(1);
+      expect(probe).toHaveBeenCalledTimes(1);
+      expect(tabRequests).not.toHaveBeenCalled();
       wrapper.unmount();
     },
   );
@@ -972,7 +987,7 @@ describe("RepoViewer loading on a big repository", () => {
     },
   );
 
-  it("retains the separate repository card and tabs for Spaces", async () => {
+  it("uses the shared repository header and Files toolbar for Spaces", async () => {
     const spaceCommits = vi.fn(() => jsonResponse([]));
     server.use(
       http.get("/api/spaces/open-media-lab/big-repo", () =>
@@ -999,23 +1014,23 @@ describe("RepoViewer loading on a big repository", () => {
     );
     const wrapper = mountViewer("files", { repoType: "space" });
     await flushPromises();
-    expect(wrapper.find(".repo-composite-header").exists()).toBe(false);
-    expect(wrapper.get(".card.repo-header h1").text()).toContain("big-repo");
-    expect(wrapper.findAll(".repo-tabs a")).toHaveLength(4);
-    expect(wrapper.get(".card.repo-header").find(".repo-tabs").exists()).toBe(
-      false,
+    await vi.waitFor(() => expect(spaceCommits).toHaveBeenCalledTimes(2));
+    expect(wrapper.get(".repo-composite-header h1").text()).toContain(
+      "big-repo",
     );
+    expect(wrapper.find(".card.repo-header").exists()).toBe(false);
+    expect(wrapper.findAll(".repo-tabs a").map((link) => link.text())).toEqual([
+      "App",
+      "Files",
+      "Metadata",
+    ]);
     expect(wrapper.find('section[aria-label="Latest commit"]').exists()).toBe(
-      false,
+      true,
     );
-    expect(spaceCommits).not.toHaveBeenCalled();
-    expect(wrapper.get('[data-testid="file-list-count"]').text()).toBe(
-      "0 files",
+    expect(wrapper.find('[data-testid="repository-size"]').exists()).toBe(true);
+    expect(wrapper.get(".repository-history-link").attributes("href")).toBe(
+      "/spaces/open-media-lab/big-repo/commits/main",
     );
-    expect(wrapper.find('[data-testid="repository-size"]').exists()).toBe(
-      false,
-    );
-    expect(wrapper.find(".repository-history-link").exists()).toBe(false);
     wrapper.unmount();
   });
 

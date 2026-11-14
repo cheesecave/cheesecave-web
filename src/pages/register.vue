@@ -1,43 +1,8 @@
 <!-- src/kohaku-hub-ui/src/pages/register.vue -->
 <template>
   <div class="min-h-[calc(100vh-16rem)] flex items-center justify-center">
-    <!-- Invitation-only blocked -->
-    <div
-      v-if="siteConfig?.invitation_only && !invitationToken"
-      class="card w-full max-w-md text-center"
-    >
-      <div class="i-carbon-locked text-6xl text-gray-400 mb-4 inline-block" />
-      <h1 class="text-2xl font-bold mb-4">Registration is Invitation-Only</h1>
-      <p class="text-gray-600 dark:text-gray-400 mb-6">
-        This site requires an invitation to create an account. Please contact
-        the administrator for an invitation link.
-      </p>
-      <el-button type="primary" @click="$router.push('/login')">
-        Go to Login
-      </el-button>
-    </div>
-
-    <!-- Registration form -->
-    <div v-else class="card w-full max-w-md">
+    <div class="card w-full max-w-md">
       <h1 class="text-2xl font-bold mb-6 text-center">Create Account</h1>
-
-      <!-- Invitation info -->
-      <div
-        v-if="invitationToken"
-        class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded"
-      >
-        <div class="flex items-start gap-2 text-sm">
-          <div class="i-carbon-email text-blue-600 text-lg" />
-          <div>
-            <div class="font-semibold text-blue-800 dark:text-blue-200">
-              Using Invitation
-            </div>
-            <div class="text-blue-700 dark:text-blue-300">
-              You're registering with an invitation link
-            </div>
-          </div>
-        </div>
-      </div>
 
       <el-form
         ref="formRef"
@@ -63,6 +28,23 @@
           />
         </el-form-item>
 
+        <el-form-item
+          v-if="showInvitationInput"
+          label="Invitation code"
+          prop="invitationCode"
+        >
+          <el-input
+            v-model="form.invitationCode"
+            type="password"
+            show-password
+            autocomplete="off"
+            placeholder="Invitation code"
+            aria-label="Invitation code"
+            :required="invitationRequired"
+            maxlength="256"
+          />
+        </el-form-item>
+
         <el-form-item label="Password" prop="password">
           <el-input
             v-model="form.password"
@@ -78,6 +60,7 @@
           size="large"
           class="w-full"
           :loading="loading"
+          :disabled="!siteConfig"
           @click="handleSubmit"
         >
           Sign Up
@@ -104,6 +87,10 @@ import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import axios from "axios";
 import { passwordProblem } from "@/utils/password-policy";
+import {
+  clearRepositoryRegistration,
+  readRepositoryRegistration,
+} from "@/utils/repository-registration";
 
 const route = useRoute();
 const router = useRouter();
@@ -111,15 +98,22 @@ const authStore = useAuthStore();
 const formRef = ref(null);
 const loading = ref(false);
 const siteConfig = ref(null);
-const invitationToken = ref(route.query.invitation || null);
-
+const registrationId = route.query.repository_invitation;
+const repositoryRegistration = readRepositoryRegistration(registrationId);
+const suppliedInvitation =
+  typeof route.query.invitation === "string" ? route.query.invitation : "";
 const form = reactive({
   username: "",
   email: "",
   password: "",
+  invitationCode: suppliedInvitation || repositoryRegistration?.token || "",
 });
+const invitationRequired = computed(() => !!siteConfig.value?.invitation_only);
+const showInvitationInput = computed(
+  () => !repositoryRegistration?.guestRepositoryId || invitationRequired.value,
+);
 
-const rules = {
+const rules = computed(() => ({
   username: [
     { required: true, message: "Please enter username", trigger: "blur" },
     {
@@ -141,16 +135,29 @@ const rules = {
       trigger: "blur",
     },
   ],
-};
+  invitationCode: [
+    {
+      required: invitationRequired.value,
+      message: "Enter an invitation code",
+      trigger: "blur",
+    },
+  ],
+}));
 
 async function loadSiteConfig() {
   try {
     const { data } = await axios.get("/api/site-config");
     siteConfig.value = data;
 
-    // If invitation-only and no invitation, user shouldn't be here
-    if (data.invitation_only && !invitationToken.value) {
-      ElMessage.warning("Registration requires an invitation");
+    // An automatic repository grant is retained separately when site policy
+    // requires an additional registration credential. No type selection UI.
+    if (
+      data.invitation_only &&
+      !suppliedInvitation &&
+      repositoryRegistration?.token &&
+      form.invitationCode === repositoryRegistration.token
+    ) {
+      form.invitationCode = "";
     }
   } catch (err) {
     console.error("Failed to load site config:", err);
@@ -159,41 +166,63 @@ async function loadSiteConfig() {
 }
 
 async function handleSubmit() {
-  if (!formRef.value) return;
-
+  if (!formRef.value || !siteConfig.value || loading.value) return;
   await formRef.value.validate(async (valid) => {
-    if (!valid) return;
+    if (!valid || (invitationRequired.value && !form.invitationCode.trim()))
+      return;
 
     loading.value = true;
     try {
-      // Add invitation token to registration if present
-      const registerData = { ...form };
-      if (invitationToken.value) {
-        registerData.invitation_token = invitationToken.value;
-      }
-
+      const { invitationCode: suppliedCode, ...registerData } = form;
+      const code = suppliedCode.trim();
+      if (code) registerData.invitation_code = code;
+      // Preserve automatic context if the single visible field supplies another
+      // credential; only the server determines the invitation's type.
+      if (
+        repositoryRegistration?.token &&
+        repositoryRegistration.token !== code
+      )
+        registerData.repo_invitation_token = repositoryRegistration.token;
+      if (repositoryRegistration?.guestRepositoryId)
+        registerData.repo_guest_repository_id =
+          repositoryRegistration.guestRepositoryId;
       const result = await authStore.register(registerData);
+      const serverDestination = result.repository_url;
+      const destination =
+        typeof serverDestination === "string" &&
+        safeReturn(serverDestination) === serverDestination
+          ? serverDestination
+          : repositoryRegistration?.repositoryPath ||
+            safeReturn(route.query.return);
+      clearRepositoryRegistration(registrationId);
+      form.invitationCode = "";
       ElMessage.success(result.message || "Registration successful");
 
       // Auto login if email verified
       if (result.email_verified) {
-        await authStore.login({
-          username: form.username,
-          password: form.password,
-        });
-
-        // Redirect based on context
-        const returnUrl = route.query.return;
-        if (returnUrl) {
-          router.push(safeReturn(returnUrl));
-        } else if (invitationToken.value) {
-          // If registered with invitation, redirect to home
-          router.push("/");
-        } else {
-          router.push("/");
+        try {
+          await authStore.login({
+            username: form.username,
+            password: form.password,
+          });
+        } catch (error) {
+          notifyError(error, {
+            fallback: "Account created. Sign in to continue",
+          });
+          router.push(
+            destination === "/"
+              ? "/login"
+              : { path: "/login", query: { return: destination } },
+          );
+          return;
         }
+        router.push(destination);
       } else {
-        router.push("/login");
+        router.push(
+          destination === "/"
+            ? "/login"
+            : { path: "/login", query: { return: destination } },
+        );
       }
     } catch (err) {
       notifyError(err, { fallback: "Registration failed" });

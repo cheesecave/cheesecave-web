@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { defineComponent, h } from "vue";
+import { defineComponent, h, ref } from "vue";
 import { ElMessage } from "element-plus";
 
 import { http } from "@/testing/msw";
@@ -20,6 +20,22 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("vue-router/auto", () => ({ useRouter: () => mocks.router }));
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard: mocks.copy }));
+
+vi.mock("@/pages/[type]s/[namespace]/[name]/settings.vue", () => ({
+  __esModule: true,
+  default: defineComponent({
+    props: ["embedded"],
+    setup: (props) => () =>
+      h(
+        "section",
+        {
+          "data-testid": "settings-content",
+          "data-embedded": String(props.embedded),
+        },
+        "Settings form",
+      ),
+  }),
+}));
 
 import RepoViewer from "@/components/repo/RepoViewer.vue";
 
@@ -84,7 +100,7 @@ function installHandlers(
   return commitRequests;
 }
 
-function mountViewer(tab = "card", props = {}) {
+function mountViewer(tab = "card", props = {}, access = null) {
   return mount(RepoViewer, {
     props: {
       repoType: "dataset",
@@ -96,6 +112,7 @@ function mountViewer(tab = "card", props = {}) {
       ...props,
     },
     global: {
+      provide: { repositoryAccess: access || ref(null) },
       stubs: {
         ...ElementPlusStubs,
         ElTooltip: true,
@@ -159,6 +176,103 @@ describe("RepoViewer real links", () => {
     setActivePinia(createPinia());
     vi.spyOn(console, "error").mockImplementation(() => {});
     installHandlers();
+  });
+
+  it("keeps the same repository header while entering and leaving Settings", async () => {
+    const auth = useAuthStore();
+    auth.user = { username: "reader", organizations: [] };
+    const access = ref({ can_manage: true });
+    const wrapper = mountViewer("files", {}, access);
+    await ready(wrapper);
+    const header = wrapper.get('[aria-label="Repository header"]').element;
+    await wrapper.setProps({
+      tab: "settings",
+      detailView: "settings",
+      detailKey: `${PAGE}/settings`,
+    });
+    await flushPromises();
+    expect(wrapper.get('[aria-label="Repository header"]').element).toBe(
+      header,
+    );
+    expect(
+      wrapper
+        .get('[data-testid="settings-content"]')
+        .attributes("data-embedded"),
+    ).toBe("true");
+    expect(wrapper.get('nav [aria-current="page"]').text()).toBe("Settings");
+    await wrapper.setProps({ tab: "files", detailView: "", detailKey: "" });
+    await flushPromises();
+    expect(wrapper.get('[aria-label="Repository header"]').element).toBe(
+      header,
+    );
+    expect(wrapper.find('[data-testid="settings-content"]').exists()).toBe(
+      false,
+    );
+    wrapper.unmount();
+  });
+
+  it("refreshes header visibility after Settings changes without replacing the header", async () => {
+    useAuthStore().user = { username: "open-media-lab", id: 1 };
+    let isPrivate = false;
+    let reads = 0;
+    server.use(
+      http.get(BASE, () => {
+        reads += 1;
+        return jsonResponse({
+          ...cloneFixture(uiApiFixtures.repo.info),
+          private: isPrivate,
+        });
+      }),
+    );
+    const access = ref({
+      access: "full",
+      visibility: "public",
+      can_manage: true,
+    });
+    const wrapper = mountViewer(
+      "settings",
+      { detailView: "settings", detailKey: `${PAGE}/settings` },
+      access,
+    );
+    await ready(wrapper);
+    const header = wrapper.get('[aria-label="Repository header"]').element;
+    expect(wrapper.find(".repository-like").exists()).toBe(true);
+    for (const visibility of ["invite", "private", "public"]) {
+      isPrivate = visibility !== "public";
+      const previousReads = reads;
+      access.value = { ...access.value, visibility };
+      await vi.waitFor(() => expect(reads).toBeGreaterThan(previousReads));
+      await flushPromises();
+      expect(wrapper.get('[aria-label="Repository header"]').element).toBe(
+        header,
+      );
+      expect(wrapper.find(".repository-visibility").exists()).toBe(isPrivate);
+      expect(wrapper.find(".repository-like").exists()).toBe(!isPrivate);
+      if (isPrivate)
+        expect(wrapper.get(".repository-visibility").text()).toBe(
+          visibility === "invite" ? "Invite" : "Private",
+        );
+    }
+    wrapper.unmount();
+  });
+
+  it("does not mount Settings for a signed-in account with read access only", async () => {
+    const auth = useAuthStore();
+    auth.user = { username: "open-media-lab", organizations: [] };
+    const wrapper = mountViewer(
+      "settings",
+      { detailView: "settings", detailKey: `${PAGE}/settings` },
+      ref({ can_manage: false }),
+    );
+    await ready(wrapper);
+    expect(wrapper.find('[data-testid="settings-content"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.find('a[href="' + PAGE + '/settings"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.text()).toContain("management access");
+    wrapper.unmount();
   });
 
   it("makes the card, Files and Metadata tabs links to their own URLs", async () => {
@@ -335,18 +449,18 @@ describe("RepoViewer real links", () => {
       }),
     );
     const wrapper = mountViewer("files", { repoType: "space" });
-    await vi.waitFor(() =>
-      expect(wrapper.find(".card.repo-header").exists()).toBe(true),
-    );
-    const header = wrapper.get(".card.repo-header");
+    await ready(wrapper);
+    const header = wrapper.get('[aria-label="Repository header"]');
     expect(header.text()).toContain("Private");
     expect(header.text()).toContain("Updated");
     const like = header
       .findAll("button")
       .find((button) => button.find(".i-carbon-favorite").exists());
-    expect(like.text()).toBe("19");
+    expect(like.get(".repository-like-count").text()).toBe("19");
     await like.trigger("click");
-    await vi.waitFor(() => expect(like.text()).toBe("20"));
+    await vi.waitFor(() =>
+      expect(like.get(".repository-like-count").text()).toBe("20"),
+    );
     expect(requests).toEqual(["GET", "POST"]);
     expect(
       wrapper.get('aside [aria-label="Repository info"]').text(),
@@ -570,6 +684,12 @@ describe("RepoViewer real links", () => {
     const link = (text) =>
       owner.findAll("a").find((item) => item.text() === text);
     expect(link("Settings").attributes("href")).toBe(`${PAGE}/settings`);
+    expect(owner.get('nav[aria-label="Repository sections"]').text()).toContain(
+      "Settings",
+    );
+    expect(
+      owner.find('.repository-actions a[href$="/settings"]').exists(),
+    ).toBe(false);
     expect(link("Upload Files").attributes("href")).toBe(`${PAGE}/upload/main`);
     const filter = owner.get('input[aria-label="Filter files by name prefix"]');
     const history = owner.get("a.repository-history-link");
@@ -584,6 +704,23 @@ describe("RepoViewer real links", () => {
     expect(owner.findAll("button").map((b) => b.text())).not.toEqual(
       expect.arrayContaining(["Settings", "Upload Files"]),
     );
+  });
+
+  it("uses explicit management access for the Settings tab without granting upload rights", async () => {
+    useAuthStore().user = { username: "reader", id: 2 };
+    const access = ref({ access: "full", can_manage: true });
+    const wrapper = mountViewer("files", {}, access);
+    await ready(wrapper);
+    expect(
+      wrapper.get('nav[aria-label="Repository sections"]').text(),
+    ).toContain("Settings");
+    expect(wrapper.text()).not.toContain("Upload Files");
+    access.value = { access: "full", can_manage: false };
+    await flushPromises();
+    expect(
+      wrapper.get('nav[aria-label="Repository sections"]').text(),
+    ).not.toContain("Settings");
+    wrapper.unmount();
   });
 
   it("keeps branch-aware section and upload links after changing branches", async () => {

@@ -70,6 +70,18 @@ describe("ProfileRepoCard", () => {
     );
     expect(mountCard().find(".repo-private").exists()).toBe(false);
   });
+  it("labels the optional invitation mode without changing legacy private cards", () => {
+    expect(
+      mountCard({ private: true, invite_mode: true })
+        .get(".repo-private")
+        .text(),
+    ).toBe("Invite");
+    expect(
+      mountCard({ private: true, invite_mode: false })
+        .get(".repo-private")
+        .text(),
+    ).toBe("Private");
+  });
 
   it("shows the first three chips and the numbers, with 0 for a missing count", () => {
     const tagged = mountCard({ tags: ["a", "b", "c", "d", "e"] });

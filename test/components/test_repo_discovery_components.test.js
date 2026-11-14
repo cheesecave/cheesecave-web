@@ -272,6 +272,15 @@ describe("RepoDiscoveryCard", () => {
       wrapper.unmount();
     },
   );
+  it("shows Invite for an authorized discovery result carrying invitation mode", () => {
+    const w = mountCard({
+      id: "owner/invited",
+      private: true,
+      invite_mode: true,
+    });
+    expect(w.get(".repo-private").text()).toBe("Invite");
+    w.unmount();
+  });
 
   it("uses real README metadata aliases and prefers indexed facets", () => {
     const wrapper = mountCard({

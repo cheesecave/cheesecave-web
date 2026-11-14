@@ -32,7 +32,18 @@ Create, read, update, delete, move, and squash repositories.
 - `name`: Repository name (required)
 - `organization`: Organization name (optional, defaults to user namespace)
 - `private`: Privacy setting (default: false)
+- `invite_mode`: Invitation page mode (default: false; requires `private: true`)
 - `sdk`: SDK hint (optional, reserved for future use)
+
+The web visibility selector sends both privacy fields: Public is
+`{private: false, invite_mode: false}`, Private is
+`{private: true, invite_mode: false}`, and Invite is
+`{private: true, invite_mode: true}`. HF-compatible information continues to expose
+a boolean `private`; invitation state is obtained through the separate browser
+access API. Invite repositories are not automatically added to public discovery.
+
+See [Repository invitation access](repository-access) for the invitation page,
+review workflow, code binding and restricted visitor previews.
 
 **Response:**
 ```json

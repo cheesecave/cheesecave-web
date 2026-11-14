@@ -2,7 +2,8 @@
 import { defineStore, acceptHMRUpdate } from "pinia";
 import { authAPI, settingsAPI } from "@/utils/api";
 import { clearRepoSortPreference } from "@/utils/repoSortPreference";
-import { KIND, decodeError } from "@/errors";
+import { KIND } from "@/errors/appError";
+import { decodeError } from "@/errors/decode";
 
 // One check of the session is enough for a burst of refused requests
 const SESSION_CHECK_WINDOW_MS = 30_000;

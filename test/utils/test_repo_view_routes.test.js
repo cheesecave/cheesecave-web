@@ -55,12 +55,10 @@ const suffixes = [
 ];
 
 describe("composite repository header route scope", () => {
-  it.each(["model", "dataset"])(
-    "includes the repository tabs, blobs and single commits for %s repositories",
+  it.each(["model", "dataset", "space"])(
+    "includes repository browsing, details and settings for %s repositories",
     (type) => {
-      for (const [suffix] of suffixes.filter(
-        ([suffix]) => suffix !== "/settings",
-      )) {
+      for (const [suffix] of suffixes) {
         expect(
           isCompositeRepositoryRoute({
             name: prefix + suffix,
@@ -72,19 +70,14 @@ describe("composite repository header route scope", () => {
     },
   );
 
-  it("excludes Spaces, repository operation pages, lists and unrelated routes", () => {
-    for (const [suffix] of suffixes.filter(
-      ([suffix]) => suffix !== "/settings",
-    )) {
-      expect(
-        isCompositeRepositoryRoute({
-          name: prefix + suffix,
-          params: { type: "space", namespace: "team", name: "demo" },
-        }),
-      ).toBe(false);
-    }
+  it("excludes operation pages, lists, unsupported types and unrelated routes", () => {
+    expect(
+      isCompositeRepositoryRoute({
+        name: `${prefix}/`,
+        params: { type: "organization" },
+      }),
+    ).toBe(false);
     for (const name of [
-      `${prefix}/settings`,
       `${prefix}/upload/[branch]`,
       `${prefix}/edit/[branch]/[...file]`,
       "/models/",
@@ -196,7 +189,7 @@ describe("repository view route normalization", () => {
     wrapper.unmount();
   });
 
-  it("keeps the repository instance through blob and commit details and restores it after settings", async () => {
+  it("keeps the same repository header through details and Settings", async () => {
     const { wrapper, navigate } = await mountRouter("/datasets/mai_lin/demo");
     const header = wrapper.get("header").element;
     for (const [path, detailView, branch] of [
@@ -215,8 +208,15 @@ describe("repository view route normalization", () => {
       expect(lifecycle.mounts).toBe(1);
     }
     await navigate("/datasets/mai_lin/demo/settings");
-    expect(wrapper.find("section").exists()).toBe(false);
-    expect(wrapper.find("[data-generated-page]").exists()).toBe(true);
+    expect(wrapper.get("header").element).toBe(header);
+    expect(JSON.parse(wrapper.get("output").text())).toMatchObject({
+      tab: "settings",
+      detailView: "settings",
+      detailKey: "/datasets/mai_lin/demo/settings",
+    });
+    await navigate("/datasets/mai_lin/demo/settings?tab=access");
+    expect(wrapper.get("header").element).toBe(header);
+    expect(lifecycle.mounts).toBe(1);
     await navigate("/datasets/mai_lin/demo");
     expect(wrapper.get("header").element).toBe(header);
     expect(lifecycle.mounts).toBe(1);
@@ -302,12 +302,12 @@ describe("repository view route normalization", () => {
         meta,
       })),
     );
-    expect(children[5]).toEqual(routes[5]);
+    expect(children[5].component).toBe(children[0].component);
     expect(children[7]).toEqual(external);
     expect(
       new Set(
         children
-          .filter((_, index) => [0, 1, 2, 3, 4, 6].includes(index))
+          .filter((_, index) => [0, 1, 2, 3, 4, 5, 6].includes(index))
           .map(({ component }) => component),
       ).size,
     ).toBe(1);

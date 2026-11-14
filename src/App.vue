@@ -18,9 +18,11 @@
       <main class="site-main flex-1 min-w-0">
         <RouterView v-slot="{ Component, route }">
           <RouteBoundary :route-key="route.path">
-            <keep-alive :include="['RepoViewer']">
-              <component :is="Component" :key="getRouteKey(route)" />
-            </keep-alive>
+            <RepositoryAccessGate
+              :route="route"
+              :component="Component"
+              :component-key="getRouteKey(route)"
+            />
           </RouteBoundary>
         </RouterView>
       </main>
@@ -31,6 +33,7 @@
 
 <script setup>
 import RouteBoundary from "@/components/common/RouteBoundary.vue";
+import RepositoryAccessGate from "@/components/repo/RepositoryAccessGate.vue";
 import SessionBanner from "@/components/common/SessionBanner.vue";
 import TheHeader from "@/components/layout/TheHeader.vue";
 import TheFooter from "@/components/layout/TheFooter.vue";
