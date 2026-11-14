@@ -118,6 +118,10 @@ import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import axios from "axios";
 import { passwordProblem } from "@/utils/password-policy";
+import {
+  clearRepositoryRegistration,
+  readRepositoryRegistration,
+} from "@/utils/repository-registration";
 
 const route = useRoute();
 const router = useRouter();
@@ -125,13 +129,17 @@ const authStore = useAuthStore();
 const formRef = ref(null);
 const loading = ref(false);
 const siteConfig = ref(null);
+const registrationId = route.query.repository_invitation;
+const repositoryRegistration = readRepositoryRegistration(registrationId);
 const suppliedInvitation =
   typeof route.query.invitation === "string" ? route.query.invitation : "";
 const invitationToken = ref(
   suppliedInvitation.startsWith("repo_") ? null : suppliedInvitation || null,
 );
 const repoInvitationToken = ref(
-  suppliedInvitation.startsWith("repo_") ? suppliedInvitation : "",
+  suppliedInvitation.startsWith("repo_")
+    ? suppliedInvitation
+    : repositoryRegistration?.token || "",
 );
 
 const form = reactive({
@@ -196,27 +204,42 @@ async function handleSubmit() {
       if (repoInvitationToken.value.trim())
         registerData.repo_invitation_token = repoInvitationToken.value.trim();
       const result = await authStore.register(registerData);
+      const serverDestination = result.repository_url;
+      const destination =
+        typeof serverDestination === "string" &&
+        safeReturn(serverDestination) === serverDestination
+          ? serverDestination
+          : repositoryRegistration?.repositoryPath ||
+            safeReturn(route.query.return);
+      clearRepositoryRegistration(registrationId);
+      repoInvitationToken.value = "";
       ElMessage.success(result.message || "Registration successful");
 
       // Auto login if email verified
       if (result.email_verified) {
-        await authStore.login({
-          username: form.username,
-          password: form.password,
-        });
-
-        // Redirect based on context
-        const returnUrl = route.query.return;
-        if (returnUrl) {
-          router.push(safeReturn(returnUrl));
-        } else if (invitationToken.value) {
-          // If registered with invitation, redirect to home
-          router.push("/");
-        } else {
-          router.push("/");
+        try {
+          await authStore.login({
+            username: form.username,
+            password: form.password,
+          });
+        } catch (error) {
+          notifyError(error, {
+            fallback: "Account created. Sign in to continue",
+          });
+          router.push(
+            destination === "/"
+              ? "/login"
+              : { path: "/login", query: { return: destination } },
+          );
+          return;
         }
+        router.push(destination);
       } else {
-        router.push("/login");
+        router.push(
+          destination === "/"
+            ? "/login"
+            : { path: "/login", query: { return: destination } },
+        );
       }
     } catch (err) {
       notifyError(err, { fallback: "Registration failed" });
