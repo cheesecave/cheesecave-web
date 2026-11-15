@@ -68,7 +68,7 @@ displayed in a browser can still be copied or saved.
 
 ## Coordinated release
 
-Deploy the Backend and migrations 043/044 before this Web build: repository pages
+Deploy the Backend and migrations 043 (LFS index), 044/045 (invitation repositories) before this Web build: repository pages
 use the new access preflight even for ordinary repositories. Roll Web back before
 rolling Backend back. The [shared release guide](https://github.com/cheesecave/cheesecave-backend/blob/feat/invite-repo/docs/deployment/invitation-repositories.md)
 contains review findings, migration rehearsal, acceptance checks and rollback order.
