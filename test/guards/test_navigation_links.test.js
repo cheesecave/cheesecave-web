@@ -19,6 +19,8 @@ const ALLOWED = {
     "table row opens the repository's storage",
 };
 
+const normalizedPath = (path) => path.replaceAll("\\", "/");
+
 function vueFiles(dir) {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
@@ -40,12 +42,18 @@ function inTemplate(source) {
 function offenders() {
   return vueFiles(SRC).flatMap((file) =>
     inTemplate(readFileSync(file, "utf8")).map(
-      (found) => `${relative(SRC, file)}: ${found}`,
+      (found) => `${normalizedPath(relative(SRC, file))}: ${found}`,
     ),
   );
 }
 
 describe("navigation controls", () => {
+  it("matches allow-list paths on Windows and POSIX", () => {
+    for (const file of Object.keys(ALLOWED)) {
+      expect(normalizedPath(file)).toBe(file);
+      expect(normalizedPath(file.replaceAll("/", "\\"))).toBe(file);
+    }
+  });
   it("has no click-to-navigate handler on a plain element, outside the allow-list", () => {
     const found = offenders().filter(
       (line) => !Object.keys(ALLOWED).some((file) => line.startsWith(file)),

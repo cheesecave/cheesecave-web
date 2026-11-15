@@ -144,8 +144,8 @@ watch([() => props.username, view], () => {
                 ><span
                   v-if="repo.private"
                   class="i-carbon-locked"
-                  title="Private"
-                  aria-label="Private"
+                  :title="repo.invite_mode ? 'Invite' : 'Private'"
+                  :aria-label="repo.invite_mode ? 'Invite' : 'Private'"
               /></RouterLink>
             </li>
           </ul>

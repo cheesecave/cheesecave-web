@@ -18,8 +18,19 @@ User authentication, registration, API token management, and email verification.
 
 **Authentication:** Public (no auth required)
 
-**Query Parameters:**
-- `invitation_token` (optional): Required if server is in invitation-only mode
+The optional JSON field `invitation_code` accepts a site or repository code. The
+server identifies the code and applies the site's registration policy. Invitation-only
+sites require a valid site registration invitation. A repository code grants
+read and download access to one repository, including during open registration.
+
+The `invitation_token` query parameter and `repo_invitation_token` body field remain
+available to existing clients. When registration includes repository access, the
+response supplies `repository_url` for the return after sign-in or required email
+verification. The Web can carry the repository invitation from the invitation
+dialog or an eligible visitor session.
+
+Signed-in accounts can submit a repository code at `/repo-access` to gain access
+and open its repository. See [Repository invitation access](repository-access.md).
 
 **Request Body:**
 ```json

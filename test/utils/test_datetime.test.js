@@ -6,6 +6,7 @@ import {
   formatServerDate,
   formatUnixRelativeTime,
   parseServerTime,
+  localDateTimeToIso,
 } from "@/utils/datetime";
 
 // UTC and the 26 whole-hour zones around it, plus half- and quarter-hour zones
@@ -31,6 +32,24 @@ function inZone(zone, fn) {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe("localDateTimeToIso: user-entered form times", () => {
+  it.each([
+    ["UTC", "2026-01-02T12:00:00.000Z"],
+    ["Asia/Shanghai", "2026-01-02T04:00:00.000Z"],
+    ["America/Los_Angeles", "2026-01-02T20:00:00.000Z"],
+  ])("keeps the form's local clock in %s", (zone, expected) => {
+    inZone(zone, () => {
+      expect(localDateTimeToIso("2026-01-02T12:00")).toBe(expected);
+    });
+  });
+
+  it("returns no expiry for an empty field and rejects invalid input", () => {
+    expect(localDateTimeToIso("")).toBeNull();
+    expect(localDateTimeToIso(null)).toBeNull();
+    expect(() => localDateTimeToIso("not a date")).toThrow(RangeError);
+  });
 });
 
 describe("parseServerTime: one reading of what the server sends", () => {

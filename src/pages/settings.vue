@@ -2,6 +2,11 @@
 <template>
   <div class="container-main">
     <h1 class="text-3xl font-bold mb-6">Settings</h1>
+    <p class="mb-4">
+      <RouterLink to="/repo-access" class="text-blue-500"
+        >Access repository</RouterLink
+      >
+    </p>
 
     <el-tabs v-model="activeTab">
       <!-- Profile -->

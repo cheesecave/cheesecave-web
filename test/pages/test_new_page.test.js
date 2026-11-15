@@ -106,7 +106,7 @@ describe("new repository page", () => {
         type: "dataset",
         name: "vision-set",
         organization: "aurora-labs",
-        private: false,
+        private: false, invite_mode: false,
       },
     ]);
     expect(pushSpy).toHaveBeenCalledWith("/datasets/acme/fresh-model");
@@ -141,7 +141,7 @@ describe("new repository page", () => {
         type: "space",
         name: "my-demo",
         organization: null,
-        private: false,
+        private: false, invite_mode: false,
         sdk: "gradio", // a Space is created with the card that names its SDK
       },
     ]);
@@ -174,7 +174,7 @@ describe("new repository page", () => {
         type: "model",
         name: "fresh-model",
         organization: null,
-        private: false,
+        private: false, invite_mode: false,
       },
     ]);
     expect(pushSpy).toHaveBeenCalledWith("/models/mai_lin/fresh-model");
@@ -300,7 +300,7 @@ describe("new repository page", () => {
         type: "model",
         name: "fresh-model",
         organization: null,
-        private: false,
+        private: false, invite_mode: false,
       },
     ]);
   });
@@ -321,7 +321,7 @@ describe("new repository page", () => {
           .trigger("click");
         await flushPromises();
         expect(createRequests).toEqual([
-          { type: "model", name, organization: null, private: false },
+          { type: "model", name, organization: null, private: false, invite_mode: false },
         ]);
       } finally {
         wrapper.unmount();

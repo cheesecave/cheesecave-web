@@ -43,7 +43,7 @@ function openExternal() {
           >
             {{ repo.id }}
           </RouterLink>
-          <PrivateBadge v-if="repo.private" />
+          <PrivateBadge v-if="repo.private" :invite="repo.invite_mode" />
         </h3>
         <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">
           Updated {{ formatRelativeTime(repo.lastModified, "never") }}

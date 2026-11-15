@@ -22,6 +22,7 @@
         :name="name"
         :branch="branch"
         :current-path="filePath"
+        :preview-source="previewSource"
         @collapse="sidebarOpen = false"
       />
     </aside>
@@ -126,6 +127,7 @@
         :name="name"
         :branch="branch"
         :path="filePath"
+        :preview-source="previewSource"
       />
 
       <div
@@ -169,6 +171,7 @@
         </div>
         <div class="file-detail-actions">
           <a
+            v-if="!restricted"
             :href="fileUrl"
             target="_blank"
             rel="noopener noreferrer"
@@ -178,6 +181,7 @@
           <button
             type="button"
             class="file-action file-action-icon"
+            v-if="!restricted"
             aria-label="Copy URL"
             title="Copy URL"
             @click="copyFileUrl"
@@ -197,6 +201,7 @@
           <button
             type="button"
             class="file-action file-action-icon"
+            v-if="!restricted"
             aria-label="Download"
             title="Download"
             @click="downloadFile"
@@ -280,6 +285,7 @@
                 <span class="sm:hidden">Edit</span>
               </LinkButton>
               <el-button
+                v-if="!restricted"
                 @click="copyFileUrl"
                 size="small"
                 class="flex-1 sm:flex-initial"
@@ -289,6 +295,7 @@
                 <span class="sm:hidden">Copy</span>
               </el-button>
               <el-button
+                v-if="!restricted"
                 type="primary"
                 @click="downloadFile"
                 size="small"
@@ -413,7 +420,12 @@
             :filename="fileName"
           >
             <template #error-actions>
-              <el-button type="primary" size="large" @click="downloadFile">
+              <el-button
+                v-if="!restricted"
+                type="primary"
+                size="large"
+                @click="downloadFile"
+              >
                 <div class="i-carbon-download inline-block mr-1" />
                 Download File
               </el-button>
@@ -422,7 +434,7 @@
           <!-- Image Preview -->
           <div v-else-if="isImage" class="text-center">
             <img
-              v-if="!imageFailed"
+              v-if="!imageFailed && (!restricted || fileUrl)"
               :src="fileUrl"
               :alt="fileName"
               class="max-w-full h-auto mx-auto"
@@ -430,42 +442,40 @@
               @error="imageFailed = true"
             />
             <p v-else class="py-10 text-sm text-gray-600 dark:text-gray-400">
-              This browser cannot display this image. Use the download button
-              above to open it locally.
+              {{
+                restricted
+                  ? "Image preview unavailable"
+                  : "This browser cannot display this image. Use the download button above to open it locally."
+              }}
             </p>
           </div>
 
           <!-- Video Preview -->
-          <div v-else-if="isVideo" class="text-center">
-            <video
-              :src="fileUrl"
-              controls
-              class="max-w-full h-auto mx-auto"
-              style="max-height: 600px"
-              :aria-label="`Video: ${fileName}`"
-            >
-              <track kind="captions" :label="`${fileName} captions`" />
-              Your browser does not support video playback.
-            </video>
-          </div>
-
-          <!-- Audio Preview -->
-          <div v-else-if="isAudio" class="text-center py-8">
-            <div
-              class="i-carbon-music text-6xl text-gray-400 mb-4 inline-block"
-            />
-            <audio :src="fileUrl" controls class="w-full max-w-xl mx-auto" />
-          </div>
-
-          <!-- PDF Preview -->
-          <div v-else-if="isPDF" class="h-[800px]">
-            <iframe
-              :src="fileUrl"
-              class="w-full h-full border-0"
-              title="PDF Preview"
-            />
-          </div>
-
+          <RepositoryMediaPreview
+            v-else-if="isVideo"
+            :src="fileUrl"
+            :filename="fileName"
+            :restricted="restricted"
+            :playlist="restricted"
+            @access-denied="previewSource?.onAccessDenied?.($event)"
+          />
+          <RepositoryMediaPreview
+            v-else-if="isAudio"
+            kind="audio"
+            :src="fileUrl"
+            :filename="fileName"
+            :restricted="restricted"
+            :playlist="restricted"
+            @access-denied="previewSource?.onAccessDenied?.($event)"
+          />
+          <RepositoryPdfPreview
+            v-else-if="isPDF"
+            :url="restricted ? '' : fileUrl"
+            :filename="fileName"
+            :page-count="controlledContent?.page_count || 0"
+            :load-page="restricted ? loadRenderedPdfPage : null"
+            @access-denied="previewSource?.onAccessDenied?.($event)"
+          />
           <!-- Text/Code Preview -->
           <div v-else-if="canPreviewText">
             <CodeViewer
@@ -528,6 +538,8 @@
                 :namespace="namespace"
                 :name="name"
                 :branch="branch"
+                :file-path="filePath"
+                :controlled-source="previewSource"
               />
             </div>
             <CodeViewer
@@ -548,20 +560,38 @@
               :class="getFileIcon(fileName)"
               class="text-8xl text-gray-300 dark:text-gray-600 mb-4 inline-block"
             />
-            <h3 class="text-xl font-semibold mb-2">{{ tooLargeMessage }}</h3>
-            <p class="text-gray-600 dark:text-gray-400 mb-6">
+            <h3 class="text-xl font-semibold mb-2">
+              {{
+                restricted
+                  ? controlledContent?.message || "Preview unavailable"
+                  : tooLargeMessage
+              }}
+            </h3>
+            <p v-if="!restricted" class="text-gray-600 dark:text-gray-400 mb-6">
               {{
                 fileSize > maxPreviewSize
                   ? `File is ${formatSize(fileSize)}, too large to preview`
                   : "This file type cannot be previewed"
               }}
             </p>
-            <el-button type="primary" size="large" @click="downloadFile">
+            <el-button
+              v-if="!restricted"
+              type="primary"
+              size="large"
+              @click="downloadFile"
+            >
               <div class="i-carbon-download inline-block mr-1" />
               Download File
             </el-button>
           </div>
         </div>
+        <p
+          v-if="restricted && controlledContent?.truncated"
+          class="py-3 text-sm"
+          style="color: var(--site-muted)"
+        >
+          This preview is limited. The complete original file is not available.
+        </p>
         <!-- Keep the binary preview notice above its readable header details.
            The tensor tree grows with the page, independently of the size lookup. -->
         <div v-if="isSafetensors" class="file-metadata-preview">
@@ -580,6 +610,8 @@
 <script setup>
 import { notifyError } from "@/errors";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
+import RepositoryPdfPreview from "@/components/repo/RepositoryPdfPreview.vue";
+import RepositoryMediaPreview from "@/components/repo/RepositoryMediaPreview.vue";
 import CodeViewer from "@/components/common/CodeViewer.vue";
 import RepositoryFileTree from "@/components/repo/RepositoryFileTree.vue";
 import RepositoryFileCommit from "@/components/repo/RepositoryFileCommit.vue";
@@ -619,7 +651,13 @@ import { useAuthStore } from "@/stores/auth";
 import { repoAPI } from "@/utils/api";
 import { extractYAMLFrontmatter } from "@/utils/yaml-parser";
 
-const props = defineProps({ embedded: { type: Boolean, default: false } });
+const props = defineProps({
+  embedded: { type: Boolean, default: false },
+  previewSource: { type: Object, default: null },
+  fileIdentity: { type: Object, default: null },
+});
+const restricted = computed(() => Boolean(props.previewSource));
+const controlledContent = ref(null);
 
 const route = useRoute();
 const router = useRouter();
@@ -632,16 +670,23 @@ const repoType = computed(() => {
   // `archives/models/bundle.tar`, which made a dataset .tar render
   // under `/api/models/...` and 404-out (the indexed-tar inline
   // panel got stuck on the binary fallback as a result).
+  if (props.fileIdentity?.type) return props.fileIdentity.type;
   const seg = (route.path || "").split("/")[1];
   if (seg === "models") return "model";
   if (seg === "datasets") return "dataset";
   if (seg === "spaces") return "space";
   return "model";
 });
-const namespace = computed(() => route.params.namespace);
-const name = computed(() => route.params.name);
-const branch = computed(() => route.params.branch || "main");
-const filePath = computed(() => normalizeCatchAllParam(route.params.file));
+const namespace = computed(
+  () => props.fileIdentity?.namespace ?? route.params.namespace,
+);
+const name = computed(() => props.fileIdentity?.name ?? route.params.name);
+const branch = computed(
+  () => props.fileIdentity?.branch ?? route.params.branch ?? "main",
+);
+const filePath = computed(
+  () => props.fileIdentity?.path ?? normalizeCatchAllParam(route.params.file),
+);
 
 // Constants
 const maxPreviewSize = 100 * 1000; // 100KB
@@ -674,18 +719,19 @@ const deleting = ref(false);
 // sidecar.
 const indexedTarTreeEntry = ref(null);
 const isIndexedTar = ref(false);
-// How the check for the sidecar stands: "idle" (not a tar, or not started),
-// "detecting", "indexed", "none" (a bare tar) or "error" (could not tell).
+// The ordinary TAR path keeps its detection state and preloaded sidecar.
 const tarDetect = ref("idle");
-// The sidecar the check already downloaded: the panel uses it instead of
-// fetching the same JSON a second time.
 const prefetchedTarIndex = ref(null);
-const isZipArchive = computed(() => isZipArchivePath(filePath.value));
-const isParquet = computed(() => getPreviewKind(filePath.value) === "parquet");
-const isSafetensors = computed(
-  () => getPreviewKind(filePath.value) === "safetensors",
+const isZipArchive = computed(
+  () => !restricted.value && isZipArchivePath(filePath.value),
 );
-const isPsd = computed(() => isPsdPath(filePath.value));
+const isParquet = computed(
+  () => !restricted.value && getPreviewKind(filePath.value) === "parquet",
+);
+const isSafetensors = computed(
+  () => !restricted.value && getPreviewKind(filePath.value) === "safetensors",
+);
+const isPsd = computed(() => !restricted.value && isPsdPath(filePath.value));
 // One source per file: it remembers the size and the header it has read
 const psdSource = computed(() => createHttpRangeSource(fileUrl.value));
 // Absolute, like the file-list preview: metadata readers range-read this URL.
@@ -733,6 +779,17 @@ const repositoryTreePath = computed(
 );
 
 const fileUrl = computed(() => {
+  if (restricted.value) {
+    if (controlledContent.value?.kind === "image")
+      return /^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(
+        controlledContent.value.data_url || "",
+      )
+        ? controlledContent.value.data_url
+        : "";
+    if (["video", "audio"].includes(controlledContent.value?.kind))
+      return controlledContent.value.playlist_url || "";
+    return "";
+  }
   return `/${repoType.value}s/${namespace.value}/${name.value}/resolve/${branch.value}/${filePath.value}`;
 });
 
@@ -781,18 +838,35 @@ const lineCount = computed(() => {
   return fileContent.value ? fileContent.value.split("\n").length : 0;
 });
 
-const isImage = computed(() => mediaKind(fileName.value) === "image");
-const isVideo = computed(() => mediaKind(fileName.value) === "video");
-const isAudio = computed(() => mediaKind(fileName.value) === "audio");
+const isImage = computed(() =>
+  restricted.value
+    ? controlledContent.value?.kind === "image"
+    : mediaKind(fileName.value) === "image",
+);
+const isVideo = computed(() =>
+  restricted.value
+    ? controlledContent.value?.kind === "video"
+    : mediaKind(fileName.value) === "video",
+);
+const isAudio = computed(() =>
+  restricted.value
+    ? controlledContent.value?.kind === "audio"
+    : mediaKind(fileName.value) === "audio",
+);
 // Set when the browser cannot decode the image (see utils/media-types)
 const imageFailed = ref(false);
 
 const isPDF = computed(() => {
-  return fileExtension.value === "pdf";
+  return restricted.value
+    ? controlledContent.value?.kind === "pdf"
+    : fileExtension.value === "pdf";
 });
 
 const isMarkdown = computed(() => {
-  return ["md", "markdown"].includes(fileExtension.value);
+  return (
+    (!restricted.value || controlledContent.value?.kind === "text") &&
+    ["md", "markdown"].includes(fileExtension.value)
+  );
 });
 
 const fileFrontmatter = computed(() =>
@@ -841,6 +915,8 @@ const isTextFile = computed(() => {
     "sass",
     "less",
     "json",
+    "jsonl",
+    "ndjson",
     "xml",
     "yaml",
     "yml",
@@ -873,6 +949,8 @@ const isTextFile = computed(() => {
 });
 
 const canPreviewText = computed(() => {
+  if (restricted.value)
+    return controlledContent.value?.kind === "text" && !isMarkdown.value;
   return (
     isTextFile.value && fileSize.value <= maxPreviewSize && !isMarkdown.value
   );
@@ -892,6 +970,7 @@ const canEdit = computed(() => {
   // Only allow editing text files that are not too large
   // Check if user can write to this namespace (own repo or org member)
   return (
+    !restricted.value &&
     authStore.isAuthenticated &&
     authStore.canWriteToNamespace(namespace.value) &&
     (isTextFile.value || isMarkdown.value) &&
@@ -902,7 +981,9 @@ const canEdit = computed(() => {
 const canDelete = computed(() => {
   // Allow deleting files if user has write access to the namespace
   return (
-    authStore.isAuthenticated && authStore.canWriteToNamespace(namespace.value)
+    !restricted.value &&
+    authStore.isAuthenticated &&
+    authStore.canWriteToNamespace(namespace.value)
   );
 });
 
@@ -972,7 +1053,46 @@ async function loadFile() {
   await loadFileInfo();
 }
 
+let fileRequestSequence = 0;
+async function loadRenderedPdfPage(page, options) {
+  return props.previewSource.loadPdfPage(
+    filePath.value,
+    page,
+    controlledContent.value?.snapshot,
+    options,
+  );
+}
 async function loadFileInfo() {
+  const request = ++fileRequestSequence;
+  if (restricted.value) {
+    loading.value = true;
+    loadError.value = null;
+    controlledContent.value = null;
+    fileContent.value = "";
+    fileSize.value = null;
+    imageFailed.value = false;
+    try {
+      if (branch.value !== "main")
+        throw Object.assign(
+          new Error("Only the default branch is available in guest preview"),
+          { status: 400 },
+        );
+      const result = await props.previewSource.loadFile(filePath.value);
+      if (request !== fileRequestSequence) return;
+      controlledContent.value = result.content;
+      fileContent.value =
+        result.content?.kind === "text" ? result.content.text : "";
+      fileSize.value = result.info?.size ?? result.content?.size ?? null;
+    } catch (error) {
+      if (request === fileRequestSequence) {
+        loadError.value = decodeError(error);
+        props.previewSource?.onAccessDenied?.(error);
+      }
+    } finally {
+      if (request === fileRequestSequence) loading.value = false;
+    }
+    return;
+  }
   loading.value = true;
   loadError.value = null;
   imageFailed.value = false;
@@ -1075,6 +1195,7 @@ async function detectIndexedTar() {
 }
 
 async function downloadFile() {
+  if (restricted.value) return;
   // Pre-flight probe via probeUrl — issues a Range: 0-0 GET
   // against the resolve endpoint so we can tell a gated/404/etc.
   // failure apart from a successful stream. The happy path still
@@ -1096,6 +1217,7 @@ async function downloadFile() {
 }
 
 async function copyFileUrl() {
+  if (restricted.value) return;
   const fullUrl = window.location.origin + fileUrl.value;
   const success = await copyToClipboard(fullUrl);
   if (success) {
@@ -1159,6 +1281,7 @@ const editPath = computed(
 );
 
 async function confirmDeleteFile() {
+  if (restricted.value) return;
   try {
     await ElMessageBox.confirm(
       `Are you sure you want to delete "${fileName.value}"? This action cannot be undone.`,
@@ -1220,6 +1343,13 @@ async function deleteFile() {
   }
 }
 
+// Controlled adapters can remain mounted while the SPA selects another file.
+watch(
+  () => [props.previewSource, JSON.stringify(props.fileIdentity)],
+  () => {
+    if (props.previewSource) loadFileInfo();
+  },
+);
 // Lifecycle
 onMounted(() => {
   loadFileInfo();
@@ -1237,6 +1367,7 @@ onMounted(() => {
   }
 });
 onUnmounted(() => {
+  fileRequestSequence++;
   scrollViewport?.removeEventListener("scroll", scheduleWorkbenchGeometry);
   window.removeEventListener("resize", scheduleWorkbenchGeometry);
   viewportObserver?.disconnect();
@@ -1258,8 +1389,13 @@ onUnmounted(() => {
 }
 .file-detail-sidebar {
   position: sticky;
-  top: 0;
-  height: var(--file-sidebar-height, 100dvh);
+  top: var(--repository-sticky-offset, 0px);
+  height: max(
+    0px,
+    calc(
+      var(--file-sidebar-height, 100dvh) - var(--repository-sticky-offset, 0px)
+    )
+  );
   min-height: 0;
   border-right: 1px solid var(--site-border);
 }
@@ -1269,7 +1405,7 @@ onUnmounted(() => {
 }
 .file-detail-pathbar {
   position: sticky;
-  top: 0;
+  top: var(--repository-sticky-offset, 0px);
   z-index: 22;
   display: flex;
   align-items: center;
@@ -1309,7 +1445,7 @@ onUnmounted(() => {
 }
 .file-detail-toolbar {
   position: sticky;
-  top: 56px;
+  top: calc(var(--repository-sticky-offset, 0px) + 56px);
   z-index: 21;
   display: flex;
   align-items: center;

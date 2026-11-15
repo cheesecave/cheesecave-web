@@ -34,6 +34,11 @@ export function parseServerTime(value) {
   return dayjs(value);
 }
 
+/** Serialize a datetime-local form value in the user's zone, not as server UTC. */
+export function localDateTimeToIso(value) {
+  return value ? new Date(value).toISOString() : null;
+}
+
 export function formatRelativeTime(value, fallback = "never") {
   if (!value) return fallback;
 

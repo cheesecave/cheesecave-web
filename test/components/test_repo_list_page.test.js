@@ -464,7 +464,7 @@ describe("RepoListPage", () => {
 
     await wrapper.get('input[placeholder="my-model"]').setValue("fresh-model");
     await wrapper.get('select[aria-label="Select owner"]').setValue("acme");
-    await wrapper.get('input[type="checkbox"]').setValue(true);
+    await wrapper.get('select[aria-label="Repository visibility"]').setValue("private");
 
     const createDialogButton = wrapper
       .findAll("button")
@@ -483,7 +483,7 @@ describe("RepoListPage", () => {
         type: "model",
         name: "fresh-model",
         organization: "acme",
-        private: true,
+        private: true, invite_mode: false,
       },
     ]);
     expect(mocks.router.push).toHaveBeenCalledWith("/models/acme/fresh-model");
@@ -546,7 +546,7 @@ describe("RepoListPage", () => {
         type: "model",
         name: "fresh-model",
         organization: null,
-        private: false,
+        private: false, invite_mode: false,
       },
     ]);
     expect(mocks.router.push).toHaveBeenCalledWith(
@@ -634,7 +634,7 @@ describe("RepoListPage", () => {
         type: "model",
         name: "broken-model",
         organization: null,
-        private: false,
+        private: false, invite_mode: false,
       },
     ]);
     expect(mocks.router.push).not.toHaveBeenCalledWith(
@@ -738,7 +738,7 @@ describe("RepoListPage", () => {
         .trigger("click");
       await flushPromises();
       expect(requests.create).toEqual([
-        { type: "model", name, organization: null, private: false },
+        { type: "model", name, organization: null, private: false, invite_mode: false },
       ]);
     },
   );
@@ -1120,7 +1120,7 @@ describe("RepoListPage", () => {
     await flushPromises();
     await wrapper.get('input[placeholder="my-model"]').setValue("draft");
     await wrapper.get('select[aria-label="Select owner"]').setValue("acme");
-    await wrapper.get('input[type="checkbox"]').setValue(true);
+    await wrapper.get('select[aria-label="Repository visibility"]').setValue("private");
     await clickButton("Cancel");
     expect(wrapper.find('input[placeholder="my-model"]').exists()).toBe(false);
     await clickButton("New Model");
@@ -1129,7 +1129,7 @@ describe("RepoListPage", () => {
     expect(wrapper.get('select[aria-label="Select owner"]').element.value).toBe(
       "alice",
     );
-    expect(wrapper.get('input[type="checkbox"]').element.checked).toBe(false);
+    expect(wrapper.get('select[aria-label="Repository visibility"]').element.value).toBe("public");
     expect(requests.create).toEqual([]);
   });
 

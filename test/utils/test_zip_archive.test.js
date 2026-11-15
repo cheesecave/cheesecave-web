@@ -4,6 +4,7 @@
 // pins the transport contract: GET only, a single simple byte range per
 // request, and cookie-carrying credentials for private repos.
 
+import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -291,7 +292,11 @@ describe("transport", () => {
     const archive = await open("a.zip");
     const head = await archive.read("big.bin", { limit: 1000 });
     expect(Array.from(head)).toEqual(Array.from(big.subarray(0, 1000)));
-    expect(await archive.read("big.bin", { limit: 10_000_000 })).toEqual(big);
+    const full = await archive.read("big.bin", { limit: 10_000_000 });
+    // Compare every byte and the length natively; recursive equality on 300KB
+    // typed arrays dominates this transport test under full-suite load.
+    expect(full).toBeInstanceOf(Uint8Array);
+    expect(Buffer.compare(full, big)).toBe(0);
     expect((await archive.read("empty.bin")).length).toBe(0);
     expect((await archive.read("empty.bin", { limit: 10 })).length).toBe(0);
   });

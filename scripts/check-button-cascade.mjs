@@ -11,8 +11,9 @@
  * usage: node scripts/check-button-cascade.mjs dist
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve, win32 } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 // Each type the pages use, plain, disabled, and a message box's confirm
@@ -67,14 +68,91 @@ export function brokenButtons(dom) {
   return JSON.parse(result[1]);
 }
 
-const chrome = (url) =>
-  execFileSync(
+function browserCandidates(env, platform) {
+  if (env.CHROME_BIN) return [env.CHROME_BIN];
+  if (platform === "win32") {
+    const programs = [
+      env.ProgramFiles || "C:\\Program Files",
+      env["ProgramFiles(x86)"] || "C:\\Program Files (x86)",
+    ];
+    const local = env.LOCALAPPDATA ? [env.LOCALAPPDATA] : [];
+    return [
+      ...[...programs, ...local].map((root) =>
+        win32.join(root, "Google", "Chrome", "Application", "chrome.exe"),
+      ),
+      ...[...programs, ...local].map((root) =>
+        win32.join(root, "Microsoft", "Edge", "Application", "msedge.exe"),
+      ),
+      "chrome.exe",
+      "chromium.exe",
+      "msedge.exe",
+    ];
+  }
+  if (platform === "darwin") {
+    return [
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "/Applications/Chromium.app/Contents/MacOS/Chromium",
+      "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+      "google-chrome",
+      "chromium",
+      "microsoft-edge",
+    ];
+  }
+  return [
     "google-chrome",
-    ["--headless=new", "--no-sandbox", "--disable-gpu", "--dump-dom", url],
-    { encoding: "utf8", stdio: "pipe" },
-  );
+    "google-chrome-stable",
+    "chromium",
+    "chromium-browser",
+    "microsoft-edge",
+  ];
+}
 
-export function checkButtonCascade(dist, run = chrome) {
+export function runBrowser(
+  url,
+  { env = process.env, platform = process.platform, run = execFileSync } = {},
+) {
+  // An isolated profile prevents an already-open browser from taking over the
+  // headless request and keeps this check independent of the user's cookies.
+  const profileRoot = resolve(tmpdir());
+  const profile = mkdtempSync(join(profileRoot, "button-cascade-browser-"));
+  let missing;
+  try {
+    for (const executable of browserCandidates(env, platform)) {
+      try {
+        return run(
+          executable,
+          [
+            "--headless=new",
+            "--no-sandbox",
+            "--disable-gpu",
+            `--user-data-dir=${profile}`,
+            "--dump-dom",
+            url,
+          ],
+          {
+            encoding: "utf8",
+            stdio: "pipe",
+            windowsHide: true,
+            timeout: 30000,
+          },
+        );
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+        missing = error;
+      }
+    }
+    throw new Error(
+      "No Chrome, Chromium or Edge executable found. Set CHROME_BIN to its executable path.",
+      { cause: missing },
+    );
+  } finally {
+    if (dirname(resolve(profile)) !== profileRoot)
+      throw new Error("Browser profile escaped its temporary directory.");
+    rmSync(profile, { recursive: true, force: true });
+  }
+}
+
+export function checkButtonCascade(dist, run = runBrowser) {
   const page = join(dist, "button-cascade.html");
   const hrefs = stylesheets(readFileSync(join(dist, "index.html"), "utf8"));
   writeFileSync(page, harness(hrefs));

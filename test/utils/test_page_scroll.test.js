@@ -229,6 +229,20 @@ describe("page scroll navigation", () => {
     expect(wrap.scrollTop).toBe(638);
   });
 
+  it("keeps hash targets below the compact header as its height settles", async () => {
+    const wrap = createWrap();
+    const target = document.createElement("h2");
+    target.id = "card";
+    target.style.scrollMarginTop = "12px";
+    target.getBoundingClientRect = () => ({ top: 64 + 650 - wrap.scrollTop });
+    wrap.firstElementChild.append(target);
+    navigate("/models#card", 0);
+    await vi.advanceTimersByTimeAsync(1);
+    wrap.style.scrollPaddingTop = "92px";
+    await settle();
+    expect(wrap.scrollTop).toBe(546);
+  });
+
   it("expires an impossible restore without moving later user scroll", async () => {
     const wrap = createWrap();
     navigate("/models", 0);

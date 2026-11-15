@@ -6,7 +6,7 @@
     "
   >
     <RepositoryHeader
-      v-if="isCompositeHeader"
+      v-if="isCompositeHeader && !externalHeader"
       :repo-type="repoType"
       :namespace="namespace"
       :name="name"
@@ -49,8 +49,17 @@
         :retry="loadRepoInfo"
         mode="inline-panel"
       />
+      <ErrorState
+        v-if="detailView === 'settings' && !canManageSettings && !error"
+        :error="settingsPermissionError"
+        :context="errorContext('repository settings')"
+        mode="inline-panel"
+      />
       <component
-        v-if="detailActive"
+        v-if="
+          detailActive &&
+          (detailView !== 'settings' || (canManageSettings && !error))
+        "
         :is="detailComponent"
         :key="detailKey"
         :embedded="isCompositeHeader"
@@ -121,7 +130,10 @@
       <!-- Main Content -->
       <main class="min-w-0">
         <!-- Repo Header -->
-        <div v-if="!isCompositeHeader" class="card repo-header mb-6">
+        <div
+          v-if="!isCompositeHeader && !externalHeader"
+          class="card repo-header mb-6"
+        >
           <div
             class="flex flex-col sm:flex-row items-start justify-between gap-4 mb-4"
           >
@@ -159,7 +171,11 @@
             <div class="flex items-center gap-2 flex-wrap">
               <el-tag v-if="repoInfo?.private" type="warning">
                 <div class="i-carbon-locked inline-block mr-1" />
-                Private
+                {{
+                  repositoryAccess?.visibility === "invite"
+                    ? "Invite"
+                    : "Private"
+                }}
               </el-tag>
               <el-tag v-else type="success">
                 <div class="i-carbon-unlocked inline-block mr-1" />
@@ -240,22 +256,12 @@
               Download
             </el-button>
             <div class="w-0 h-0 p-0 m-0"></div>
-            <LinkButton
-              v-if="isOwner"
-              :to="`/${repoType}s/${namespace}/${name}/settings`"
-              size="small"
-              class="w-full sm:w-auto m-0 sm:m-1"
-              plain
-            >
-              <div class="i-carbon-settings inline-block mr-1" />
-              Settings
-            </LinkButton>
           </div>
         </div>
 
         <!-- Metadata Header (Key badges) -->
         <MetadataHeader
-          v-if="!isCompositeHeader && hasMetadataHeader"
+          v-if="!isCompositeHeader && !externalHeader && hasMetadataHeader"
           :metadata="displayMetadata"
           :libraries="tagGroups.libraries"
           :others="tagGroups.others"
@@ -266,7 +272,7 @@
 
         <!-- Navigation Tabs: real links, so "Open in new tab" works on each of them -->
         <nav
-          v-if="!isCompositeHeader"
+          v-if="!isCompositeHeader && !externalHeader"
           class="repo-tabs mb-6 -mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto"
           aria-label="Repository sections"
         >
@@ -372,320 +378,38 @@
           </div>
         </div>
 
-        <div v-if="activeTab === 'files'" :class="{ card: !isCompositeHeader }">
-          <div
-            class="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3"
-            :class="{ 'flex-wrap repository-files-toolbar': isCompositeHeader }"
-          >
-            <div class="flex items-center gap-2 min-w-0">
-              <el-select
-                aria-label="Branch"
-                v-model="currentBranch"
-                :size="isCompositeHeader ? 'default' : 'small'"
-                class="w-full min-w-28 sm:w-37 sm:min-w-37 sm:flex-none"
-                :class="{ 'repository-branch-select': isCompositeHeader }"
-                @change="handleBranchChange"
-              >
-                <template v-if="isCompositeHeader" #prefix>
-                  <span class="i-carbon-branch" aria-hidden="true" />
-                </template>
-                <el-option label="main" value="main" />
-              </el-select>
-              <span
-                v-if="isCompositeHeader"
-                class="repository-storage-size"
-                data-testid="repository-size"
-                aria-label="Repository storage used"
-                title="Repository storage used"
-                >{{ repositorySize }}</span
-              >
-              <span
-                v-else
-                class="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap"
-                data-testid="file-list-count"
-              >
-                {{ fileTree.length }}
-                {{ fileTree.length === 1 ? "file" : "files"
-                }}<template v-if="fileListHasMore"> loaded </template>
-              </span>
-            </div>
-
-            <div
-              class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
-              :class="{ 'sm:ml-auto': isCompositeHeader }"
-            >
-              <el-input
-                v-if="isCompositeHeader"
-                aria-label="Filter files by name prefix"
-                v-model="fileSearchQuery"
-                placeholder="Filter by name prefix..."
-                class="w-full sm:w-50 repository-file-filter"
-                clearable
-                data-testid="file-list-name-prefix"
-              >
-                <template #prefix>
-                  <div class="i-carbon-search" />
-                </template>
-              </el-input>
-              <RepoHistoryLink
-                v-if="isCompositeHeader"
-                :repo-type="repoType"
-                :namespace="namespace"
-                :name="name"
-                :branch="currentBranch"
-                :external="isExternalRepo"
-                :source-url="sourceHistoryUrl"
-              />
-              <LinkButton
-                v-if="isOwner"
-                :to="`/${repoType}s/${namespace}/${name}/upload/${currentBranch}`"
-                :size="isCompositeHeader ? 'default' : 'small'"
-                type="primary"
-                class="w-full sm:w-auto"
-                :class="{ 'repository-upload-button': isCompositeHeader }"
-              >
-                <div class="i-carbon-cloud-upload inline-block mr-1" />
-                Upload Files
-              </LinkButton>
-              <el-input
-                v-if="!isCompositeHeader"
-                aria-label="Filter files by name prefix"
-                v-model="fileSearchQuery"
-                placeholder="Filter by name prefix..."
-                size="small"
-                class="w-full sm:w-50"
-                clearable
-                data-testid="file-list-name-prefix"
-              >
-                <template #prefix>
-                  <div class="i-carbon-search" />
-                </template>
-              </el-input>
-            </div>
-          </div>
-
-          <!-- Breadcrumb for current path -->
-          <div v-if="currentPath" class="mb-3">
-            <div class="flex items-center justify-between">
-              <el-breadcrumb
-                separator="/"
-                class="repo-file-breadcrumb text-sm text-gray-700 dark:text-gray-300"
-              >
-                <el-breadcrumb-item>
-                  <RouterLink
-                    :to="`/${repoType}s/${namespace}/${name}/tree/${currentBranch}`"
-                    class="text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    root
-                  </RouterLink>
-                </el-breadcrumb-item>
-                <el-breadcrumb-item
-                  v-for="(segment, idx) in pathSegments"
-                  :key="idx"
-                >
-                  <RouterLink
-                    :to="`/${repoType}s/${namespace}/${name}/tree/${currentBranch}/${pathSegments.slice(0, idx + 1).join('/')}`"
-                    class="text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    {{ segment }}
-                  </RouterLink>
-                </el-breadcrumb-item>
-              </el-breadcrumb>
-              <el-button
-                v-if="isOwner"
-                @click="confirmDeleteFolder"
-                type="danger"
-                size="small"
-                :loading="deletingFolder"
-              >
-                <div class="i-carbon-trash-can inline-block mr-1" />
-                Delete Folder
-              </el-button>
-            </div>
-          </div>
-
-          <!-- File List -->
-          <div
-            class="divide-y divide-gray-200 dark:divide-gray-700"
-            :class="{ 'repository-file-list': isCompositeHeader }"
-          >
-            <RepoLatestCommit
-              v-if="isCompositeHeader"
-              :repo-type="repoType"
-              :namespace="namespace"
-              :name="name"
-              :branch="currentBranch"
-              :external="isExternalRepo"
-            />
-            <div v-if="filesLoading" class="py-12 text-center">
-              <el-icon class="is-loading" :size="40">
-                <div class="i-carbon-circle-dash" />
-              </el-icon>
-              <p class="mt-4 text-gray-500 dark:text-gray-400">
-                Loading files...
-              </p>
-            </div>
-            <!--
-              Root-tree fetch failed (decoded by src/errors). Render the shared
-              ErrorState instead of silently showing an empty file
-              list — that was the preview-of-gated-repo symptom in
-              the linked tracking issue.
-            -->
-            <ErrorState
-              v-else-if="treeError"
-              :error="treeError"
-              :context="errorContext('file list')"
-              mode="inline-panel"
-              :retry="loadFileTree"
-            />
-            <template v-else>
-              <!-- Header Row (desktop only) -->
-              <div
-                v-if="!isCompositeHeader"
-                class="hidden md:grid md:grid-cols-[auto_minmax(0,1.4fr)_minmax(0,2fr)_120px_110px] gap-3 py-2 px-2 text-sm font-medium text-gray-600 dark:text-gray-400 border-b"
-              >
-                <div></div>
-                <!-- Icon column -->
-                <div>Name</div>
-                <div>Last Commit</div>
-                <div class="text-right">Updated</div>
-                <div class="text-right">Size</div>
-              </div>
-
-              <!-- File Rows -->
-              <!--
-                Each row is anchored with a stretched <RouterLink> that
-                covers the whole row (absolute inset-0). That makes the
-                entry a real <a href> element, so right-click → "Open in
-                New Tab", middle-click, and Cmd/Ctrl-click all work like
-                they do on any other link. Interactive children (the
-                preview button, the commit RouterLink) sit above the
-                overlay with a higher z-index + their own @click.stop so
-                they don't trigger the row navigation.
-              -->
-              <div
-                v-for="file in fileTree"
-                :key="file.path"
-                class="relative py-3 grid grid-cols-[auto_1fr] md:grid-cols-[auto_minmax(0,1.4fr)_minmax(0,2fr)_120px_110px] gap-3 items-center hover:bg-gray-50 dark:hover:bg-gray-700 px-2 cursor-pointer transition-colors"
-              >
-                <RouterLink
-                  :to="getEntryHref(file)"
-                  :aria-label="`Open ${getFileName(file.path)}`"
-                  class="absolute inset-0 z-10"
-                  data-testid="filelist-row-link"
-                />
-                <div
-                  :class="
-                    file.type === 'directory'
-                      ? 'i-carbon-folder text-blue-500'
-                      : 'i-carbon-document text-gray-500 dark:text-gray-400'
-                  "
-                  class="text-xl flex-shrink-0"
-                />
-                <div class="min-w-0">
-                  <div class="font-medium truncate flex items-center gap-2">
-                    <span class="truncate">{{ getFileName(file.path) }}</span>
-                    <button
-                      v-if="canPreviewFileRow(file)"
-                      type="button"
-                      class="relative z-20 flex-shrink-0 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
-                      :title="previewIconTitle(file)"
-                      :aria-label="`Preview metadata for ${getFileName(file.path)}`"
-                      @click.stop="openFilePreview(file)"
-                    >
-                      <div :class="previewIconClass(file)" class="text-base" />
-                    </button>
-                  </div>
-                  <div
-                    class="mt-1 text-sm text-gray-500 dark:text-gray-400 truncate md:hidden"
-                  >
-                    <RouterLink
-                      v-if="file.lastCommit"
-                      :to="getCommitPath(file.lastCommit.id)"
-                      class="relative z-20 text-gray-700 dark:text-gray-300 underline underline-offset-2 decoration-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
-                      :title="file.lastCommit.title"
-                      @click.stop
-                    >
-                      {{ getEntryCommitTitle(file) }}
-                    </RouterLink>
-                    <span v-else>{{ getEntryCommitTitle(file) }}</span>
-                  </div>
-                  <div
-                    class="mt-1 text-xs text-gray-400 dark:text-gray-500 md:hidden"
-                  >
-                    {{ getEntryUpdatedAt(file) }}
-                    <span v-if="formatEntrySize(file) !== '-'">
-                      · {{ formatEntrySize(file) }}
-                    </span>
-                  </div>
-                </div>
-                <div
-                  class="hidden md:block min-w-0 text-sm text-gray-500 dark:text-gray-400 truncate"
-                >
-                  <RouterLink
-                    v-if="file.lastCommit"
-                    :to="getCommitPath(file.lastCommit.id)"
-                    class="relative z-20 text-gray-700 dark:text-gray-300 underline underline-offset-2 decoration-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
-                    :title="file.lastCommit.title"
-                    @click.stop
-                  >
-                    {{ getEntryCommitTitle(file) }}
-                  </RouterLink>
-                  <span v-else>{{ getEntryCommitTitle(file) }}</span>
-                </div>
-                <div
-                  class="hidden md:block text-sm text-gray-500 dark:text-gray-400 text-right"
-                >
-                  {{ getEntryUpdatedAt(file) }}
-                </div>
-                <div
-                  class="hidden md:block text-sm text-gray-500 dark:text-gray-400 text-right"
-                >
-                  {{ formatEntrySize(file) }}
-                </div>
-              </div>
-
-              <div
-                v-if="fileTree.length === 0"
-                class="py-12 text-center text-gray-500 dark:text-gray-400"
-              >
-                <div
-                  class="i-carbon-document-blank text-6xl mb-4 inline-block"
-                />
-                <p v-if="fileSearchQuery">
-                  No files in this directory start with "{{ fileSearchQuery }}"
-                  (case-sensitive prefix)
-                </p>
-                <p v-else>No files found</p>
-              </div>
-            </template>
-          </div>
-
-          <!--
-            "Load more" button — centered, plain, mirroring the
-            commit-history "Load More Commits" affordance below. We
-            switched away from a numbered pager because the cursor-
-            only LakeFS list API gives no total page count and the
-            old pager had to walk every page forward just to render
-            its buttons (issue #56). The per-batch selector that
-            controls the next click's `limit` lives up in the header
-            next to the count, not here.
-
-            Hidden when the listing is exhausted — at that point
-            there is nothing to load.
-          -->
-          <div v-if="!filesLoading && fileListHasMore" class="text-center pt-4">
-            <el-button
-              :loading="fileListLoadingMore"
-              :disabled="fileListLoadingMore"
-              plain
-              data-testid="file-list-load-more"
-              @click="loadMoreFileTree"
-            >
-              Load More Files
-            </el-button>
-          </div>
-        </div>
+        <RepositoryFiles
+          v-if="activeTab === 'files'"
+          :repo-type="repoType"
+          :namespace="namespace"
+          :name="name"
+          v-model:branch="currentBranch"
+          v-model:search="fileSearchQuery"
+          :current-path="currentPath"
+          :is-composite-header="isCompositeHeader"
+          :is-owner="isOwner"
+          :is-external-repo="isExternalRepo"
+          :source-history-url="sourceHistoryUrl"
+          :repository-size="repositorySize"
+          :file-tree="fileTree"
+          :files-loading="filesLoading"
+          :tree-error="treeError"
+          :file-list-has-more="fileListHasMore"
+          :file-list-loading-more="fileListLoadingMore"
+          :deleting-folder="deletingFolder"
+          :get-entry-href="getEntryHref"
+          :get-commit-path="getCommitPath"
+          :preview-actions="{
+            canPreview: canPreviewFileRow,
+            title: previewIconTitle,
+            icon: previewIconClass,
+          }"
+          @branch-change="handleBranchChange"
+          @reload="loadFileTree"
+          @load-more="loadMoreFileTree"
+          @delete-folder="confirmDeleteFolder"
+          @preview="openFilePreview"
+        />
 
         <div v-if="activeTab === 'commits'">
           <div v-if="isCompositeHeader" class="repository-history-navigation">
@@ -837,7 +561,7 @@
       </main>
 
       <!-- Sidebar (Compact) -->
-      <aside class="space-y-4 lg:sticky lg:top-4 lg:self-start">
+      <aside class="repository-info-sidebar space-y-4 lg:sticky lg:self-start">
         <!-- Relationships (Author + Base Model + Datasets from YAML) -->
         <SidebarRelationshipsCard
           :namespace="namespace"
@@ -858,7 +582,7 @@
               <span class="text-gray-600 dark:text-gray-400">Type:</span>
               <span class="ml-2 font-medium">{{ repoTypeLabel }}</span>
             </div>
-            <div v-if="isCompositeHeader && repoInfo">
+            <div v-if="isCompositeHeader && repoType !== 'space' && repoInfo">
               <span class="text-gray-600 dark:text-gray-400">Downloads:</span>
               <span class="ml-2">{{ repoInfo.downloads || 0 }}</span>
             </div>
@@ -1065,14 +789,15 @@ huggingface-cli download {{ repoInfo?.id }}</pre
 </template>
 
 <script setup>
-import { defineAsyncComponent } from "vue";
+import {
+  defineAsyncComponent,
+  inject,
+  watchEffect,
+  onBeforeUnmount,
+} from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import axios from "axios";
-import {
-  formatRelativeTime,
-  formatRelativeTimeCached,
-  formatUnixRelativeTime,
-} from "@/utils/datetime";
+import { formatRelativeTime, formatUnixRelativeTime } from "@/utils/datetime";
 
 import { useAuthStore } from "@/stores/auth";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -1087,8 +812,7 @@ import { resolveRepoTreeEntryPath } from "@/utils/repo-paths";
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import MetadataHeader from "@/components/repo/metadata/MetadataHeader.vue";
 import RepositoryHeader from "@/components/repo/RepositoryHeader.vue";
-import RepoLatestCommit from "@/components/repo/RepoLatestCommit.vue";
-import RepoHistoryLink from "@/components/repo/RepoHistoryLink.vue";
+import RepositoryFiles from "@/components/repo/RepositoryFiles.vue";
 import { externalRepoUrl } from "@/utils/external-repo";
 import LinkButton from "@/components/common/LinkButton.vue";
 import ModelInfoCard from "@/components/repo/metadata/ModelInfoCard.vue";
@@ -1131,6 +855,9 @@ const detailComponents = {
         "../../pages/[type]s/[namespace]/[name]/blob/[branch]/[...file].vue"
       ),
   ),
+  settings: defineAsyncComponent(
+    () => import("../../pages/[type]s/[namespace]/[name]/settings.vue"),
+  ),
   commit: defineAsyncComponent(
     () =>
       import("../../pages/[type]s/[namespace]/[name]/commit/[commit_id].vue"),
@@ -1161,6 +888,7 @@ const detailActive = ref(true);
 
 const router = useRouter();
 const authStore = useAuthStore();
+const repositoryAccess = inject("repositoryAccess", ref(null));
 
 // State
 const repoInfo = ref(null);
@@ -1303,7 +1031,11 @@ function previewIconTitle(file) {
 }
 
 function canPreviewFileRow(file) {
-  return canPreviewFile(file, loadedFilePaths.value, confirmedIndexedTars.value);
+  return canPreviewFile(
+    file,
+    loadedFilePaths.value,
+    confirmedIndexedTars.value,
+  );
 }
 
 function buildResolveForPath(path) {
@@ -1364,7 +1096,7 @@ const PATHS_INFO_BATCH_SIZE = 1000;
 // Computed
 const activeTab = computed(() => props.tab);
 const isCompositeHeader = computed(() =>
-  ["model", "dataset"].includes(props.repoType),
+  ["model", "dataset", "space"].includes(props.repoType),
 );
 
 const repoTypeLabel = computed(() => {
@@ -1374,6 +1106,23 @@ const repoTypeLabel = computed(() => {
 
 const isOwner = computed(() => {
   return authStore.canWriteToNamespace(props.namespace);
+});
+
+// Browser access state is authoritative for repository management. A single
+// read grant must never turn a namespace or repository into a settings owner.
+const canManageSettings = computed(
+  () =>
+    authStore.isAuthenticated &&
+    !isExternalRepo.value &&
+    (repositoryAccess.value
+      ? repositoryAccess.value.can_manage === true
+      : isOwner.value),
+);
+const settingsPermissionError = decodeError({
+  response: {
+    status: 403,
+    data: { detail: "Repository settings require management access" },
+  },
 });
 
 const isNamespaceOrg = ref(false);
@@ -1520,21 +1269,6 @@ function formatSize(bytes) {
   return (bytes / (1000 * 1000 * 1000)).toFixed(1) + " GB";
 }
 
-function formatEntrySize(file) {
-  return formatSize(file.size);
-}
-
-function getEntryCommitTitle(file) {
-  return file.lastCommit?.title || "-";
-}
-
-function getEntryUpdatedAt(file) {
-  return formatRelativeTimeCached(
-    file.lastCommit?.date || file.lastModified,
-    "-",
-  );
-}
-
 function getFileName(path) {
   const parts = path.split("/");
   return parts[parts.length - 1] || path;
@@ -1566,6 +1300,8 @@ function tabTarget(tab) {
       return `${page}/commits/${currentBranch.value}`;
     case "metadata":
       return `${page}?tab=metadata`;
+    case "settings":
+      return `${page}/settings`;
     default:
       return page;
   }
@@ -1591,6 +1327,7 @@ const repoTabs = computed(() => [
       : "",
   },
   { key: "metadata", label: "Metadata" },
+  ...(canManageSettings.value ? [{ key: "settings", label: "Settings" }] : []),
 ]);
 
 const headerTabs = computed(() =>
@@ -1598,6 +1335,45 @@ const headerTabs = computed(() =>
     .filter((item) => item.key !== "commits")
     .map((item) => ({ ...item, to: tabTarget(item.key) })),
 );
+
+// A repository that entered through an invitation keeps its existing header
+// when access changes. Only an authorized RepoViewer publishes normal header
+// data; the access gate clears this bridge before identity/access rechecks.
+const headerBridge = inject("repositoryHeaderBridge", null);
+const externalHeader = computed(() => Boolean(headerBridge?.enabled.value));
+const headerOwner = Symbol("repository-header");
+watchEffect(
+  () => {
+    if (!externalHeader.value) return;
+    headerBridge.state.value = {
+      owner: headerOwner,
+      repoInfo: error.value ? null : repoInfo.value,
+      namespaceLink: namespaceLink.value,
+      signedIn: authStore.isAuthenticated,
+      isOwner: isOwner.value,
+      liked: isLiked.value,
+      likesCount: likesCount.value,
+      liking: likingInProgress.value,
+      tabs: headerTabs.value,
+      activeTab: activeTab.value === "commits" ? "files" : activeTab.value,
+      metadata: displayMetadata.value,
+      tagGroups: tagGroups.value,
+      hasMetadataHeader: !error.value && hasMetadataHeader.value,
+      copy: copyRepoId,
+      clone: () => {
+        showCloneDialog.value = true;
+      },
+      download: downloadRepo,
+      like: toggleLike,
+      navigate: navigateToTab,
+    };
+  },
+  { flush: "post" },
+);
+onBeforeUnmount(() => {
+  if (headerBridge?.state.value?.owner === headerOwner)
+    headerBridge.state.value = null;
+});
 
 const sourceRepoUrl = computed(() =>
   repoInfo.value
@@ -1674,7 +1450,10 @@ async function fetchRepoInfo({ signal }) {
 
   // Private model/dataset headers show visibility instead of a like control.
   let liked = null;
-  if (authStore.isAuthenticated && !(isCompositeHeader.value && data.private)) {
+  if (
+    authStore.isAuthenticated &&
+    !(isCompositeHeader.value && props.repoType !== "space" && data.private)
+  ) {
     try {
       const { data: likeData } = await likesAPI.checkLiked(
         props.repoType,
@@ -1693,7 +1472,8 @@ async function fetchRepoInfo({ signal }) {
 
   repoInfo.value = data;
   likesCount.value = data.likes || 0;
-  if (isCompositeHeader.value && data.private) isLiked.value = false;
+  if (isCompositeHeader.value && props.repoType !== "space" && data.private)
+    isLiked.value = false;
   else if (liked !== null) isLiked.value = liked;
 
   // Check if namespace is an org (for correct linking)
@@ -1714,6 +1494,22 @@ const error = computed(() =>
   repoInfoResource.failed.value ? repoInfoResource.error.value : null,
 );
 const loadRepoInfo = () => repoInfoResource.reload();
+
+// Settings reloads authoritative access after changing visibility. Refresh the
+// cached repository info too, so public controls and clone hints do not linger.
+watch(
+  () => repositoryAccess.value?.visibility,
+  (visibility, previous) => {
+    if (
+      visibility !== previous &&
+      ["public", "private", "invite"].includes(visibility) &&
+      repositoryAccess.value?.access === "full" &&
+      repoInfo.value
+    ) {
+      void loadRepoInfo();
+    }
+  },
+);
 
 // A cached (keep-alive) page that is hidden does not keep retrying in the
 // background; it checks again when it is shown, if it never got its answer.
@@ -1736,7 +1532,12 @@ onActivated(() => {
 });
 
 async function toggleLike() {
-  if (isCompositeHeader.value && repoInfo.value?.private) return;
+  if (
+    isCompositeHeader.value &&
+    props.repoType !== "space" &&
+    repoInfo.value?.private
+  )
+    return;
   if (!authStore.isAuthenticated) {
     ElMessage.warning("Please login to like repositories");
     return;
@@ -2556,63 +2357,11 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.repository-info-sidebar {
+  top: calc(var(--repository-sticky-offset, 0px) + 16px);
+}
 .repository-page {
   min-width: 0;
-}
-.repository-file-list {
-  border: 1px solid var(--site-border);
-  border-radius: 8px;
-}
-.repository-storage-size {
-  color: var(--site-muted);
-  font-size: 13px;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.repository-branch-select {
-  width: 132px;
-  min-width: 132px;
-  flex: none;
-}
-.repository-branch-select :deep(.el-select__wrapper) {
-  min-height: 34px;
-  padding: 7px 12px;
-  border-radius: 8px;
-  background: var(--site-card);
-  box-shadow: 0 0 0 1px var(--site-border) inset;
-}
-.repository-branch-select :deep(.el-select__wrapper:hover) {
-  background: var(--site-hover);
-}
-.repository-branch-select :deep(.el-select__prefix),
-.repository-branch-select :deep(.el-select__caret) {
-  color: var(--site-muted);
-}
-.repository-branch-select :deep(.el-select__selected-item) {
-  color: var(--site-card-text);
-  font-weight: 600;
-  font-size: 13px;
-}
-.repository-branch-select :deep(.el-select__caret) {
-  font-size: 12px;
-}
-.repository-file-filter :deep(.el-input__wrapper) {
-  min-height: 34px;
-  border-radius: 8px;
-}
-.repository-upload-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 34px;
-  margin: 0;
-  padding: 7px 12px;
-  border: 1px solid var(--site-border);
-  border-radius: 8px;
-  font-size: 13px;
-  line-height: 18px;
-  white-space: nowrap;
 }
 .repository-history-navigation {
   display: flex;

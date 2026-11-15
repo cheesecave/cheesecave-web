@@ -99,11 +99,15 @@ describe("shared repository creation form", () => {
     );
     // Backend namespace creation currently permits every organization membership.
     expect(
-      wrapper.findAll("option").map((option) => option.element.value),
+      wrapper
+        .findAll('select[aria-label="Select owner"] option')
+        .map((option) => option.element.value),
     ).toEqual(["alice", "team", "visitors"]);
     await wrapper.get('select[aria-label="Select owner"]').setValue("team");
     await wrapper.get('input[placeholder="my-dataset"]').setValue("data.v1");
-    await wrapper.get('input[type="checkbox"]').setValue(true);
+    await wrapper
+      .get('select[aria-label="Repository visibility"]')
+      .setValue("private");
     await button(wrapper, "Create Dataset").trigger("click");
     await flushPromises();
     expect(mocks.create).toHaveBeenCalledWith({
@@ -111,6 +115,7 @@ describe("shared repository creation form", () => {
       name: "data.v1",
       organization: "team",
       private: true,
+      invite_mode: false,
     });
     expect(mocks.push).toHaveBeenCalledWith("/datasets/team/data.v1");
     expect(wrapper.emitted("created")).toEqual([
@@ -124,14 +129,38 @@ describe("shared repository creation form", () => {
     await wrapper
       .get('input[placeholder="my-awesome-model"]')
       .setValue("draft");
-    await wrapper.get('input[type="checkbox"]').setValue(true);
+    await wrapper
+      .get('select[aria-label="Repository visibility"]')
+      .setValue("invite");
     await button(wrapper, "Cancel").trigger("click");
     expect(wrapper.emitted("cancel")).toHaveLength(1);
     expect(
       wrapper.get('input[placeholder="my-awesome-model"]').element.value,
     ).toBe("");
-    expect(wrapper.get('input[type="checkbox"]').element.checked).toBe(false);
+    expect(
+      wrapper.get('select[aria-label="Repository visibility"]').element.value,
+    ).toBe("public");
     expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("creates an invitation repository as private with invitation mode enabled", async () => {
+    const wrapper = mountForm();
+    await flushPromises();
+    await wrapper
+      .get('input[placeholder="my-awesome-model"]')
+      .setValue("invited");
+    await wrapper
+      .get('select[aria-label="Repository visibility"]')
+      .setValue("invite");
+    await button(wrapper, "Create Model").trigger("click");
+    await flushPromises();
+    expect(mocks.create).toHaveBeenCalledWith({
+      type: "model",
+      name: "invited",
+      organization: null,
+      private: true,
+      invite_mode: true,
+    });
   });
 
   it("says so when the user's organizations cannot be listed", async () => {
@@ -219,6 +248,7 @@ describe("shared repository creation form", () => {
         name: "demo",
         organization: null,
         private: false,
+        invite_mode: false,
         sdk: "static",
       });
     });
@@ -256,6 +286,7 @@ describe("shared repository creation form", () => {
         name: "m",
         organization: null,
         private: false,
+        invite_mode: false,
       });
     });
 

@@ -10,19 +10,22 @@ const ROOT_TABS = new Set(["card", "metadata"]);
 const REPO_DETAIL_ROUTES = new Map([
   ["/[type]s/[namespace]/[name]/blob/[branch]/[...file]", "blob"],
   ["/[type]s/[namespace]/[name]/commit/[commit_id]", "commit"],
+  ["/[type]s/[namespace]/[name]/settings", "settings"],
 ]);
 const loadRepoViewer = () => import("../components/repo/RepoViewer.vue");
 
 /** Repository chrome also applies to file details, settings and editing routes. */
 export function isRepositoryRoute(route) {
-  return /^\/(?:models|datasets)\/[^/]+\/[^/]+(?:\/|$)/.test(route.path || "");
+  return /^\/(?:models|datasets|spaces)\/[^/]+\/[^/]+(?:\/|$)/.test(
+    route.path || "",
+  );
 }
 
-/** Model/dataset browsing shares the header, including file and commit details. */
+/** Repository browsing, details and Settings share the same header. */
 export function isCompositeRepositoryRoute(route) {
   return (
     (REPO_VIEW_ROUTES.has(route.name) || REPO_DETAIL_ROUTES.has(route.name)) &&
-    ["model", "dataset"].includes(route.params?.type)
+    ["model", "dataset", "space"].includes(route.params?.type)
   );
 }
 
@@ -61,7 +64,9 @@ export function createRepoViewRoutes(routes) {
         tab === "card" && ROOT_TABS.has(resolvedRoute.query.tab)
           ? resolvedRoute.query.tab
           : detailView
-            ? "files"
+            ? detailView === "settings"
+              ? "settings"
+              : "files"
             : tab,
       ...(detailView ? { detailView, detailKey: resolvedRoute.path } : {}),
     });
