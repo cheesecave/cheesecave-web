@@ -70,6 +70,28 @@ describe("sanitizeMermaidSvg: links in a diagram", () => {
   });
 });
 
+describe("sanitizeMermaidSvg: animation can not set a script link", () => {
+  it.each([
+    ["animate", `<animate attributeName="href" to="javascript:alert(1)"/>`],
+    ["set", `<set attributeName="xlink:href" to="javascript:alert(1)"/>`],
+    [
+      "animate with values",
+      `<animate attributeName="href" values="javascript:alert(1)"/>`,
+    ],
+    [
+      "animateMotion",
+      `<animateMotion attributeName="href" to="javascript:alert(1)"/>`,
+    ],
+  ])("removes %s that would set href to a script URL", (_, animation) => {
+    const out = sanitizeMermaidSvg(
+      `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><a>${animation}<text>Node</text></a></svg>`,
+    );
+    expect(out).not.toMatch(/javascript:/i);
+    expect(out).not.toMatch(/<(animate|set|animateMotion)/i);
+    expect(out).toContain("Node");
+  });
+});
+
 describe("sanitizeMermaidSvg: the labels of a diagram", () => {
   // Mermaid draws most node labels as HTML inside <foreignObject>; dropping them drops the text of the diagram
   const htmlLabel = (inner) =>

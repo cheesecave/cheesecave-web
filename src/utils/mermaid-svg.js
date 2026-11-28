@@ -1,20 +1,10 @@
-// Mermaid's strict mode already cleans the labels it draws. What is left to remove here: elements that run code or
-// load other documents, every event-handler attribute, and link targets that are not web, mail or in-page links.
-// (DOMPurify's SVG profile would also drop the HTML labels inside <foreignObject>, so it is not used here.)
-const FORBIDDEN_ELEMENTS = new Set([
-  "script",
-  "iframe",
-  "frame",
-  "frameset",
-  "object",
-  "embed",
-  "applet",
-  "meta",
-  "link",
-  "base",
-  "form",
-]);
+import DOMPurify from "isomorphic-dompurify";
+
+// Mermaid's strict mode already cleans the labels it draws. This pass is the second layer: DOMPurify in the HTML
+// context that innerHTML uses, with the HTML labels of a diagram (<foreignObject>) kept, animation elements removed
+// (they can set an href to a script URL), and every link target checked against web, mail and in-page targets.
 const ALLOWED_LINK_SCHEMES = new Set(["http:", "https:", "mailto:"]);
+const LINK_ATTRIBUTES = new Set(["href", "xlink:href"]);
 
 // Browsers ignore spaces, tabs and control characters inside a scheme, so they are removed before the check.
 function isSafeLink(value) {
@@ -23,30 +13,38 @@ function isSafeLink(value) {
   return !scheme || ALLOWED_LINK_SCHEMES.has(scheme[0]);
 }
 
+function dropUnsafeLinks(data) {
+  if (LINK_ATTRIBUTES.has(data.attrName) && !isSafeLink(data.attrValue)) {
+    data.keepAttr = false;
+  }
+}
+
 /**
- * Make a diagram's SVG safe to insert.
+ * Make a diagram's SVG safe to insert as markup.
  * @param {string} svg - SVG text as Mermaid returns it
  * @returns {string} - SVG text that is safe to insert
  */
 export function sanitizeMermaidSvg(svg) {
   if (!svg) return "";
-  const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
-  for (const element of [...doc.querySelectorAll("*")]) {
-    if (FORBIDDEN_ELEMENTS.has(element.localName.toLowerCase())) {
-      element.remove();
-      continue;
-    }
-    for (const attribute of [...element.attributes]) {
-      const name = attribute.name.toLowerCase();
-      if (
-        name.startsWith("on") ||
-        (attribute.localName === "href" && !isSafeLink(attribute.value))
-      ) {
-        element.removeAttributeNode(attribute);
-      }
-    }
+  // The hook is attached only for this call: the Markdown sanitizer shares this DOMPurify instance
+  DOMPurify.addHook("uponSanitizeAttribute", dropUnsafeLinks);
+  try {
+    return DOMPurify.sanitize(svg, {
+      USE_PROFILES: { svg: true, svgFilters: true, html: true },
+      ADD_TAGS: ["foreignObject"],
+      HTML_INTEGRATION_POINTS: { foreignobject: true },
+      FORBID_TAGS: [
+        "script",
+        "animate",
+        "set",
+        "animatemotion",
+        "animatetransform",
+        "discard",
+      ],
+    });
+  } finally {
+    DOMPurify.removeHook("uponSanitizeAttribute", dropUnsafeLinks);
   }
-  return new XMLSerializer().serializeToString(doc.documentElement);
 }
 
 /**
