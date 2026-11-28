@@ -11,6 +11,7 @@
 
 <script setup>
 import { HEADING_ID_PREFIX, renderMarkdown } from "@/utils/markdown";
+import { mermaidErrorBox, sanitizeMermaidSvg } from "@/utils/mermaid-svg";
 import { useThemeStore } from "@/stores/theme";
 import mermaid from "mermaid";
 import Panzoom from "panzoom";
@@ -161,7 +162,8 @@ const isDark = computed(() => themeStore.isDark);
 // Use Mermaid's built-in themes - they're designed properly
 const getMermaidConfig = (dark) => ({
   startOnLoad: false,
-  securityLevel: "loose",
+  // "strict": Mermaid drops script-scheme click links itself; the SVG is also sanitized before it is inserted
+  securityLevel: "strict",
   fontFamily: "ui-sans-serif, system-ui, sans-serif",
   theme: dark ? "dark" : "default",
   logLevel: "fatal", // Only log fatal errors, suppress warnings
@@ -206,15 +208,7 @@ async function renderMermaidDiagrams() {
         await renderSingleDiagram(wrapper, code, i);
       } catch (err) {
         console.error("Mermaid rendering error:", err);
-        const errorDiv = document.createElement("div");
-        errorDiv.className = "mermaid-error";
-        errorDiv.innerHTML = `
-          <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-4 text-sm">
-            <div class="font-semibold text-red-600 dark:text-red-400 mb-2">Mermaid Rendering Error</div>
-            <div class="text-red-700 dark:text-red-300">${err.message}</div>
-          </div>
-        `;
-        pre.parentElement?.insertBefore(errorDiv, pre);
+        pre.parentElement?.insertBefore(mermaidErrorBox(err.message), pre);
       }
     }
   } else if (existingWrappers.length > 0) {
@@ -260,7 +254,8 @@ async function renderSingleDiagram(wrapper, code, index) {
     return; // Exit early
   }
 
-  container.innerHTML = svg;
+  // Every diagram passes here (first render and theme re-render): sanitize before it becomes page markup
+  container.innerHTML = sanitizeMermaidSvg(svg);
 
   // Get SVG element
   const svgElement = container.querySelector("svg");

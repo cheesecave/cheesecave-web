@@ -23,13 +23,16 @@ vi.mock("panzoom", () => ({
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
 import { useThemeStore } from "@/stores/theme";
 
-const DIAGRAM = "```mermaid\nflowchart LR\n  A --> B\n  click A \"x\"\n```\n";
+const DIAGRAM = '```mermaid\nflowchart LR\n  A --> B\n  click A "x"\n```\n';
 const scriptLinkSvg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 200 40"><a href="javascript:(function(){document.body.dataset.pwned='1'})()" xlink:href="javascript:(function(){document.body.dataset.pwned='1'})()"><text x="5" y="20">Click me</text></a></svg>`;
 const httpsLinkSvg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 200 40"><a href="https://example.com/docs"><text x="5" y="20">Docs</text></a></svg>`;
 
 let wrapper;
 const mountViewer = (content = DIAGRAM) => {
-  wrapper = mount(MarkdownViewer, { props: { content }, attachTo: document.body });
+  wrapper = mount(MarkdownViewer, {
+    props: { content },
+    attachTo: document.body,
+  });
   return wrapper;
 };
 const anchorsInDiagrams = () =>
@@ -69,7 +72,9 @@ describe("a diagram with a script link", () => {
     await flushPromises();
 
     expect(document.querySelector(".mermaid-diagram svg")).not.toBeNull();
-    expect(document.querySelector(".mermaid-diagram")?.innerHTML).toContain("Click me");
+    expect(document.querySelector(".mermaid-diagram")?.innerHTML).toContain(
+      "Click me",
+    );
     for (const { href, xlink } of anchorsInDiagrams()) {
       expect(href ?? "").not.toMatch(/^\s*javascript:/i);
       expect(xlink ?? "").not.toMatch(/^\s*javascript:/i);
@@ -98,14 +103,18 @@ describe("a diagram with an ordinary https link", () => {
     mountViewer();
     await flushPromises();
 
-    expect(anchorsInDiagrams().map((a) => a.href)).toContain("https://example.com/docs");
+    expect(anchorsInDiagrams().map((a) => a.href)).toContain(
+      "https://example.com/docs",
+    );
   });
 });
 
 describe("a diagram that fails to render", () => {
   it("shows a fixed message, and an error text that looks like markup stays text", async () => {
     mermaid.render.mockRejectedValue(
-      new Error(`Parse error: <img src=x onerror="document.body.dataset.pwned='1'">`),
+      new Error(
+        `Parse error: <img src=x onerror="document.body.dataset.pwned='1'">`,
+      ),
     );
     mountViewer();
     await flushPromises();

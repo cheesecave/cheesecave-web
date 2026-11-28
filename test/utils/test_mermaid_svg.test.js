@@ -10,7 +10,9 @@ const svgWithLink = (href, attr = "href") =>
 const hrefsOf = (svg) => {
   const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
   return [...doc.querySelectorAll("a")].map(
-    (a) => a.getAttribute("href") ?? a.getAttributeNS("http://www.w3.org/1999/xlink", "href"),
+    (a) =>
+      a.getAttribute("href") ??
+      a.getAttributeNS("http://www.w3.org/1999/xlink", "href"),
   );
 };
 
@@ -29,7 +31,9 @@ describe("sanitizeMermaidSvg: links in a diagram", () => {
   });
 
   it("drops a script-scheme link written in xlink:href too", () => {
-    const out = sanitizeMermaidSvg(svgWithLink("javascript:alert(1)", "xlink:href"));
+    const out = sanitizeMermaidSvg(
+      svgWithLink("javascript:alert(1)", "xlink:href"),
+    );
     expect(out).not.toMatch(/javascript:/i);
   });
 
@@ -68,7 +72,9 @@ describe("sanitizeMermaidSvg: links in a diagram", () => {
 
 describe("mermaidErrorBox: the error text is text, never markup", () => {
   it("shows the message as text and creates no element from it", () => {
-    const box = mermaidErrorBox(`bad <img src=x onerror="window.pwned=1"> line`);
+    const box = mermaidErrorBox(
+      `bad <img src=x onerror="window.pwned=1"> line`,
+    );
     expect(box.textContent).toContain("bad <img src=x onerror=");
     expect(box.querySelector("img")).toBeNull();
     expect(box.querySelector("[onerror]")).toBeNull();
