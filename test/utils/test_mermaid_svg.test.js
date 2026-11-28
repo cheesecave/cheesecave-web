@@ -70,6 +70,37 @@ describe("sanitizeMermaidSvg: links in a diagram", () => {
   });
 });
 
+describe("sanitizeMermaidSvg: the labels of a diagram", () => {
+  // Mermaid draws most node labels as HTML inside <foreignObject>; dropping them drops the text of the diagram
+  const htmlLabel = (inner) =>
+    `<svg xmlns="http://www.w3.org/2000/svg"><foreignObject width="80" height="30">` +
+    `<div xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel">${inner}</span></div>` +
+    `</foreignObject></svg>`;
+
+  it("keeps an HTML label inside foreignObject, with its text", () => {
+    const out = sanitizeMermaidSvg(htmlLabel("Click me"));
+    expect(out).toContain("foreignObject");
+    expect(out).toContain("Click me");
+  });
+
+  it("removes script and handlers from an HTML label", () => {
+    const out = sanitizeMermaidSvg(
+      htmlLabel(
+        `<img src="x" onerror="window.pwned=1"/>ok<script>window.pwned=2</script>`,
+      ),
+    );
+    expect(out).toContain("ok");
+    expect(out).not.toMatch(/onerror|<script|window\.pwned/i);
+  });
+
+  it("drops a script-scheme link inside an HTML label", () => {
+    const out = sanitizeMermaidSvg(
+      htmlLabel(`<a href="javascript:alert(1)">x</a>`),
+    );
+    expect(out).not.toMatch(/javascript:/i);
+  });
+});
+
 describe("mermaidErrorBox: the error text is text, never markup", () => {
   it("shows the message as text and creates no element from it", () => {
     const box = mermaidErrorBox(

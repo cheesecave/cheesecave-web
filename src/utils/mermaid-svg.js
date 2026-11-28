@@ -1,38 +1,52 @@
-import DOMPurify from "isomorphic-dompurify";
-
-// Mermaid output is SVG that the page inserts as markup, so it gets the same care as Markdown HTML. Its links are the
-// one place a diagram can run script (a `click` directive): only web, mail and in-page or relative targets survive.
+// Mermaid's strict mode already cleans the labels it draws. What is left to remove here: elements that run code or
+// load other documents, every event-handler attribute, and link targets that are not web, mail or in-page links.
+// (DOMPurify's SVG profile would also drop the HTML labels inside <foreignObject>, so it is not used here.)
+const FORBIDDEN_ELEMENTS = new Set([
+  "script",
+  "iframe",
+  "frame",
+  "frameset",
+  "object",
+  "embed",
+  "applet",
+  "meta",
+  "link",
+  "base",
+  "form",
+]);
 const ALLOWED_LINK_SCHEMES = new Set(["http:", "https:", "mailto:"]);
 
 // Browsers ignore spaces, tabs and control characters inside a scheme, so they are removed before the check.
 function isSafeLink(value) {
-  const compact = value.replace(/[\u0000- \u007f]/g, "").toLowerCase();
+  const compact = value.replace(/[\u0000-\u0020\u007f]/g, "").toLowerCase();
   const scheme = compact.match(/^[a-z][a-z0-9+.-]*:/);
   return !scheme || ALLOWED_LINK_SCHEMES.has(scheme[0]);
 }
 
 /**
- * Make a diagram's SVG safe to insert: script-scheme link targets are removed, then the markup is sanitized.
+ * Make a diagram's SVG safe to insert.
  * @param {string} svg - SVG text as Mermaid returns it
  * @returns {string} - SVG text that is safe to insert
  */
 export function sanitizeMermaidSvg(svg) {
   if (!svg) return "";
   const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
-  for (const element of doc.querySelectorAll("*")) {
+  for (const element of [...doc.querySelectorAll("*")]) {
+    if (FORBIDDEN_ELEMENTS.has(element.localName.toLowerCase())) {
+      element.remove();
+      continue;
+    }
     for (const attribute of [...element.attributes]) {
-      if (attribute.localName === "href" && !isSafeLink(attribute.value)) {
+      const name = attribute.name.toLowerCase();
+      if (
+        name.startsWith("on") ||
+        (attribute.localName === "href" && !isSafeLink(attribute.value))
+      ) {
         element.removeAttributeNode(attribute);
       }
     }
   }
-  return DOMPurify.sanitize(
-    new XMLSerializer().serializeToString(doc.documentElement),
-    {
-      USE_PROFILES: { svg: true, svgFilters: true },
-      FORBID_TAGS: ["script"],
-    },
-  );
+  return new XMLSerializer().serializeToString(doc.documentElement);
 }
 
 /**
