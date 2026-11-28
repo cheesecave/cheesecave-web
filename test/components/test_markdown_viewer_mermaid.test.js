@@ -21,6 +21,7 @@ vi.mock("panzoom", () => ({
 }));
 
 import MarkdownViewer from "@/components/common/MarkdownViewer.vue";
+import DOMPurify from "isomorphic-dompurify";
 import { useThemeStore } from "@/stores/theme";
 
 const DIAGRAM = '```mermaid\nflowchart LR\n  A --> B\n  click A "x"\n```\n';
@@ -123,5 +124,33 @@ describe("a diagram that fails to render", () => {
     expect(shown).toContain("Diagram Syntax Error");
     expect(document.querySelector(".mermaid-wrapper img")).toBeNull();
     expect(document.body.dataset.pwned).toBeUndefined();
+  });
+});
+
+describe("a failure after rendering, while the diagram is inserted", () => {
+  it("shows the error box with its message as text, and nothing it contains runs", async () => {
+    const original = DOMPurify.sanitize.bind(DOMPurify);
+    const spy = vi
+      .spyOn(DOMPurify, "sanitize")
+      .mockImplementation((input, config) => {
+        if (String(input).includes("<svg")) {
+          throw new Error(
+            `boom <img src=x onerror="document.body.dataset.pwned='1'">`,
+          );
+        }
+        return original(input, config);
+      });
+    try {
+      mermaid.render.mockResolvedValue({ svg: httpsLinkSvg });
+      mountViewer();
+      await flushPromises();
+
+      const box = document.querySelector(".mermaid-error");
+      expect(box?.textContent).toContain("boom <img src=x onerror=");
+      expect(box?.querySelector("img")).toBeNull();
+      expect(document.body.dataset.pwned).toBeUndefined();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

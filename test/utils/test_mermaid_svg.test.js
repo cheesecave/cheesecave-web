@@ -18,6 +18,8 @@ const hrefsOf = (svg) => {
 
 describe("sanitizeMermaidSvg: links in a diagram", () => {
   it.each([
+    ["ftp://files.example/x"],
+    ["tel:+15550100"],
     ["javascript:alert(1)"],
     ["JaVaScRiPt:alert(1)"],
     [" javascript:alert(1)"],

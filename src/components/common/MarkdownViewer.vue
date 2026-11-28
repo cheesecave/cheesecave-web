@@ -194,6 +194,8 @@ async function renderMermaidDiagrams() {
       const block = mermaidBlocks[i];
       const code = block.textContent;
       const pre = block.parentElement;
+      // What stands in the document for this block: the code block, then its wrapper once it is replaced
+      let placeholder = pre;
 
       try {
         // Create wrapper for diagram + controls
@@ -203,12 +205,13 @@ async function renderMermaidDiagrams() {
 
         // Replace immediately
         pre.replaceWith(wrapper);
+        placeholder = wrapper;
 
         // Render diagram into wrapper
         await renderSingleDiagram(wrapper, code, i);
       } catch (err) {
         console.error("Mermaid rendering error:", err);
-        pre.parentElement?.insertBefore(mermaidErrorBox(err.message), pre);
+        placeholder.replaceWith(mermaidErrorBox(err.message));
       }
     }
   } else if (existingWrappers.length > 0) {

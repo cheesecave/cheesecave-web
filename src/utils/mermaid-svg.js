@@ -13,9 +13,10 @@ function isSafeLink(value) {
   return !scheme || ALLOWED_LINK_SCHEMES.has(scheme[0]);
 }
 
-function dropUnsafeLinks(data) {
-  if (LINK_ATTRIBUTES.has(data.attrName) && !isSafeLink(data.attrValue)) {
-    data.keepAttr = false;
+// DOMPurify calls an attribute hook as (node, event)
+function dropUnsafeLinks(node, event) {
+  if (LINK_ATTRIBUTES.has(event.attrName) && !isSafeLink(event.attrValue)) {
+    event.keepAttr = false;
   }
 }
 
